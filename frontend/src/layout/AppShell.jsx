@@ -21,6 +21,7 @@ import {
 } from "lucide-react";
 import { Brand } from "../components/Brand.jsx";
 import { PersonaSwitcher } from "../components/PersonaSwitcher.jsx";
+import { NotificationBell } from "../features/notifications/NotificationBell.jsx";
 import { api } from "../services/api-client.js";
 
 export function AppShell({
@@ -339,11 +340,15 @@ export function AppShell({
               onSwitch={onSwitchPersona}
             />
 
-            {/* Notification Bell */}
-            <button type="button" className="notification-bell-btn" title="Notifications">
-              <Bell size={17} />
-              <span className="notification-badge-dot" />
-            </button>
+            {/* Notification Bell & Pipeline Drawer (TASK-304) */}
+            <NotificationBell
+              onNavigateTask={(taskId) => {
+                setSection("tasks");
+                window.dispatchEvent(
+                  new CustomEvent("teamguard:navigate-task", { detail: { taskId: Number(taskId) } })
+                );
+              }}
+            />
 
             {/* User Profile Card */}
             <div className="user-profile-widget" onClick={() => setUserMenuOpen(!userMenuOpen)}>

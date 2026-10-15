@@ -110,6 +110,28 @@ export function KanbanBoardView({ user, activeOrg, userPermissions, onShowNotice
     return () => window.removeEventListener("teamguard:workspace-purged", handlePurge);
   }, []);
 
+  // TASK-304: Deep-link task navigation from notification drawer
+  useEffect(() => {
+    async function handleNavigate(e) {
+      const taskId = e.detail?.taskId;
+      if (!taskId) return;
+      let target = tasks.find((t) => t.id === Number(taskId));
+      if (!target) {
+        try {
+          const res = await api.getTask(taskId);
+          target = res.task || res;
+        } catch {
+          // ignore error
+        }
+      }
+      if (target) {
+        openTaskDetail(target);
+      }
+    }
+    window.addEventListener("teamguard:navigate-task", handleNavigate);
+    return () => window.removeEventListener("teamguard:navigate-task", handleNavigate);
+  }, [tasks]);
+
   // Reset pagination page when filters change
   useEffect(() => {
     setCurrentPage(1);

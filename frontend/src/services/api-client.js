@@ -352,4 +352,25 @@ export const api = {
       method: "POST",
       body: { roleId, permissionId, enabled },
     }),
+
+  // Notifications (TASK-304 / US-NOTIF-001 & TG-NOTIF-001)
+  getNotifications: (params = {}) => {
+    let queryStr = "";
+    if (params) {
+      const q = new URLSearchParams();
+      if (params.unreadOnly) q.set("unreadOnly", "true");
+      if (params.page) q.set("page", params.page);
+      if (params.limit) q.set("limit", params.limit);
+      const s = q.toString();
+      queryStr = s ? `?${s}` : "";
+    }
+    return request(`/notifications${queryStr}`);
+  },
+  getUnreadNotificationCount: () => request("/notifications/unread-count"),
+  markNotificationAsRead: (id) => request(`/notifications/${id}/read`, { method: "PATCH" }),
+  markAllNotificationsAsRead: () => request("/notifications/mark-all-read", { method: "PATCH" }),
+  deleteNotification: (id) => request(`/notifications/${id}`, { method: "DELETE" }),
+  clearReadNotifications: () => request("/notifications/clear-read", { method: "DELETE" }),
 };
+
+export const apiClient = api;

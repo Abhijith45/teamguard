@@ -1,6 +1,7 @@
 import { prisma } from "../../config/prisma.js";
 import { logAuditEvent } from "./audit.service.js";
 import { sanitizeCommentContent } from "../utils/sanitize.js";
+import { dispatchWorkspaceEvent } from "./event-dispatcher.service.js";
 
 export const EDIT_WINDOW_MS = 15 * 60 * 1000; // 15 minutes in milliseconds
 
@@ -201,6 +202,22 @@ export async function createCommentService({
     ipAddress,
     userAgent,
   });
+
+  const parentTask = await prisma.task.findUnique({
+    where: { id: taskId },
+    select: { id: true, title: true, creatorId: true, assigneeId: true, organizationId: true },
+  });
+
+  if (parentTask) {
+    dispatchWorkspaceEvent("comment:created", {
+      organizationId,
+      taskId,
+      commentId: comment.id,
+      actorId: userId,
+      comment,
+      task: parentTask,
+    });
+  }
 
   return { comment };
 }
