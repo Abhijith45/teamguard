@@ -270,7 +270,7 @@ Work is sequenced strictly by technical dependencies, security invariants, and r
 - **Linked User Stories**: `US-AUTH-004`, `US-TENANT-003`
 - **Linked PRD Features**: `TG-AUTH-004`, `TG-TENANT-003`
 - **Priority**: High (P1)
-- **Status**: Remediation Implementation Required
+- **Status**: Implemented & Verified (TIER-2 & TIER-3)
 - **Affected Files**: [frontend/src/context/AuthContext.jsx](file:///c:/Users/Abhijeet%20Rawat/Desktop/rbac/frontend/src/context/AuthContext.jsx), [frontend/src/AppShell.jsx](file:///c:/Users/Abhijeet%20Rawat/Desktop/rbac/frontend/src/AppShell.jsx)
 - **Implementation Steps**:
   1. In `switchOrganization`, invoke `queryClient.clear()` to completely wipe React Query cache.
