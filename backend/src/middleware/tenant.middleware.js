@@ -14,21 +14,16 @@ export async function resolveTenant(req, res, next) {
     }
 
     const headerOrgId = req.get("x-organization-id");
-    let targetOrgId = headerOrgId ? Number(headerOrgId) : null;
-
-    // If no org specified in header, fallback to the user's first active membership
-    if (!targetOrgId || !Number.isSafeInteger(targetOrgId)) {
-      const firstMembership = await prisma.membership.findFirst({
-        where: { userId, status: "ACTIVE" },
-        orderBy: { joinedAt: "asc" },
-        select: { organizationId: true },
-      });
-
-      if (!firstMembership) {
-        return res.status(403).json({ error: "No active organization memberships found for this account" });
-      }
-      targetOrgId = firstMembership.organizationId;
+    if (!headerOrgId || typeof headerOrgId !== "string" || !headerOrgId.trim()) {
+      return res.status(400).json({ error: "x-organization-id header is required" });
     }
+
+    const trimmed = headerOrgId.trim();
+    if (!/^[1-9]\d*$/.test(trimmed) || !Number.isSafeInteger(Number(trimmed))) {
+      return res.status(400).json({ error: "Invalid x-organization-id header: must be a positive integer" });
+    }
+
+    const targetOrgId = Number(trimmed);
 
     // Verify membership in requested organization
     const membership = await prisma.membership.findUnique({

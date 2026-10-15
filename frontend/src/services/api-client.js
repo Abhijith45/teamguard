@@ -7,10 +7,12 @@ export function setAccessToken(token) { accessToken = token; }
 export function clearAccessToken() { accessToken = null; }
 
 export function setActiveOrgId(orgId) {
-  activeOrganizationId = orgId ? Number(orgId) : null;
-  if (activeOrganizationId) {
-    localStorage.setItem("teamguard_active_org", String(activeOrganizationId));
+  const parsed = orgId ? Number(orgId) : null;
+  if (parsed && Number.isSafeInteger(parsed) && parsed > 0) {
+    activeOrganizationId = parsed;
+    localStorage.setItem("teamguard_active_org", String(parsed));
   } else {
+    activeOrganizationId = null;
     localStorage.removeItem("teamguard_active_org");
   }
 }
@@ -18,9 +20,23 @@ export function setActiveOrgId(orgId) {
 export function getActiveOrgId() {
   if (!activeOrganizationId) {
     const saved = localStorage.getItem("teamguard_active_org");
-    if (saved) activeOrganizationId = Number(saved);
+    if (saved) {
+      const parsed = Number(saved);
+      if (Number.isSafeInteger(parsed) && parsed > 0) {
+        activeOrganizationId = parsed;
+      } else {
+        localStorage.removeItem("teamguard_active_org");
+        activeOrganizationId = null;
+      }
+    }
   }
   return activeOrganizationId;
+}
+
+function isTenantScoped(path) {
+  if (path.startsWith("/auth/") || path.startsWith("/demo/")) return false;
+  if (path === "/organizations" || path === "/organizations/") return false;
+  return true;
 }
 
 async function readResponse(response) {
@@ -65,7 +81,16 @@ async function request(path, options = {}, retry = true) {
   if (options.body !== undefined) headers.set("Content-Type", "application/json");
   if (accessToken) headers.set("Authorization", `Bearer ${accessToken}`);
   const currentOrgId = getActiveOrgId();
-  if (currentOrgId && !headers.has("x-organization-id")) {
+  if (isTenantScoped(path)) {
+    if (currentOrgId && !headers.has("x-organization-id")) {
+      headers.set("x-organization-id", String(currentOrgId));
+    } else if (!headers.has("x-organization-id")) {
+      const error = new Error("No organization selected. Please select a workspace.");
+      error.status = 400;
+      error.code = "NO_ORGANIZATION_SELECTED";
+      throw error;
+    }
+  } else if (currentOrgId && !headers.has("x-organization-id")) {
     headers.set("x-organization-id", String(currentOrgId));
   }
 
