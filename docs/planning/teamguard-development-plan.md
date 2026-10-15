@@ -311,8 +311,8 @@ Work is sequenced strictly by technical dependencies, security invariants, and r
 - **Linked User Stories**: `US-AUTH-001`, `US-AUTH-002`, `US-AUTH-003`, `US-AUTH-005`, `US-ACC-001`
 - **Linked PRD Features**: `TG-AUTH-001`, `TG-AUTH-002`, `TG-AUTH-003`, `TG-AUTH-005`, `TG-ACC-001`
 - **Priority**: High (P1)
-- **Status**: Hardening Required
-- **Affected Files**: [backend/src/services/token.service.js](file:///c:/Users/Abhijeet%20Rawat/Desktop/rbac/backend/src/services/token.service.js), [backend/src/controllers/auth.controller.js](file:///c:/Users/Abhijeet%20Rawat/Desktop/rbac/backend/src/controllers/auth.controller.js)
+- **Status**: Complete / Verified
+- **Affected Files**: [backend/src/services/auth.service.js](file:///c:/Users/Abhijeet%20Rawat/Desktop/rbac/backend/src/services/auth.service.js), [backend/src/controllers/auth.controller.js](file:///c:/Users/Abhijeet%20Rawat/Desktop/rbac/backend/src/controllers/auth.controller.js), [backend/src/routes/auth.routes.js](file:///c:/Users/Abhijeet%20Rawat/Desktop/rbac/backend/src/routes/auth.routes.js), [frontend/src/features/account/AccountPage.jsx](file:///c:/Users/Abhijeet%20Rawat/Desktop/rbac/frontend/src/features/account/AccountPage.jsx), [backend/test/auth.test.js](file:///c:/Users/Abhijeet%20Rawat/Desktop/rbac/backend/test/auth.test.js)
 - **Implementation Steps**:
   1. Ensure `RefreshSession` rotates on every refresh request.
   2. On detection of an already-used refresh token, revoke all sessions sharing that `familyId` (`revokedAt = now()`).

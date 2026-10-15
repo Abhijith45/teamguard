@@ -224,6 +224,9 @@ export const api = {
   refresh: refreshSession,
   logout: () => request("/auth/logout", { method: "POST" }),
   me: () => request("/auth/me"),
+  updateProfile: (body) => request("/auth/profile", { method: "PATCH", body }),
+  changePassword: (body) => request("/auth/change-password", { method: "POST", body }),
+  cleanupSessions: (body = {}) => request("/auth/sessions/cleanup", { method: "POST", body }),
 
   // Demo Persona Switcher
   switchPersona: (persona, organizationSlug = "acme-corp") =>

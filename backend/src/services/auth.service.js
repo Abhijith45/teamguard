@@ -109,16 +109,18 @@ export async function getPublicUser(userId, requestedOrgId = null) {
   };
 }
 
-async function createSession(userId, metadata, activeOrgId = null) {
+async function createSession(userId, metadata = {}, activeOrgId = null) {
   const refresh = createRefreshToken();
+  const familyId = refresh.sessionId;
   await prisma.refreshSession.create({
     data: {
       id: refresh.sessionId,
+      familyId,
       userId,
       tokenHash: refresh.tokenHash,
       expiresAt: refreshTokenExpiry(),
-      userAgent: metadata.userAgent,
-      ipAddress: metadata.ipAddress,
+      userAgent: metadata?.userAgent ?? null,
+      ipAddress: metadata?.ipAddress ?? null,
     },
   });
 
@@ -126,6 +128,8 @@ async function createSession(userId, metadata, activeOrgId = null) {
     user: await getPublicUser(userId, activeOrgId),
     accessToken: signAccessToken(userId),
     refreshToken: refresh.token,
+    sessionId: refresh.sessionId,
+    familyId,
   };
 }
 
@@ -133,6 +137,18 @@ export async function registerUser(input, metadata) {
   const passwordHash = await hashPassword(input.password);
   const normalizedUsername = input.username.trim().toLowerCase();
   const normalizedEmail = input.email.trim().toLowerCase();
+
+  const existing = await prisma.user.findFirst({
+    where: {
+      OR: [{ email: normalizedEmail }, { username: normalizedUsername }],
+    },
+  });
+  if (existing) {
+    if (existing.email === normalizedEmail) {
+      throw new HttpError(409, "An account with this email already exists");
+    }
+    throw new HttpError(409, "An account with this username already exists");
+  }
 
   const user = await prisma.$transaction(async (tx) => {
     // 1. Create user
@@ -215,7 +231,7 @@ export async function loginUser(identifier, password, metadata, activeOrgId = nu
   return createSession(user.id, metadata, activeOrgId);
 }
 
-export async function rotateRefreshToken(token, metadata, activeOrgId = null) {
+export async function rotateRefreshToken(token, metadata = {}, activeOrgId = null) {
   if (!token) throw new HttpError(401, "Refresh session is required");
 
   const current = await prisma.refreshSession.findUnique({
@@ -224,13 +240,23 @@ export async function rotateRefreshToken(token, metadata, activeOrgId = null) {
   if (!current) throw new HttpError(401, "Refresh session is invalid");
 
   const now = new Date();
-  if (current.revokedAt) {
+  const familyId = current.familyId || current.id;
+
+  // 1. Replay / Reuse Detection:
+  // If an already-rotated or already-revoked token is re-presented,
+  // invalidate the entire session family immediately to prevent replay attacks.
+  if (current.revokedAt || current.rotatedAt) {
     await prisma.refreshSession.updateMany({
-      where: { userId: current.userId, revokedAt: null },
+      where: {
+        OR: [{ familyId }, { id: current.id }],
+        revokedAt: null,
+      },
       data: { revokedAt: now },
     });
-    throw new HttpError(401, "Refresh token reuse detected; sign in again");
+    throw new HttpError(401, "Refresh token reuse detected; session family invalidated");
   }
+
+  // 2. Expiration check
   if (current.expiresAt <= now) {
     await prisma.refreshSession.updateMany({
       where: { id: current.id, revokedAt: null },
@@ -239,6 +265,7 @@ export async function rotateRefreshToken(token, metadata, activeOrgId = null) {
     throw new HttpError(401, "Refresh session has expired");
   }
 
+  // 3. Atomic Token Rotation within the Family
   const next = createRefreshToken();
   await prisma.$transaction(async (tx) => {
     const revoked = await tx.refreshSession.updateMany({
@@ -256,11 +283,12 @@ export async function rotateRefreshToken(token, metadata, activeOrgId = null) {
     await tx.refreshSession.create({
       data: {
         id: next.sessionId,
+        familyId,
         userId: current.userId,
         tokenHash: next.tokenHash,
         expiresAt: refreshTokenExpiry(now),
-        userAgent: metadata.userAgent,
-        ipAddress: metadata.ipAddress,
+        userAgent: metadata?.userAgent ?? current.userAgent,
+        ipAddress: metadata?.ipAddress ?? current.ipAddress,
       },
     });
   });
@@ -269,17 +297,147 @@ export async function rotateRefreshToken(token, metadata, activeOrgId = null) {
     user: await getPublicUser(current.userId, activeOrgId),
     accessToken: signAccessToken(current.userId),
     refreshToken: next.token,
+    sessionId: next.sessionId,
+    familyId,
   };
 }
 
 export async function revokeRefreshToken(token) {
   if (!token) return;
-  await prisma.refreshSession.updateMany({
-    where: { tokenHash: hashRefreshToken(token), revokedAt: null },
-    data: { revokedAt: new Date() },
+  const hash = hashRefreshToken(token);
+  const current = await prisma.refreshSession.findUnique({
+    where: { tokenHash: hash },
   });
+  if (!current) return;
+
+  const now = new Date();
+  const familyId = current.familyId || current.id;
+
+  await prisma.refreshSession.updateMany({
+    where: {
+      OR: [{ familyId }, { id: current.id }],
+      revokedAt: null,
+    },
+    data: { revokedAt: now },
+  });
+}
+
+export async function revokeAllUserSessions(userId, exceptToken = null) {
+  const now = new Date();
+  let exceptId = null;
+  if (exceptToken) {
+    const current = await prisma.refreshSession.findUnique({
+      where: { tokenHash: hashRefreshToken(exceptToken) },
+    });
+    if (current) exceptId = current.id;
+  }
+
+  const where = {
+    userId: Number(userId),
+    revokedAt: null,
+  };
+  if (exceptId) {
+    where.id = { not: exceptId };
+  }
+
+  return prisma.refreshSession.updateMany({
+    where,
+    data: { revokedAt: now },
+  });
+}
+
+export async function cleanupExpiredSessions({ olderThanDays = 30 } = {}) {
+  const now = new Date();
+  const revokedCutoff = new Date(now.getTime() - olderThanDays * 24 * 60 * 60 * 1000);
+
+  const result = await prisma.refreshSession.deleteMany({
+    where: {
+      OR: [
+        { expiresAt: { lt: now } },
+        { revokedAt: { not: null, lt: revokedCutoff } },
+      ],
+    },
+  });
+
+  return {
+    deletedCount: result.count,
+    timestamp: now.toISOString(),
+  };
+}
+
+export async function updateUserProfile(userId, { name, email, avatarUrl, username }, activeOrgId = null) {
+  const user = await prisma.user.findUnique({ where: { id: Number(userId) } });
+  if (!user) throw new HttpError(404, "User not found");
+
+  const updateData = {};
+
+  if (name !== undefined) {
+    updateData.name = name.trim();
+  }
+
+  if (email !== undefined) {
+    const normalizedEmail = email.trim().toLowerCase();
+    if (normalizedEmail !== user.email) {
+      const existing = await prisma.user.findUnique({ where: { email: normalizedEmail } });
+      if (existing && existing.id !== user.id) {
+        throw new HttpError(409, "Email is already in use by another account");
+      }
+      updateData.email = normalizedEmail;
+    }
+  }
+
+  if (username !== undefined) {
+    const normalizedUsername = username.trim().toLowerCase();
+    if (normalizedUsername !== user.username) {
+      const existing = await prisma.user.findUnique({ where: { username: normalizedUsername } });
+      if (existing && existing.id !== user.id) {
+        throw new HttpError(409, "Username is already in use by another account");
+      }
+      updateData.username = normalizedUsername;
+    }
+  }
+
+  if (avatarUrl !== undefined) {
+    updateData.avatarUrl = avatarUrl ? avatarUrl.trim() : null;
+  }
+
+  if (Object.keys(updateData).length > 0) {
+    await prisma.user.update({
+      where: { id: user.id },
+      data: updateData,
+    });
+  }
+
+  return getPublicUser(user.id, activeOrgId);
+}
+
+export async function changeUserPassword(userId, { currentPassword, newPassword, revokeOtherSessions = true }, currentRefreshToken = null) {
+  const user = await prisma.user.findUnique({ where: { id: Number(userId) } });
+  if (!user) throw new HttpError(404, "User not found");
+
+  const matches = await bcrypt.compare(currentPassword, user.passwordHash);
+  if (!matches) {
+    throw new HttpError(401, "Current password is incorrect");
+  }
+
+  if (currentPassword === newPassword) {
+    throw new HttpError(400, "New password cannot be the same as current password");
+  }
+
+  const newHash = await hashPassword(newPassword);
+  await prisma.user.update({
+    where: { id: user.id },
+    data: { passwordHash: newHash },
+  });
+
+  if (revokeOtherSessions) {
+    await revokeAllUserSessions(user.id, currentRefreshToken);
+  }
+
+  return { success: true, message: "Password updated successfully" };
 }
 
 export async function getCurrentUser(userId, activeOrgId = null) {
   return getPublicUser(userId, activeOrgId);
 }
+
