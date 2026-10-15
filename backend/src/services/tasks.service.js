@@ -1,5 +1,6 @@
 import { prisma } from "../../config/prisma.js";
 import { logAuditEvent } from "./audit.service.js";
+import { dispatchWorkspaceEvent } from "./event-dispatcher.service.js";
 
 /**
  * Tasks Service (TASK-203 — Task Core CRUD, Validation, Status Workflow & Priority Engine)
@@ -429,6 +430,24 @@ export async function createTaskService({ organizationId, actorId, input, permis
     },
   });
 
+  dispatchWorkspaceEvent("task:created", {
+    organizationId,
+    taskId: task.id,
+    actorId,
+    task,
+  });
+
+  if (task.assigneeId) {
+    dispatchWorkspaceEvent("task:assigned", {
+      organizationId,
+      taskId: task.id,
+      actorId,
+      task,
+      previousAssigneeId: null,
+      newAssigneeId: task.assigneeId,
+    });
+  }
+
   return task;
 }
 
@@ -544,6 +563,28 @@ export async function updateTaskService({
     resourceId: String(taskId),
     details: input,
   });
+
+  if (input.status !== undefined && existing.status !== updated.status) {
+    dispatchWorkspaceEvent("task:status_changed", {
+      organizationId,
+      taskId: updated.id,
+      actorId,
+      task: updated,
+      previousStatus: existing.status,
+      newStatus: updated.status,
+    });
+  }
+
+  if (input.assigneeId !== undefined && existing.assigneeId !== updated.assigneeId) {
+    dispatchWorkspaceEvent("task:assigned", {
+      organizationId,
+      taskId: updated.id,
+      actorId,
+      task: updated,
+      previousAssigneeId: existing.assigneeId,
+      newAssigneeId: updated.assigneeId,
+    });
+  }
 
   return updated;
 }

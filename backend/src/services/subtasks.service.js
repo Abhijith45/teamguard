@@ -1,5 +1,6 @@
 import { prisma } from "../../config/prisma.js";
 import { logAuditEvent } from "./audit.service.js";
+import { dispatchWorkspaceEvent } from "./event-dispatcher.service.js";
 
 /**
  * Calculates completion progress for an array of subtask items.
@@ -271,6 +272,23 @@ export async function updateSubtaskService({
     details: { taskId, isCompleted: updated.isCompleted, title: updated.title },
     outcome: "SUCCESS",
   });
+
+  if (updated.isCompleted && !existing.isCompleted) {
+    const parentTask = await prisma.task.findUnique({
+      where: { id: taskId },
+      select: { id: true, title: true, creatorId: true, assigneeId: true, organizationId: true },
+    });
+    if (parentTask) {
+      dispatchWorkspaceEvent("subtask:completed", {
+        organizationId,
+        taskId,
+        subtaskId: updated.id,
+        actorId: userId,
+        subtask: updated,
+        task: parentTask,
+      });
+    }
+  }
 
   return {
     subtask: updated,

@@ -637,18 +637,20 @@ Work is sequenced strictly by technical dependencies, security invariants, and r
 - **Linked User Stories**: `US-NOTIF-001`, `US-NOTIF-002`
 - **Linked PRD Features**: `TG-NOTIF-001`, `TG-NOTIF-002`
 - **Priority**: Medium (P2)
-- **Status**: Implementation Required
-- **Affected Files**: `backend/src/services/event-dispatcher.service.js`, `frontend/src/components/NotificationBell.jsx`
+- **Status**: Completed (Sprint 3 / Phase 3)
+- **Affected Files**: `backend/prisma/schema.prisma`, `backend/src/services/event-dispatcher.service.js`, `backend/src/services/notifications.service.js`, `backend/src/controllers/notifications.controller.js`, `backend/src/routes/notifications.routes.js`, `backend/test/notifications.test.js`, `frontend/src/features/notifications/NotificationBell.jsx`, `frontend/src/features/notifications/NotificationDrawer.jsx`, `frontend/src/features/notifications/notificationUtils.js`, `frontend/src/features/notifications/notification.test.js`, `frontend/src/services/api-client.js`, `frontend/src/layout/AppShell.jsx`, `frontend/src/App.css`
 - **Implementation Steps**:
-  1. Build decoupled in-process `EventEmitter` dispatching structured workspace events (`task:created`, `comment:added`).
-  2. Persist notification rows to database for offline recipients.
-  3. Connect in-app notification bell with unread badge counter.
-- **Data/API Impact**: Adds `Notification` table via migration.
-- **Security Considerations**: Notifications filtered strictly by organization and recipient permissions.
-- **Dependencies & Blockers**: TASK-302.
-- **Test Plan**: Unit test verifying notification row creation on task assignment.
-- **Acceptance Criteria**: Unread counter increments; mark-as-read clears counter.
-- **Definition of Done**: Dispatcher and bell UI operational.
+  1. Relational schema addition: `Notification` model with relations to `Organization` and `User` (recipients and actors) with cascade deletion and compound indexing.
+  2. Built decoupled in-process `workspaceEventEmitter` in `event-dispatcher.service.js` listening for `task:created`, `task:assigned`, `task:status_changed`, `comment:created`, and `subtask:completed`.
+  3. Enforced strict self-notification prevention invariant (`actorId !== recipientId`) and active tenant membership barrier.
+  4. Implemented full REST API endpoints: `GET /api/notifications` (with pagination and unread filter), `GET /unread-count`, `PATCH /:id/read`, `PATCH /mark-all-read`, `DELETE /:id`, and `DELETE /clear-read`.
+  5. Built topbar `NotificationBell` with animated unread badge counter, polling sync, and slide-over `NotificationDrawer` with relative times, type badges, mark-as-read, clear-read, and deep-linking into tasks.
+- **Data/API Impact**: `Notification` model active with indexes on `[organizationId, userId, isRead]` and `[userId, createdAt]`.
+- **Security Considerations**: All notification queries and mutations strictly scoped to `organizationId` and `req.auth.userId` (zero-leak cross-user/tenant isolation).
+- **Dependencies & Blockers**: TASK-302, TASK-303 (Resolved).
+- **Test Plan**: 18 comprehensive backend integration tests in `backend/test/notifications.test.js` (246/246 total pass rate); 4 unit tests in `frontend/src/features/notifications/notification.test.js` (41/41 total pass rate).
+- **Acceptance Criteria**: Unread counter increments; mark-as-read clears counter; deep-links open target tasks.
+- **Definition of Done**: Dispatcher, REST APIs, bell UI, and slide-over drawer fully operational and verified.
 - **Effort Estimate**: M (2 business days).
 - **Risk & Rollback**: Low risk.
 
