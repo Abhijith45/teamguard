@@ -354,18 +354,18 @@ Work is sequenced strictly by technical dependencies, security invariants, and r
 - **Linked User Stories**: `US-TENANT-004`, `US-INV-004`, `US-INV-005`
 - **Linked PRD Features**: `TG-TENANT-004`, `TG-INV-001`
 - **Priority**: High (P1)
-- **Status**: Implementation Required
-- **Affected Files**: [backend/src/controllers/users.controller.js](file:///c:/Users/Abhijeet%20Rawat/Desktop/rbac/backend/src/controllers/users.controller.js), [frontend/src/views/MembersView.jsx](file:///c:/Users/Abhijeet%20Rawat/Desktop/rbac/frontend/src/views/MembersView.jsx)
+- **Status**: Complete / Verified (TIER-2 & TIER-3)
+- **Affected Files**: [backend/src/controllers/members.controller.js](file:///c:/Users/Abhijeet%20Rawat/Desktop/rbac/backend/src/controllers/members.controller.js), [backend/src/routes/members.routes.js](file:///c:/Users/Abhijeet%20Rawat/Desktop/rbac/backend/src/routes/members.routes.js), [backend/test/members.test.js](file:///c:/Users/Abhijeet%20Rawat/Desktop/rbac/backend/test/members.test.js), [frontend/src/features/members/MembersView.jsx](file:///c:/Users/Abhijeet%20Rawat/Desktop/rbac/frontend/src/features/members/MembersView.jsx), [frontend/src/services/api-client.js](file:///c:/Users/Abhijeet%20Rawat/Desktop/rbac/frontend/src/services/api-client.js)
 - **Implementation Steps**:
   1. Create `GET /api/members` returning tenant members, status, and role names.
-  2. Implement `PATCH /api/members/:id/role` guarded by `roles:assign`.
-  3. Enforce last-owner safeguard: prevent deactivation/removal of the final `Owner` / `Super Admin`.
-- **Data/API Impact**: Updates `MembershipRole` and `Membership` records.
-- **Security Considerations**: Prevents accidental organizational orphan state.
+  2. Implement `PATCH /api/members/:id/role` guarded by `members:manage`.
+  3. Enforce last-owner safeguard: prevent deactivation/removal/demotion of the final `Owner` / `Super Admin`.
+- **Data/API Impact**: Updates `MembershipRole` and `Membership` records; records audit events.
+- **Security Considerations**: Prevents accidental organizational orphan state (BR-010).
 - **Dependencies & Blockers**: TASK-001.
-- **Test Plan**: Integration test asserting 403 when removing the only active owner.
-- **Acceptance Criteria**: Member directory loads; last owner cannot be deactivated.
-- **Definition of Done**: Controller and UI connected with automated tests.
+- **Test Plan**: Integration tests asserting 403 when demoting, deactivating, or removing the only active owner (`backend/test/members.test.js`).
+- **Acceptance Criteria**: Member directory loads; last owner cannot be demoted, deactivated, or removed; role reassignment and department edits update state cleanly with audit trail.
+- **Definition of Done**: Controller, routes, client service, and UI connected with automated tests passing (10/10 test vectors).
 - **Effort Estimate**: M (2 business days).
 - **Risk & Rollback**: Low risk.
 
@@ -1089,7 +1089,7 @@ Activated only after stakeholder decisions UD-001 through UD-005 are formally ra
 | **Authentication & Accounts** | 5 | 5 | 5 Verified | `TASK-003`, `TASK-004`, `TASK-005` |
 | **Multi-Tenant Organizations** | 5 | 4 | 5 Verified | `TASK-001`, `TASK-003`, `TASK-004`, `TASK-006`, `TASK-101`, `TASK-102` |
 | **Platform Administration** | 2 | 1 | 2 Blocked (UD-001) | `TASK-501 (Blocked)` |
-| **Invitations & Onboarding** | 5 | 1 | 2 Planned, 3 Blocked (UD-005) | `TASK-101`, `TASK-505 (Blocked)` |
+| **Invitations & Onboarding** | 5 | 1 | 2 Verified, 3 Blocked (UD-005) | `TASK-101`, `TASK-505 (Blocked)` |
 | **RBAC Administration** | 7 | 8 | 4 Verified, 3 Planned | `TASK-102`, `TASK-103`, `TASK-104` |
 | **ABAC & Policy Engine** | 4 | 3 | 2 Verified, 1 Planned, 1 Blocked | `TASK-002`, `TASK-203`, `TASK-506 (Blocked)` |
 | **Project Management** | 5 | 5 | 1 Verified, 4 Planned | `TASK-201`, `TASK-202` |

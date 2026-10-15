@@ -250,6 +250,8 @@ export default function App() {
         <MembersView
           key={`members-${activeOrg?.id}`}
           activeOrg={activeOrg}
+          currentUser={user}
+          onShowNotice={showNotice}
         />
       )}
 

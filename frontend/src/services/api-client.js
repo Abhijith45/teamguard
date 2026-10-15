@@ -235,10 +235,19 @@ export const api = {
       body: { persona, organizationSlug },
     }),
 
-  // Organizations
+  // Organizations & Members (TASK-101)
   getOrganizations: () => request("/organizations"),
   createOrganization: (body) => request("/organizations", { method: "POST", body }),
-  getMembers: () => request("/organizations/members"),
+  getMembers: (params = "") => request(`/members${params ? `?${params}` : ""}`),
+  getMemberRoles: () => request("/members/roles"),
+  reassignMemberRole: (membershipId, roleId) =>
+    request(`/members/${membershipId}/role`, { method: "PATCH", body: { roleId } }),
+  updateMemberDepartment: (membershipId, department) =>
+    request(`/members/${membershipId}/department`, { method: "PATCH", body: { department } }),
+  updateMemberStatus: (membershipId, status) =>
+    request(`/members/${membershipId}/status`, { method: "PATCH", body: { status } }),
+  removeMember: (membershipId) =>
+    request(`/members/${membershipId}`, { method: "DELETE" }),
 
   // Dashboard
   getDashboard: () => request("/dashboard"),

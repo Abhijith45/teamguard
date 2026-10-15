@@ -1,9 +1,9 @@
 import { Router } from "express";
 import {
   createOrganization,
-  listMembers,
   listOrganizations,
 } from "../controllers/organizations.controller.js";
+import { listMembers } from "../controllers/members.controller.js";
 import { authenticate } from "../middleware/authenticate.js";
 import { resolveTenant } from "../middleware/tenant.middleware.js";
 
