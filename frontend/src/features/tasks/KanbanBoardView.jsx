@@ -275,10 +275,10 @@ export function KanbanBoardView({ user, activeOrg, userPermissions, onShowNotice
               type="button"
               className={`filter-btn ${filterPriority !== "ALL" ? "active" : ""}`}
               onClick={() => {
-                const next = filterPriority === "ALL" ? "HIGH" : filterPriority === "HIGH" ? "MEDIUM" : filterPriority === "MEDIUM" ? "LOW" : "ALL";
+                const next = filterPriority === "ALL" ? "URGENT" : filterPriority === "URGENT" ? "HIGH" : filterPriority === "HIGH" ? "MEDIUM" : filterPriority === "MEDIUM" ? "LOW" : "ALL";
                 setFilterPriority(next);
               }}
-              title="Cycle filter: All -> High -> Medium -> Low"
+              title="Cycle filter: All -> Urgent -> High -> Medium -> Low"
             >
               <Filter size={15} />
               <span>Priority: {filterPriority}</span>
@@ -574,6 +574,7 @@ export function KanbanBoardView({ user, activeOrg, userPermissions, onShowNotice
                     <option value="LOW">Low</option>
                     <option value="MEDIUM">Medium</option>
                     <option value="HIGH">High</option>
+                    <option value="URGENT">Urgent</option>
                   </select>
                 </div>
               </div>
@@ -765,6 +766,7 @@ export function KanbanBoardView({ user, activeOrg, userPermissions, onShowNotice
                   <option value="LOW">Low</option>
                   <option value="MEDIUM">Medium</option>
                   <option value="HIGH">High</option>
+                  <option value="URGENT">Urgent</option>
                 </select>
               </div>
 

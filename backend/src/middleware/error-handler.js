@@ -16,7 +16,15 @@ export function errorHandler(error, _req, res, _next) {
     console.error(error);
   }
 
-  return res.status(statusCode).json({
+  const payload = {
     error: statusCode >= 500 ? "Internal server error" : error.message,
-  });
+  };
+  if (error.code && typeof error.code === "string" && !error.code.startsWith("P2")) {
+    payload.code = error.code;
+  }
+  if (error.field) {
+    payload.field = error.field;
+  }
+
+  return res.status(statusCode).json(payload);
 }

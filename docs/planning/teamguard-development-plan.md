@@ -482,18 +482,20 @@ Work is sequenced strictly by technical dependencies, security invariants, and r
 - **Linked User Stories**: `US-TASK-001`, `US-TASK-002`, `US-TASK-003`, `US-TASK-006`, `US-ABAC-001`, `US-ABAC-002`
 - **Linked PRD Features**: `TG-TASK-001`, `TG-TASK-002`, `TG-TASK-003`, `TG-TASK-006`, `TG-ABAC-001`, `TG-ABAC-002`
 - **Priority**: Critical (P0)
-- **Status**: Verified in Baseline / Expansion Required
-- **Affected Files**: [backend/src/controllers/tasks.controller.js](file:///c:/Users/Abhijeet%20Rawat/Desktop/rbac/backend/src/controllers/tasks.controller.js), [backend/src/services/tasks.service.js](file:///c:/Users/Abhijeet%20Rawat/Desktop/rbac/backend/src/services/tasks.service.js)
+- **Status**: Complete / Verified (TIER-1, TIER-2 & TIER-3)
+- **Affected Files**: [backend/src/controllers/tasks.controller.js](file:///c:/Users/Abhijeet%20Rawat/Desktop/rbac/backend/src/controllers/tasks.controller.js), [backend/src/services/tasks.service.js](file:///c:/Users/Abhijeet%20Rawat/Desktop/rbac/backend/src/services/tasks.service.js), [backend/test/tasks.test.js](file:///c:/Users/Abhijeet%20Rawat/Desktop/rbac/backend/test/tasks.test.js)
 - **Implementation Steps**:
-  1. Validate title, priority (`LOW`, `MEDIUM`, `HIGH`, `URGENT`), status (`TODO`, `IN_PROGRESS`, `REVIEW`, `DONE`).
-  2. When moving to `DONE`, set `completedAt = now()`.
-  3. Enforce ABAC ownership checks (creator vs assignee vs admin) with structured 403 error codes.
-- **Data/API Impact**: Task CRUD endpoints.
-- **Security Considerations**: Rigorous negative tests for unauthorized status mutations.
-- **Dependencies & Blockers**: TASK-001, TASK-002.
-- **Test Plan**: Tests #2 and #4 in `backend/test/rbac.test.js` verified; add unit tests for priority transitions.
-- **Acceptance Criteria**: State machine transitions work smoothly; negative tests return 403.
-- **Definition of Done**: 100% test pass on task workflow suite.
+  1. Validate title, priority (`LOW`, `MEDIUM`, `HIGH`, `URGENT`), status (`TODO`, `IN_PROGRESS`, `REVISION` / `REVIEW`, `DONE`).
+  2. When moving to `DONE`, set `completedAt = now()`. When moving away from `DONE`, reset `completedAt = null`.
+  3. Enforce ABAC ownership checks (creator vs assignee vs admin) with structured 403 error codes (`CANNOT_UPDATE_OTHERS_TASK`).
+  4. Enforce protected governance fields barrier (`creatorId`, `projectId`, `assigneeId`) with `PROTECTED_FIELD_MUTATION` and prototype pollution defense.
+  5. Enforce project archival mutation freezing (`PROJECT_ARCHIVED`) across create, update, and delete.
+- **Data/API Impact**: Task CRUD endpoints (`GET /api/tasks`, `GET /api/tasks/:id`, `POST /api/tasks`, `PATCH /api/tasks/:id`, `DELETE /api/tasks/:id`). Added `completedAt` timestamp and composite indexes.
+- **Security Considerations**: Strict tenant isolation, zero-leak IDOR, ABAC ownership validation, and audit logging.
+- **Dependencies & Blockers**: TASK-001, TASK-002, TASK-201, TASK-202.
+- **Test Plan**: 28 automated integration tests in `backend/test/tasks.test.js` validating CRUD, priority engine, status workflow, completedAt, ABAC ownership, IDOR isolation, and archival freezing.
+- **Acceptance Criteria**: State machine transitions work smoothly; negative tests return 403; archival freezing enforced.
+- **Definition of Done**: 100% test pass on task workflow suite (28/28 tests passing).
 - **Effort Estimate**: M (2 business days).
 - **Risk & Rollback**: Low risk.
 
@@ -1095,9 +1097,9 @@ Activated only after stakeholder decisions UD-001 through UD-005 are formally ra
 | **Platform Administration** | 2 | 1 | 2 Blocked (UD-001) | `TASK-501 (Blocked)` |
 | **Invitations & Onboarding** | 5 | 1 | 2 Verified, 3 Blocked (UD-005) | `TASK-101`, `TASK-505 (Blocked)` |
 | **RBAC Administration** | 7 | 8 | 7 Verified, 0 Planned | `TASK-102`, `TASK-103`, `TASK-104` |
-| **ABAC & Policy Engine** | 4 | 3 | 2 Verified, 1 Planned, 1 Blocked | `TASK-002`, `TASK-203`, `TASK-506 (Blocked)` |
+| **ABAC & Policy Engine** | 4 | 3 | 3 Verified, 0 Planned, 1 Blocked | `TASK-002`, `TASK-203`, `TASK-506 (Blocked)` |
 | **Project Management** | 5 | 5 | 5 Verified, 0 Planned | `TASK-201`, `TASK-202` |
-| **Task Management** | 10 | 10 | 5 Verified, 5 Planned | `TASK-203`, `TASK-204`, `TASK-205`, `TASK-206` |
+| **Task Management** | 10 | 10 | 6 Verified, 4 Planned | `TASK-203`, `TASK-204`, `TASK-205`, `TASK-206` |
 | **Subtask Hierarchy** | 2 | 2 | 2 Planned | `TASK-301` |
 | **Collaboration & Comments** | 4 | 4 | 3 Planned, 1 Blocked (UD-004) | `TASK-302`, `TASK-504 (Blocked)` |
 | **Audit Logs & Compliance** | 2 | 2 | 2 Verified | `TASK-303` |

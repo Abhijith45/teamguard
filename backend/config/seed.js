@@ -446,7 +446,16 @@ async function main() {
     });
     if (!existing) {
       await prisma.task.create({
-        data: { ...t, organizationId: acme.id },
+        data: {
+          ...t,
+          completedAt: t.status === "DONE" ? new Date("2026-10-10T00:00:00.000Z") : null,
+          organizationId: acme.id,
+        },
+      });
+    } else if (existing.status === "DONE" && !existing.completedAt) {
+      await prisma.task.update({
+        where: { id: existing.id },
+        data: { completedAt: new Date("2026-10-10T00:00:00.000Z") },
       });
     }
   }
@@ -573,7 +582,16 @@ async function main() {
     });
     if (!existing) {
       await prisma.task.create({
-        data: { ...t, organizationId: nova.id },
+        data: {
+          ...t,
+          completedAt: t.status === "DONE" ? new Date("2026-10-10T00:00:00.000Z") : null,
+          organizationId: nova.id,
+        },
+      });
+    } else if (existing.status === "DONE" && !existing.completedAt) {
+      await prisma.task.update({
+        where: { id: existing.id },
+        data: { completedAt: new Date("2026-10-10T00:00:00.000Z") },
       });
     }
   }

@@ -266,6 +266,7 @@ export const api = {
 
   // Tasks
   getTasks: (params = "") => request(`/tasks${params ? `?${params}` : ""}`),
+  getTask: (id) => request(`/tasks/${id}`),
   createTask: (body) => request("/tasks", { method: "POST", body }),
   updateTask: (id, body) => request(`/tasks/${id}`, { method: "PATCH", body }),
   deleteTask: (id) => request(`/tasks/${id}`, { method: "DELETE" }),
