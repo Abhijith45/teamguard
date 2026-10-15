@@ -13,6 +13,7 @@ import tasksRoutes from "./routes/tasks.routes.js";
 import filesRoutes from "./routes/files.routes.js";
 import permissionsMatrixRoutes from "./routes/permissions-matrix.routes.js";
 import membersRoutes from "./routes/members.routes.js";
+import adminRoutes from "./routes/admin.routes.js";
 import demoRoutes from "./routes/demo.routes.js";
 import { errorHandler } from "./middleware/error-handler.js";
 
@@ -112,6 +113,7 @@ app.use("/api/projects", projectsRoutes);
 app.use("/api/tasks", tasksRoutes);
 app.use("/api/files", filesRoutes);
 app.use("/api/permissions-matrix", permissionsMatrixRoutes);
+app.use("/api/admin", adminRoutes);
 app.use("/api/demo", demoRoutes);
 
 app.use((_req, res) => {

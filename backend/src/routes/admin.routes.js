@@ -8,11 +8,12 @@ import {
 import { createRole, deleteRole, listRoles, replaceRolePermissions, updateRole } from "../controllers/roles.controller.js";
 import { createPermission, deletePermission, listPermissions } from "../controllers/permissions.controller.js";
 import { authenticate } from "../middleware/authenticate.js";
+import { resolveTenant } from "../middleware/tenant.middleware.js";
 import { requirePermission } from "../middleware/require-permission.js";
 
 const router = Router();
 
-router.use(authenticate);
+router.use(authenticate, resolveTenant);
 
 router.get("/users", requirePermission("users", "read"), listUsers);
 router.patch("/users/:userId/status", requirePermission("users", "manage"), setUserActive);

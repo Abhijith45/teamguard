@@ -96,10 +96,11 @@ export async function togglePermission(req, res, next) {
       return res.status(404).json({ error: "Role not found in this organization" });
     }
 
-    // Privilege escalation protection: prevent locking out Super Admin
-    if (role.name === "Super Admin" && !enabled) {
+    // Privilege escalation protection: prevent locking out Super Admin (US-RBAC-003 / BR-004 / SEC-05)
+    if ((role.name === "Super Admin" || role.slug === "super-admin" || role.slug === "owner") && !enabled) {
       return res.status(403).json({
         error: "Privilege Guard: Cannot revoke permissions from Super Admin role to prevent lockout",
+        code: "SUPER_ADMIN_LOCKOUT_PROTECTION",
       });
     }
 
