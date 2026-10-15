@@ -415,18 +415,19 @@ Work is sequenced strictly by technical dependencies, security invariants, and r
 - **Linked User Stories**: `US-RBAC-006`, `US-RBAC-007`
 - **Linked PRD Features**: `TG-RBAC-007`, `TG-RBAC-008`
 - **Priority**: Critical (P0)
-- **Status**: Implementation Required
-- **Affected Files**: [backend/src/middleware/rbac.middleware.js](file:///c:/Users/Abhijeet%20Rawat/Desktop/rbac/backend/src/middleware/rbac.middleware.js), [backend/src/controllers/roles.controller.js](file:///c:/Users/Abhijeet%20Rawat/Desktop/rbac/backend/src/controllers/roles.controller.js)
+- **Status**: Complete / Verified (TIER-1, TIER-2 & TIER-3)
+- **Affected Files**: [backend/src/middleware/rbac.middleware.js](file:///c:/Users/Abhijeet%20Rawat/Desktop/rbac/backend/src/middleware/rbac.middleware.js), [backend/src/controllers/roles.controller.js](file:///c:/Users/Abhijeet%20Rawat/Desktop/rbac/backend/src/controllers/roles.controller.js), [backend/src/controllers/permissions-matrix.controller.js](file:///c:/Users/Abhijeet%20Rawat/Desktop/rbac/backend/src/controllers/permissions-matrix.controller.js), [backend/src/controllers/members.controller.js](file:///c:/Users/Abhijeet%20Rawat/Desktop/rbac/backend/src/controllers/members.controller.js), [backend/test/delegation.test.js](file:///c:/Users/Abhijeet%20Rawat/Desktop/rbac/backend/test/delegation.test.js)
 - **Implementation Steps**:
-  1. In role creation/assignment, compare target permissions against caller's active permissions.
-  2. If target permission $\not\subset$ caller permissions, return `HTTP 403 Forbidden` (`{ "code": "DELEGATION_BARRIER_BREACH" }`).
-  3. Block `DELETE /api/roles/:id` if `isSystem = true`.
-- **Data/API Impact**: Validation barrier on role mutations.
-- **Security Considerations**: Prevents low-privilege actors from escalating to Super Admin.
+  1. Universal Privilege Delegation Barrier in `validateDelegationBarrier()`: compares target grant/clone/assignment permissions against caller's active workspace permissions (`req.userPermissions`).
+  2. If target permissions $\not\subseteq$ caller permissions, return `HTTP 403 Forbidden` (`{ "code": "DELEGATION_BARRIER_BREACH", "unauthorizedPermissions": [...] }`).
+  3. System Role Protection in `isSystemRole()`: blocks renaming and deletion (`DELETE /api/roles/:id` and `PATCH /api/roles/:id`) for system roles (`HTTP 403 Forbidden`, `{ "code": "SYSTEM_ROLE_IMMUTABLE" }`), while permitting metadata/description updates for authorized admins.
+  4. Super Admin lockout immutability guarded across discrete toggle, bulk toggle, and permission assignment endpoints.
+- **Data/API Impact**: Fail-closed validation barrier on role mutations (`POST /api/roles`, `PUT /api/roles/:id/permissions`, `POST /api/roles/:id/modules/:module/toggle`, `POST /api/permissions-matrix/toggle`, `PATCH /api/members/:membershipId/role`).
+- **Security Considerations**: Permanently blocks privilege escalation attacks (horizontal and vertical); prevents intermediate admins from granting or cloning unheld privileges or reassigning users to roles exceeding their authority.
 - **Dependencies & Blockers**: TASK-103.
-- **Test Plan**: Negative integration test asserting 403 when Project Manager tries to create role with `roles:manage`.
-- **Acceptance Criteria**: Delegation boundary strictly enforced; system roles immutable.
-- **Definition of Done**: Automated test passing in `backend/test/rbac.test.js`.
+- **Test Plan**: 14 automated integration vectors in `backend/test/delegation.test.js` validating cloning barriers, discrete and bulk toggling restrictions, member reassignment barriers, Super Admin unbounded authority, system role immutability, and cross-tenant isolation.
+- **Acceptance Criteria**: Delegation boundary strictly enforced across all 5 mutation vectors; system roles immutable; full test suite passing with 0 failures.
+- **Definition of Done**: Verified across Tier-1, Tier-2, and Tier-3; 14 test vectors passing in `backend/test/delegation.test.js`.
 - **Effort Estimate**: M (2 business days).
 - **Risk & Rollback**: Low risk.
 
@@ -1091,7 +1092,7 @@ Activated only after stakeholder decisions UD-001 through UD-005 are formally ra
 | **Multi-Tenant Organizations** | 5 | 4 | 5 Verified | `TASK-001`, `TASK-003`, `TASK-004`, `TASK-006`, `TASK-101`, `TASK-102` |
 | **Platform Administration** | 2 | 1 | 2 Blocked (UD-001) | `TASK-501 (Blocked)` |
 | **Invitations & Onboarding** | 5 | 1 | 2 Verified, 3 Blocked (UD-005) | `TASK-101`, `TASK-505 (Blocked)` |
-| **RBAC Administration** | 7 | 8 | 4 Verified, 3 Planned | `TASK-102`, `TASK-103`, `TASK-104` |
+| **RBAC Administration** | 7 | 8 | 7 Verified, 0 Planned | `TASK-102`, `TASK-103`, `TASK-104` |
 | **ABAC & Policy Engine** | 4 | 3 | 2 Verified, 1 Planned, 1 Blocked | `TASK-002`, `TASK-203`, `TASK-506 (Blocked)` |
 | **Project Management** | 5 | 5 | 1 Verified, 4 Planned | `TASK-201`, `TASK-202` |
 | **Task Management** | 10 | 10 | 5 Verified, 5 Planned | `TASK-203`, `TASK-204`, `TASK-205`, `TASK-206` |

@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { prisma } from "../../config/prisma.js";
 import { logAuditEvent } from "../services/audit.service.js";
+import { validateDelegationBarrier } from "../middleware/rbac.middleware.js";
 
 const toggleSchema = z.object({
   roleId: z.number().int().positive(),
@@ -112,6 +113,17 @@ export async function togglePermission(req, res, next) {
     }
 
     if (enabled) {
+      // Universal Privilege Delegation Barrier (US-RBAC-006 / TG-RBAC-007)
+      const grantKey = `${permission.resource}:${permission.action}`;
+      const delegationCheck = validateDelegationBarrier(req.userPermissions, [grantKey]);
+      if (!delegationCheck.allowed) {
+        return res.status(403).json({
+          error: "Privilege Delegation Barrier: Cannot grant permissions that you do not personally possess",
+          code: "DELEGATION_BARRIER_BREACH",
+          unauthorizedPermissions: delegationCheck.unauthorizedPermissions,
+        });
+      }
+
       await prisma.rolePermission.upsert({
         where: { roleId_permissionId: { roleId, permissionId } },
         update: {},
