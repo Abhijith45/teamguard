@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { prisma } from "../../config/prisma.js";
 import { logAuditEvent } from "../services/audit.service.js";
+import { isSystemRole, validateDelegationBarrier } from "../middleware/rbac.middleware.js";
 
 const createRoleSchema = z.object({
   name: z
@@ -94,6 +95,21 @@ export async function createRole(req, res, next) {
       }
 
       clonedPermissionIds = sourceRole.permissions.map((rp) => rp.permissionId);
+
+      // Universal Privilege Delegation Barrier (US-RBAC-006 / TG-RBAC-007)
+      if (clonedPermissionIds.length > 0) {
+        const clonedPerms = await prisma.permission.findMany({
+          where: { id: { in: clonedPermissionIds } },
+        });
+        const delegationCheck = validateDelegationBarrier(req.userPermissions, clonedPerms);
+        if (!delegationCheck.allowed) {
+          return res.status(403).json({
+            error: "Privilege Delegation Barrier: Cannot clone or grant permissions that you do not personally possess",
+            code: "DELEGATION_BARRIER_BREACH",
+            unauthorizedPermissions: delegationCheck.unauthorizedPermissions,
+          });
+        }
+      }
     }
 
     const newRole = await prisma.$transaction(async (tx) => {
@@ -170,10 +186,13 @@ export async function updateRole(req, res, next) {
       return res.status(404).json({ error: "Role not found in this organization" });
     }
 
-    // Protect system roles from being renamed
-    if (role.isSystem || ["admin", "user", "Super Admin"].includes(role.name) || ["super-admin", "admin", "owner"].includes(role.slug)) {
+    // System Role Protection (US-RBAC-007 / TG-RBAC-008)
+    if (isSystemRole(role)) {
       if (input.name && input.name !== role.name) {
-        return res.status(403).json({ error: "Cannot rename built-in system role" });
+        return res.status(403).json({
+          error: "Cannot rename built-in system role",
+          code: "SYSTEM_ROLE_IMMUTABLE",
+        });
       }
     }
 
@@ -259,6 +278,16 @@ export async function bulkToggleModulePermissions(req, res, next) {
     const permissionIds = permissions.map((p) => p.id);
 
     if (enabled) {
+      // Universal Privilege Delegation Barrier (US-RBAC-006 / TG-RBAC-007)
+      const delegationCheck = validateDelegationBarrier(req.userPermissions, permissions);
+      if (!delegationCheck.allowed) {
+        return res.status(403).json({
+          error: "Privilege Delegation Barrier: Cannot grant permissions that you do not personally possess",
+          code: "DELEGATION_BARRIER_BREACH",
+          unauthorizedPermissions: delegationCheck.unauthorizedPermissions,
+        });
+      }
+
       // Upsert permissions
       for (const pId of permissionIds) {
         await prisma.rolePermission.upsert({
@@ -332,9 +361,12 @@ export async function deleteRole(req, res, next) {
       return res.status(404).json({ error: "Role not found in this organization" });
     }
 
-    // System role protection (US-RBAC-003, US-RBAC-006, SEC-05)
-    if (role.isSystem || ["admin", "user", "Super Admin"].includes(role.name) || ["super-admin", "admin", "owner"].includes(role.slug)) {
-      return res.status(403).json({ error: "Cannot delete protected system role" });
+    // System role protection (US-RBAC-003, US-RBAC-007, TG-RBAC-008, SEC-05)
+    if (isSystemRole(role)) {
+      return res.status(403).json({
+        error: "Cannot delete protected system role",
+        code: "SYSTEM_ROLE_IMMUTABLE",
+      });
     }
 
     // Active member assignment guard (US-RBAC-006 AC 1)
@@ -388,6 +420,21 @@ export async function replaceRolePermissions(req, res, next) {
         return res.status(403).json({
           error: "Privilege Guard: Cannot revoke permissions from Super Admin role to prevent lockout",
           code: "SUPER_ADMIN_LOCKOUT_PROTECTION",
+        });
+      }
+    }
+
+    // Universal Privilege Delegation Barrier (US-RBAC-006 / TG-RBAC-007)
+    if (permissionIds.length > 0) {
+      const permsToGrant = await prisma.permission.findMany({
+        where: { id: { in: permissionIds } },
+      });
+      const delegationCheck = validateDelegationBarrier(req.userPermissions, permsToGrant);
+      if (!delegationCheck.allowed) {
+        return res.status(403).json({
+          error: "Privilege Delegation Barrier: Cannot grant permissions that you do not personally possess",
+          code: "DELEGATION_BARRIER_BREACH",
+          unauthorizedPermissions: delegationCheck.unauthorizedPermissions,
         });
       }
     }

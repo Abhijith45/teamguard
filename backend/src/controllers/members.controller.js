@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { prisma } from "../../config/prisma.js";
 import { logAuditEvent } from "../services/audit.service.js";
+import { validateDelegationBarrier } from "../middleware/rbac.middleware.js";
 
 const roleReassignSchema = z.object({
   roleId: z.number().int().positive().optional(),
@@ -252,6 +253,26 @@ export async function reassignMemberRole(req, res, next) {
           detail: "An organization must maintain at least one active Super Admin / Owner at all times.",
         });
       }
+    }
+
+    // 3b. Universal Privilege Delegation Barrier (US-RBAC-006 / TG-RBAC-007)
+    // An actor cannot assign a role granting permissions that exceed their own active authority.
+    const targetRolePermissions = await prisma.rolePermission.findMany({
+      where: { roleId: targetRole.id },
+      include: { permission: true },
+    });
+
+    const delegationCheck = validateDelegationBarrier(
+      req.userPermissions,
+      targetRolePermissions.map((rp) => rp.permission)
+    );
+
+    if (!delegationCheck.allowed) {
+      return res.status(403).json({
+        error: "Privilege Delegation Barrier: Cannot assign a role granting permissions you do not personally possess",
+        code: "DELEGATION_BARRIER_BREACH",
+        unauthorizedPermissions: delegationCheck.unauthorizedPermissions,
+      });
     }
 
     // 4. Atomically update membership roles
