@@ -142,6 +142,7 @@ model Task {
   assigneeId       Int?
   creatorId        Int
   dueDate          DateTime?
+  completedAt      DateTime?
   order            Int          @default(0)
   commentsCount    Int          @default(0)
   attachmentsCount Int          @default(0)
@@ -155,6 +156,9 @@ model Task {
   @@index([organizationId])
   @@index([projectId])
   @@index([assigneeId])
+  @@index([organizationId, status])
+  @@index([organizationId, priority])
+  @@index([organizationId, dueDate])
 }
 
 model FileAsset {

@@ -2,6 +2,7 @@ import { Router } from "express";
 import {
   createTask,
   deleteTask,
+  getTask,
   listTasks,
   updateTask,
 } from "../controllers/tasks.controller.js";
@@ -14,9 +15,10 @@ const router = Router();
 router.use(authenticate, resolveTenant);
 
 router.get("/", requirePermission("task", "view"), listTasks);
+router.get("/:taskId", requirePermission("task", "view"), getTask);
 router.post("/", requirePermission("task", "create"), createTask);
 
-// Update task: allow if user has either task:update:any or task:update:own (ABAC verified in controller)
+// Update task: allow if user has either task:update:any or task:update:own (ABAC verified in controller/service)
 router.patch("/:taskId", (req, res, next) => {
   const p = req.userPermissions;
   if (!p || (!p.has("task:update:any") && !p.has("task:update:own") && !p.has("task:manage"))) {
