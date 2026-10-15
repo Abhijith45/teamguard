@@ -24,7 +24,10 @@ const personaEmailMap = {
 export async function switchPersona(req, res, next) {
   try {
     const { persona, organizationSlug } = switchSchema.parse(req.body);
-    const targetEmail = personaEmailMap[persona];
+    let targetEmail = personaEmailMap[persona];
+    if (organizationSlug === "nova-labs" && persona === "super-admin") {
+      targetEmail = "elena@novalabs.io";
+    }
 
     const user = await prisma.user.findUnique({
       where: { email: targetEmail },

@@ -472,18 +472,137 @@ async function main() {
     }
   }
 
-  // 9. Initial Audit Log
-  await prisma.auditLog.create({
-    data: {
-      organizationId: acme.id,
-      actorId: annisa.id,
-      action: "organization:bootstrap",
-      resourceType: "Organization",
-      resourceId: String(acme.id),
-      details: "Organization Acme Corp initialized with default RBAC hierarchy and demo projects.",
-      outcome: "SUCCESS",
+  // 9. Initial Audit Log for Acme Corp
+  const existingAuditAcme = await prisma.auditLog.findFirst({
+    where: { organizationId: acme.id, action: "organization:bootstrap" },
+  });
+  if (!existingAuditAcme) {
+    await prisma.auditLog.create({
+      data: {
+        organizationId: acme.id,
+        actorId: annisa.id,
+        action: "organization:bootstrap",
+        resourceType: "Organization",
+        resourceId: String(acme.id),
+        details: "Organization Acme Corp initialized with default RBAC hierarchy and demo projects.",
+        outcome: "SUCCESS",
+      },
+    });
+  }
+
+  // 10. Reproducible Multi-Tenant Fixtures: Nova Labs (TASK-006 / US-DEV-001)
+  const elena = await prisma.user.upsert({
+    where: { email: "elena@novalabs.io" },
+    update: { name: "Dr. Elena Rostova", username: "elena" },
+    create: {
+      name: "Dr. Elena Rostova",
+      username: "elena",
+      email: "elena@novalabs.io",
+      passwordHash: defaultPasswordHash,
+      avatarUrl: "https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=120&auto=format&fit=crop&q=80",
     },
   });
+
+  const memElenaNova = await prisma.membership.upsert({
+    where: { userId_organizationId: { userId: elena.id, organizationId: nova.id } },
+    update: {},
+    create: { userId: elena.id, organizationId: nova.id, department: "Research & Development" },
+  });
+  await prisma.membershipRole.upsert({
+    where: { membershipId_roleId: { membershipId: memElenaNova.id, roleId: novaRoles.superAdminRole.id } },
+    update: {},
+    create: { membershipId: memElenaNova.id, roleId: novaRoles.superAdminRole.id },
+  });
+
+  // Nova Labs Projects
+  const novaProjectsData = [
+    { name: "Quantum Core Engine", description: "High-performance distributed engine", progress: 50, priority: "HIGH" },
+    { name: "BioSensor Firmware", description: "Embedded firmware and real-time calibration", progress: 20, priority: "MEDIUM" },
+  ];
+  const novaProjects = [];
+  for (const p of novaProjectsData) {
+    const existing = await prisma.project.findFirst({
+      where: { organizationId: nova.id, name: p.name },
+    });
+    if (existing) {
+      novaProjects.push(existing);
+    } else {
+      const created = await prisma.project.create({
+        data: { ...p, organizationId: nova.id },
+      });
+      novaProjects.push(created);
+    }
+  }
+
+  // Nova Labs Tasks
+  const novaTasksData = [
+    {
+      title: "Calibrate Spectral Sensor",
+      description: "Sensor calibration and sensitivity test runs.",
+      status: "TODO",
+      priority: "HIGH",
+      assigneeId: elena.id,
+      creatorId: elena.id,
+      commentsCount: 2,
+      attachmentsCount: 1,
+      projectId: novaProjects[0].id,
+    },
+    {
+      title: "Zero-Knowledge Proof Audit",
+      description: "Security assessment of cryptographic circuits.",
+      status: "IN_PROGRESS",
+      priority: "HIGH",
+      assigneeId: elena.id,
+      creatorId: elena.id,
+      commentsCount: 6,
+      attachmentsCount: 3,
+      projectId: novaProjects[1].id,
+    },
+  ];
+  for (const t of novaTasksData) {
+    const existing = await prisma.task.findFirst({
+      where: { organizationId: nova.id, title: t.title },
+    });
+    if (!existing) {
+      await prisma.task.create({
+        data: { ...t, organizationId: nova.id },
+      });
+    }
+  }
+
+  // Nova Labs Files
+  const novaFilesData = [
+    { name: "Quantum_Architecture.pdf", sizeBytes: 1540000, fileType: "PDF", uploadedById: elena.id, projectId: novaProjects[0].id },
+    { name: "Sensor_Calibration.csv", sizeBytes: 85000, fileType: "CSV", uploadedById: elena.id, projectId: novaProjects[1].id },
+  ];
+  for (const f of novaFilesData) {
+    const existing = await prisma.fileAsset.findFirst({
+      where: { organizationId: nova.id, name: f.name },
+    });
+    if (!existing) {
+      await prisma.fileAsset.create({
+        data: { ...f, organizationId: nova.id },
+      });
+    }
+  }
+
+  // Nova Labs Audit Log
+  const existingAuditNova = await prisma.auditLog.findFirst({
+    where: { organizationId: nova.id, action: "organization:bootstrap" },
+  });
+  if (!existingAuditNova) {
+    await prisma.auditLog.create({
+      data: {
+        organizationId: nova.id,
+        actorId: elena.id,
+        action: "organization:bootstrap",
+        resourceType: "Organization",
+        resourceId: String(nova.id),
+        details: "Organization Nova Labs initialized with multi-tenant research projects.",
+        outcome: "SUCCESS",
+      },
+    });
+  }
 
   console.log("TeamGuard seed completed successfully!");
 }
