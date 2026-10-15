@@ -152,6 +152,15 @@ export function KanbanBoardView({ user, activeOrg, userPermissions, onShowNotice
     );
   }
 
+  function handleCommentsCountChange(taskId, newCount) {
+    setTasks((prev) =>
+      prev.map((t) => (t.id === taskId ? { ...t, commentsCount: newCount } : t))
+    );
+    if (editingTask && editingTask.id === taskId) {
+      setEditingTask((prev) => ({ ...prev, commentsCount: newCount }));
+    }
+  }
+
   // Status transition with optimistic update and rollback (TASK-204)
   async function handleStatusChange(taskId, newStatus, e) {
     if (e) e.stopPropagation();
@@ -711,6 +720,15 @@ export function KanbanBoardView({ user, activeOrg, userPermissions, onShowNotice
                                 </span>
                               </span>
                             )}
+                            {Number(task.commentsCount) > 0 && (
+                              <span
+                                className="comment-card-badge"
+                                title={`Comments: ${task.commentsCount} discussion items`}
+                              >
+                                <MessageSquare size={11} />
+                                <span>{task.commentsCount}</span>
+                              </span>
+                            )}
                             <span className="counter-item" title="Associated project">
                               <Layers size={12} /> {task.project?.name || "Project"}
                             </span>
@@ -826,6 +844,9 @@ export function KanbanBoardView({ user, activeOrg, userPermissions, onShowNotice
           task={editingTask}
           projects={projects}
           members={members}
+          currentUser={user}
+          userPermissions={userPermissions}
+          userRoles={user?.roles || []}
           canEdit={canEditTask(editingTask)}
           canAssign={canAssign}
           canManageProjects={canManageProjects}
@@ -834,6 +855,7 @@ export function KanbanBoardView({ user, activeOrg, userPermissions, onShowNotice
           onSave={handleDrawerSave}
           onDelete={handleDrawerDelete}
           onSubtasksChange={handleSubtasksChange}
+          onCommentsCountChange={(count) => handleCommentsCountChange(editingTask.id, count)}
         />
       )}
 

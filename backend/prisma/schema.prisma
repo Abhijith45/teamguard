@@ -15,6 +15,7 @@ model Organization {
   projects    Project[]
   tasks       Task[]
   subtasks    Subtask[]
+  comments    Comment[]
   files       FileAsset[]
   auditLogs   AuditLog[]
   createdAt   DateTime     @default(now())
@@ -33,6 +34,7 @@ model User {
   refreshSessions RefreshSession[]
   createdTasks    Task[]           @relation("TaskCreator")
   assignedTasks   Task[]           @relation("TaskAssignee")
+  comments        Comment[]
   uploadedFiles   FileAsset[]
   auditLogs       AuditLog[]
   createdAt       DateTime         @default(now())
@@ -154,6 +156,7 @@ model Task {
   assignee         User?        @relation("TaskAssignee", fields: [assigneeId], references: [id], onDelete: SetNull)
   creator          User         @relation("TaskCreator", fields: [creatorId], references: [id], onDelete: Cascade)
   subtasks         Subtask[]
+  comments         Comment[]
 
   @@index([organizationId])
   @@index([projectId])
@@ -177,6 +180,24 @@ model Subtask {
 
   @@index([organizationId])
   @@index([taskId, order])
+}
+
+model Comment {
+  id             Int          @id @default(autoincrement())
+  organizationId Int
+  taskId         Int
+  authorId       Int
+  content        String
+  editedAt       DateTime?
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  task           Task         @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  author         User         @relation(fields: [authorId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+  @@index([taskId, createdAt])
+  @@index([authorId])
 }
 
 model FileAsset {

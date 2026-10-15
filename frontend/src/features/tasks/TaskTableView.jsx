@@ -7,6 +7,7 @@ import {
   Edit3,
   Layers,
   Lock,
+  MessageSquare,
   Trash2,
 } from "lucide-react";
 import { DueDateBadge } from "./DueDateBadge.jsx";
@@ -276,6 +277,15 @@ export function TaskTableView({
                               <span>
                                 {task.subtasks.filter((s) => s.isCompleted).length}/{task.subtasks.length}
                               </span>
+                            </span>
+                          )}
+                          {Number(task.commentsCount) > 0 && (
+                            <span
+                              className="comment-card-badge"
+                              title={`Comments: ${task.commentsCount} discussion items`}
+                            >
+                              <MessageSquare size={11} />
+                              <span>{task.commentsCount}</span>
                             </span>
                           )}
                         </div>

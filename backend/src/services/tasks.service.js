@@ -328,6 +328,18 @@ export async function getTaskService({ organizationId, taskId }) {
         select: { id: true, title: true, isCompleted: true, order: true, createdAt: true },
         orderBy: { order: "asc" },
       },
+      comments: {
+        select: {
+          id: true,
+          content: true,
+          editedAt: true,
+          createdAt: true,
+          author: {
+            select: { id: true, name: true, username: true, email: true, avatarUrl: true },
+          },
+        },
+        orderBy: { createdAt: "asc" },
+      },
     },
   });
 
