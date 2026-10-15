@@ -5,6 +5,7 @@ import {
   Filter,
   Kanban,
   Layers,
+  List,
   Lock,
   MessageSquare,
   Plus,
@@ -12,6 +13,9 @@ import {
 } from "lucide-react";
 import { api } from "../../services/api-client.js";
 import { TaskDetailDrawer } from "./TaskDetailDrawer.jsx";
+import { TaskListView } from "./TaskListView.jsx";
+import { TaskTableView } from "./TaskTableView.jsx";
+import { DueDateBadge } from "./DueDateBadge.jsx";
 
 const COLUMNS = [
   { id: "TODO", label: "To do", dotColor: "#A855F7" },
@@ -27,7 +31,7 @@ export function KanbanBoardView({ user, activeOrg, userPermissions, onShowNotice
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [filterPriority, setFilterPriority] = useState("ALL");
-  const [viewMode, setViewMode] = useState("board");
+  const [viewMode, setViewMode] = useState("board"); // "board" | "list" | "table"
 
   // Create Modal state
   const [createModalOpen, setCreateModalOpen] = useState(false);
@@ -239,7 +243,7 @@ export function KanbanBoardView({ user, activeOrg, userPermissions, onShowNotice
     return (
       <div className="view-loading-container">
         <div className="loading-spinner" />
-        <span>Loading Kanban board…</span>
+        <span>Loading tasks…</span>
       </div>
     );
   }
@@ -249,27 +253,48 @@ export function KanbanBoardView({ user, activeOrg, userPermissions, onShowNotice
       {/* Subheader */}
       <div className="kanban-view-header">
         <div className="kanban-header-left">
-          <h2>Task Board</h2>
-          <p>Manage and track team tasks with strict attribute-based ownership (ABAC) and governance protection.</p>
+          <h2>Task Board & Views</h2>
+          <p>Manage and track team tasks across Kanban Board, Accordion List, and Spreadsheet Table views.</p>
         </div>
 
         <div className="kanban-header-controls">
-          <div className="view-mode-tabs">
+          {/* Multi-View Mode Tabs (TASK-205) */}
+          <div className="view-mode-tabs" role="tablist" aria-label="Task View Modes">
             <button
               type="button"
+              role="tab"
+              aria-selected={viewMode === "board"}
               className={`view-tab-btn ${viewMode === "board" ? "active" : ""}`}
               onClick={() => setViewMode("board")}
+              data-testid="view-tab-board"
+              title="Kanban Board view with drag-and-drop"
             >
               <Kanban size={15} />
               <span>Board</span>
             </button>
             <button
               type="button"
+              role="tab"
+              aria-selected={viewMode === "list"}
               className={`view-tab-btn ${viewMode === "list" ? "active" : ""}`}
               onClick={() => setViewMode("list")}
+              data-testid="view-tab-list"
+              title="Collapsible accordion list view grouped by status"
+            >
+              <List size={15} />
+              <span>List</span>
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={viewMode === "table"}
+              className={`view-tab-btn ${viewMode === "table" ? "active" : ""}`}
+              onClick={() => setViewMode("table")}
+              data-testid="view-tab-table"
+              title="Dense spreadsheet table view with sortable columns"
             >
               <Table size={15} />
-              <span>List</span>
+              <span>Table</span>
             </button>
           </div>
 
@@ -317,191 +342,225 @@ export function KanbanBoardView({ user, activeOrg, userPermissions, onShowNotice
         </div>
       )}
 
-      {/* Kanban Board Columns with Native Drag-and-Drop (TASK-204) */}
-      <div className="kanban-columns-grid">
-        {COLUMNS.map((col) => {
-          const colTasks = filteredTasks.filter((t) => t.status === col.id);
-          const isOver = dragOverColumn === col.id;
-          return (
-            <div
-              key={col.id}
-              className={`kanban-column ${isOver ? "drag-over-column" : ""}`}
-              onDragOver={(e) => handleColumnDragOver(e, col.id)}
-              onDragLeave={(e) => handleColumnDragLeave(e, col.id)}
-              onDrop={(e) => handleColumnDrop(e, col.id)}
-              data-testid={`kanban-column-${col.id.toLowerCase()}`}
-            >
-              <div className="kanban-column-header">
-                <div className="kanban-column-title-group">
-                  <span className="column-dot" style={{ backgroundColor: col.dotColor }} />
-                  <h3>{col.label}</h3>
-                  <span className="column-count-badge">{colTasks.length}</span>
+      {/* View 1: Kanban Board with Native Drag-and-Drop (TASK-204) */}
+      {viewMode === "board" && (
+        <div className="kanban-columns-grid">
+          {COLUMNS.map((col) => {
+            const colTasks = filteredTasks.filter((t) => t.status === col.id);
+            const isOver = dragOverColumn === col.id;
+            return (
+              <div
+                key={col.id}
+                className={`kanban-column ${isOver ? "drag-over-column" : ""}`}
+                onDragOver={(e) => handleColumnDragOver(e, col.id)}
+                onDragLeave={(e) => handleColumnDragLeave(e, col.id)}
+                onDrop={(e) => handleColumnDrop(e, col.id)}
+                data-testid={`kanban-column-${col.id.toLowerCase()}`}
+              >
+                <div className="kanban-column-header">
+                  <div className="kanban-column-title-group">
+                    <span className="column-dot" style={{ backgroundColor: col.dotColor }} />
+                    <h3>{col.label}</h3>
+                    <span className="column-count-badge">{colTasks.length}</span>
+                  </div>
+                  <div className="kanban-column-actions">
+                    {canCreateTask && (
+                      <button
+                        type="button"
+                        className="icon-btn-ghost"
+                        onClick={() => setCreateModalOpen(true)}
+                        title="Add task in this column"
+                      >
+                        <Plus size={16} />
+                      </button>
+                    )}
+                  </div>
                 </div>
-                <div className="kanban-column-actions">
-                  {canCreateTask && (
-                    <button
-                      type="button"
-                      className="icon-btn-ghost"
-                      onClick={() => setCreateModalOpen(true)}
-                      title="Add task in this column"
-                    >
-                      <Plus size={16} />
-                    </button>
-                  )}
-                </div>
-              </div>
 
-              <div className="kanban-column-cards column-drop-zone">
-                {colTasks.map((task) => {
-                  const editable = canEditTask(task);
-                  const isDragging = draggingTaskId === task.id;
-                  return (
-                    <div
-                      key={task.id}
-                      className={`kanban-card ${editable ? "draggable-card" : "card-non-draggable"} ${isDragging ? "is-dragging" : ""} ${!editable ? "card-abac-restricted" : ""}`}
-                      draggable={editable}
-                      onDragStart={(e) => handleCardDragStart(e, task)}
-                      onDragEnd={handleCardDragEnd}
-                      onClick={() => openTaskDetail(task)}
-                      tabIndex={0}
-                      role="button"
-                      data-testid={`kanban-card-${task.id}`}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter" || e.key === " ") {
-                          e.preventDefault();
-                          openTaskDetail(task);
-                        }
-                      }}
-                      title={editable ? "Drag to reorder status or click to view details" : "ABAC Restricted: Click to view details"}
-                    >
-                      <div className="kanban-card-top">
-                        <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-                          <span
-                            className="task-jira-key-badge"
-                            style={{
-                              fontSize: "11px",
-                              fontWeight: "700",
-                              color: "#64748b",
-                              background: "rgba(100, 116, 139, 0.12)",
-                              padding: "2px 6px",
-                              borderRadius: "4px",
-                              letterSpacing: "0.5px",
-                            }}
-                          >
-                            {(task.project?.key || "PROJ")}-{task.id}
-                          </span>
-                          <span className={`tag-priority tag-${task.priority.toLowerCase()}`}>
-                            {task.priority}
-                          </span>
-                          {task.project?.isArchived && (
+                <div className="kanban-column-cards column-drop-zone">
+                  {colTasks.map((task) => {
+                    const editable = canEditTask(task);
+                    const isDragging = draggingTaskId === task.id;
+                    return (
+                      <div
+                        key={task.id}
+                        className={`kanban-card ${editable ? "draggable-card" : "card-non-draggable"} ${isDragging ? "is-dragging" : ""} ${!editable ? "card-abac-restricted" : ""}`}
+                        draggable={editable}
+                        onDragStart={(e) => handleCardDragStart(e, task)}
+                        onDragEnd={handleCardDragEnd}
+                        onClick={() => openTaskDetail(task)}
+                        tabIndex={0}
+                        role="button"
+                        data-testid={`kanban-card-${task.id}`}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter" || e.key === " ") {
+                            e.preventDefault();
+                            openTaskDetail(task);
+                          }
+                        }}
+                        title={editable ? "Drag to reorder status or click to view details" : "ABAC Restricted: Click to view details"}
+                      >
+                        <div className="kanban-card-top">
+                          <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
                             <span
+                              className="task-jira-key-badge"
                               style={{
-                                fontSize: "10px",
+                                fontSize: "11px",
                                 fontWeight: "700",
-                                color: "#f59e0b",
-                                background: "rgba(245, 158, 11, 0.15)",
-                                padding: "2px 5px",
+                                color: "#64748b",
+                                background: "rgba(100, 116, 139, 0.12)",
+                                padding: "2px 6px",
                                 borderRadius: "4px",
+                                letterSpacing: "0.5px",
                               }}
-                              title="Project is archived and read-only"
                             >
-                              ARCHIVED
+                              {(task.project?.key || "PROJ")}-{task.id}
                             </span>
-                          )}
+                            <span className={`tag-priority tag-${task.priority.toLowerCase()}`}>
+                              {task.priority}
+                            </span>
+                            {task.project?.isArchived && (
+                              <span
+                                style={{
+                                  fontSize: "10px",
+                                  fontWeight: "700",
+                                  color: "#f59e0b",
+                                  background: "rgba(245, 158, 11, 0.15)",
+                                  padding: "2px 5px",
+                                  borderRadius: "4px",
+                                }}
+                                title="Project is archived and read-only"
+                              >
+                                ARCHIVED
+                              </span>
+                            )}
+                          </div>
+                          <div className="card-top-actions">
+                            {!editable && (
+                              <span
+                                className="abac-lock-badge"
+                                title={
+                                  task.project?.isArchived
+                                    ? "Project is archived and read-only"
+                                    : `ABAC Restricted: Assigned to ${task.assignee?.name || "another member"}. You cannot edit this task.`
+                                }
+                              >
+                                <Lock size={12} />
+                              </span>
+                            )}
+                            <div className="card-quick-actions">
+                              <button
+                                type="button"
+                                className="card-action-btn"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  openTaskDetail(task);
+                                }}
+                                title="View or edit task details"
+                              >
+                                <Edit3 size={13} />
+                              </button>
+                            </div>
+                          </div>
                         </div>
-                        <div className="card-top-actions">
-                          {!editable && (
-                            <span
-                              className="abac-lock-badge"
-                              title={
-                                task.project?.isArchived
-                                  ? "Project is archived and read-only"
-                                  : `ABAC Restricted: Assigned to ${task.assignee?.name || "another member"}. You cannot edit this task.`
-                              }
-                            >
-                              <Lock size={12} />
+
+                        <h4 className="kanban-card-title">{task.title}</h4>
+                        {task.description && (
+                          <p className="kanban-card-desc">{task.description}</p>
+                        )}
+
+                        {/* Interactive Status Transition Pill */}
+                        <div className="kanban-card-status-selector" onClick={(e) => e.stopPropagation()}>
+                          <label className="card-status-label">Move to:</label>
+                          <select
+                            className="status-dropdown"
+                            value={task.status}
+                            disabled={!editable}
+                            onChange={(e) => handleStatusChange(task.id, e.target.value, e)}
+                            title={!editable ? "ABAC Restricted: Only assignee or manager can update status" : "Change task status"}
+                          >
+                            {COLUMNS.map((c) => (
+                              <option key={c.id} value={c.id}>
+                                {c.label}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+
+                        <div className="kanban-card-footer">
+                          <div className="card-assignee-info">
+                            {task.assignee?.avatarUrl ? (
+                              <img
+                                src={task.assignee.avatarUrl}
+                                alt={task.assignee.name}
+                                className="card-avatar"
+                              />
+                            ) : (
+                              <span className="card-avatar-initials">
+                                {task.assignee?.name ? task.assignee.name[0] : "U"}
+                              </span>
+                            )}
+                            <span className="assignee-name-snippet">
+                              {task.assignee?.name?.split(" ")[0] || "Unassigned"}
                             </span>
-                          )}
-                          <div className="card-quick-actions">
-                            <button
-                              type="button"
-                              className="card-action-btn"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                openTaskDetail(task);
-                              }}
-                              title="View or edit task details"
-                            >
-                              <Edit3 size={13} />
-                            </button>
+                          </div>
+
+                          <div className="card-meta-counters">
+                            <DueDateBadge dueDate={task.dueDate} status={task.status} compact />
+                            <span className="counter-item" title="Associated project">
+                              <Layers size={12} /> {task.project?.name || "Project"}
+                            </span>
                           </div>
                         </div>
                       </div>
+                    );
+                  })}
 
-                      <h4 className="kanban-card-title">{task.title}</h4>
-                      {task.description && (
-                        <p className="kanban-card-desc">{task.description}</p>
-                      )}
-
-                      {/* Interactive Status Transition Pill */}
-                      <div className="kanban-card-status-selector" onClick={(e) => e.stopPropagation()}>
-                        <label className="card-status-label">Move to:</label>
-                        <select
-                          className="status-dropdown"
-                          value={task.status}
-                          disabled={!editable}
-                          onChange={(e) => handleStatusChange(task.id, e.target.value, e)}
-                          title={!editable ? "ABAC Restricted: Only assignee or manager can update status" : "Change task status"}
-                        >
-                          {COLUMNS.map((c) => (
-                            <option key={c.id} value={c.id}>
-                              {c.label}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-
-                      <div className="kanban-card-footer">
-                        <div className="card-assignee-info">
-                          {task.assignee?.avatarUrl ? (
-                            <img
-                              src={task.assignee.avatarUrl}
-                              alt={task.assignee.name}
-                              className="card-avatar"
-                            />
-                          ) : (
-                            <span className="card-avatar-initials">
-                              {task.assignee?.name ? task.assignee.name[0] : "U"}
-                            </span>
-                          )}
-                          <span className="assignee-name-snippet">
-                            {task.assignee?.name?.split(" ")[0] || "Unassigned"}
-                          </span>
-                        </div>
-
-                        <div className="card-meta-counters">
-                          <span className="counter-item" title="Associated project">
-                            <Layers size={12} /> {task.project?.name || "Project"}
-                          </span>
-                          <span className="counter-item">
-                            <MessageSquare size={13} /> {task.commentsCount || 4}
-                          </span>
-                        </div>
-                      </div>
+                  {colTasks.length === 0 && (
+                    <div className="empty-column-placeholder">
+                      <span>No tasks in {col.label}</span>
                     </div>
-                  );
-                })}
-
-                {colTasks.length === 0 && (
-                  <div className="empty-column-placeholder">
-                    <span>No tasks in {col.label}</span>
-                  </div>
-                )}
+                  )}
+                </div>
               </div>
-            </div>
-          );
-        })}
-      </div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* View 2: Collapsible Accordion List View (TASK-205) */}
+      {viewMode === "list" && (
+        <TaskListView
+          tasks={filteredTasks}
+          projects={projects}
+          members={members}
+          user={user}
+          canEditTask={canEditTask}
+          canCreateTask={canCreateTask}
+          canDeleteTask={canDeleteTask}
+          onOpenDetail={openTaskDetail}
+          onStatusChange={handleStatusChange}
+          onDeleteTask={handleDrawerDelete}
+          onCreateTaskInStatus={() => {
+            setCreateModalOpen(true);
+          }}
+        />
+      )}
+
+      {/* View 3: Dense Spreadsheet Table View (TASK-205) */}
+      {viewMode === "table" && (
+        <TaskTableView
+          tasks={filteredTasks}
+          projects={projects}
+          members={members}
+          user={user}
+          canEditTask={canEditTask}
+          canDeleteTask={canDeleteTask}
+          onOpenDetail={openTaskDetail}
+          onStatusChange={handleStatusChange}
+          onDeleteTask={handleDrawerDelete}
+        />
+      )}
 
       {/* Slide-Over Task Detail Drawer (TASK-204) */}
       {editingTask && (

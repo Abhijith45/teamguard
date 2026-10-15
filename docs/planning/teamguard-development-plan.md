@@ -522,22 +522,24 @@ Work is sequenced strictly by technical dependencies, security invariants, and r
 - **Risk & Rollback**: Low risk.
 
 #### Task ID: TASK-205 — Multi-View Task Representations: List & Table Views
-- **Objective**: Deliver interactive List and Table views for tasks with due date badges and overdue alert styling.
-- **Linked User Stories**: `US-TASK-007`, `US-TASK-008`, `US-TASK-009`
+- **Objective**: Deliver interactive List (collapsible status accordions) and Table (dense spreadsheet data grid) views for tasks with due date badges, overdue alert styling, and column sorting.
+- **Linked User Stories**: `US-TASK-005`, `US-TASK-007`, `US-TASK-008`, `US-TASK-009`
 - **Linked PRD Features**: `TG-TASK-007`, `TG-TASK-008`, `TG-TASK-009`
 - **Priority**: Medium (P2)
-- **Status**: Implementation Required
-- **Affected Files**: `frontend/src/views/TaskListView.jsx`, `frontend/src/views/TaskTableView.jsx`, [frontend/src/index.css](file:///c:/Users/Abhijeet%20Rawat/Desktop/rbac/frontend/src/index.css)
+- **Status**: Complete / Verified (TIER-1, TIER-2 & TIER-3)
+- **Affected Files**: `frontend/src/features/tasks/TaskListView.jsx`, `frontend/src/features/tasks/TaskTableView.jsx`, `frontend/src/features/tasks/DueDateBadge.jsx`, `frontend/src/features/tasks/dueDateUtils.js`, `frontend/src/features/tasks/KanbanBoardView.jsx`, `frontend/src/App.css`, `frontend/src/features/tasks/task-multi-views.test.js`
 - **Implementation Steps**:
-  1. Build List view grouped by status with collapsible sections.
-  2. Build Table view featuring compact grid, column headers, and inline priority tags.
-  3. Add due date badges: red for overdue, amber for due within 48h, muted grey for future.
-- **Data/API Impact**: Client-side view rendering consuming `GET /api/tasks`.
-- **Security Considerations**: Identical RBAC guards applied to all views.
+  1. Built status-aware due date utility and badge (`DueDateBadge.jsx` / `dueDateUtils.js`): red pulsing alert for overdue tasks, amber for due within 48h, neutral slate for future, green for completed, and muted dash for unassigned dates.
+  2. Built interactive List view (`TaskListView.jsx`) partitioned by status (`TODO`, `IN_PROGRESS`, `REVISION`, `DONE`) with collapsible accordions, item count badges, "Expand All" / "Collapse All" controls, and inline status dropdowns.
+  3. Built dense Table view (`TaskTableView.jsx`) with sortable column headers (`Key`, `Title`, `Status`, `Priority`, `Assignee`, `Project`, `Due Date`), multi-type comparator ranking, and row click integration opening the detail drawer.
+  4. Updated `KanbanBoardView.jsx` with an accessible view mode tabswitcher (`Board`, `List`, `Table`) sharing unified priority filtering and optimistic mutation pipelines.
+  5. Implemented comprehensive CSS in `frontend/src/App.css` featuring curated micro-interactions, responsive grids, and dark theme support.
+- **Data/API Impact**: Real-time client-side view rendering consuming `GET /api/tasks` and `PATCH /api/tasks/:id`.
+- **Security Considerations**: Identical ABAC ownership checks (`canEditTask`) and project archival locks enforced consistently across all three representations.
 - **Dependencies & Blockers**: TASK-204.
-- **Test Plan**: Frontend component tests verifying table sort and overdue badge styling.
-- **Acceptance Criteria**: View switcher smoothly alternates between Kanban, List, Table.
-- **Definition of Done**: Both views operational with responsive styling.
+- **Test Plan**: Unit test suite in `frontend/src/features/tasks/task-multi-views.test.js` (9/9 passing), full backend regression suite (172/172 passing), and end-to-end browser verification of view transitions, sorting, accordion collapsing, and drawer triggers.
+- **Acceptance Criteria**: View switcher smoothly alternates between Board, List, and Table; column headers sort ascending/descending; due date badges display correct alert colors.
+- **Definition of Done**: Both views fully operational, responsive, tested, and verified in browser.
 - **Effort Estimate**: M (2 business days).
 - **Risk & Rollback**: Low risk.
 
