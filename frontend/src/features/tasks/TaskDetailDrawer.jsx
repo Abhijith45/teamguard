@@ -14,11 +14,15 @@ import {
   X,
 } from "lucide-react";
 import { SubtaskChecklist } from "./SubtaskChecklist.jsx";
+import { TaskCommentsSection } from "./TaskCommentsSection.jsx";
 
 export function TaskDetailDrawer({
   task,
   projects = [],
   members = [],
+  currentUser = null,
+  userPermissions = [],
+  userRoles = [],
   canEdit = false,
   canAssign = false,
   canManageProjects = false,
@@ -27,6 +31,7 @@ export function TaskDetailDrawer({
   onSave,
   onDelete,
   onSubtasksChange,
+  onCommentsCountChange,
 }) {
   const [title, setTitle] = useState(task?.title || "");
   const [description, setDescription] = useState(task?.description || "");
@@ -370,23 +375,15 @@ export function TaskDetailDrawer({
             onSubtasksChange={onSubtasksChange}
           />
 
-          {/* Comments Discussion Section Preview */}
-          <div
-            style={{
-              padding: "16px",
-              background: "#F8FAFC",
-              borderRadius: "8px",
-              border: "1px dashed var(--color-border)",
-            }}
-          >
-            <div style={{ display: "flex", alignItems: "center", gap: 6, fontWeight: 700, fontSize: "0.82rem", marginBottom: 6 }}>
-              <MessageSquare size={14} />
-              <span>Discussion & Comments ({task.commentsCount || 0})</span>
-            </div>
-            <p style={{ fontSize: "0.76rem", color: "var(--color-text-muted)", margin: 0 }}>
-              Chronological discussion thread and user mentions (enabled in Phase 3).
-            </p>
-          </div>
+          {/* Comments Discussion Section (TASK-302 / US-COLLAB-001, US-COLLAB-002, US-COLLAB-003) */}
+          <TaskCommentsSection
+            taskId={task.id}
+            task={task}
+            currentUser={currentUser}
+            userPermissions={userPermissions}
+            userRoles={userRoles}
+            onCommentsCountChange={onCommentsCountChange}
+          />
         </form>
 
         {/* Drawer Footer Actions */}

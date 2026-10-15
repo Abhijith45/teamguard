@@ -7,6 +7,7 @@ import {
   Edit3,
   Layers,
   Lock,
+  MessageSquare,
   Plus,
   Trash2,
 } from "lucide-react";
@@ -206,6 +207,15 @@ export function TaskListView({
                                     <span>
                                       {task.subtasks.filter((s) => s.isCompleted).length}/{task.subtasks.length}
                                     </span>
+                                  </span>
+                                )}
+                                {Number(task.commentsCount) > 0 && (
+                                  <span
+                                    className="comment-card-badge"
+                                    title={`Comments: ${task.commentsCount} discussion items`}
+                                  >
+                                    <MessageSquare size={11} />
+                                    <span>{task.commentsCount}</span>
                                   </span>
                                 )}
                               </div>

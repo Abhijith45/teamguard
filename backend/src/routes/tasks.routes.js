@@ -13,6 +13,12 @@ import {
   reorderSubtasks,
   updateSubtask,
 } from "../controllers/subtasks.controller.js";
+import {
+  createComment,
+  deleteComment,
+  listComments,
+  updateComment,
+} from "../controllers/comments.controller.js";
 import { authenticate } from "../middleware/authenticate.js";
 import { resolveTenant } from "../middleware/tenant.middleware.js";
 import { requirePermission } from "../middleware/require-permission.js";
@@ -43,5 +49,11 @@ router.post("/:taskId/subtasks", requireTaskUpdatePermission, createSubtask);
 router.patch("/:taskId/subtasks/:subtaskId", requireTaskUpdatePermission, updateSubtask);
 router.delete("/:taskId/subtasks/:subtaskId", requireTaskUpdatePermission, deleteSubtask);
 router.put("/:taskId/subtasks/reorder", requireTaskUpdatePermission, reorderSubtasks);
+
+// Nested Comment Routes (TASK-302 / US-COLLAB-001, US-COLLAB-002, US-COLLAB-003)
+router.get("/:taskId/comments", requirePermission("task", "view"), listComments);
+router.post("/:taskId/comments", requirePermission("task", "view"), createComment);
+router.patch("/:taskId/comments/:commentId", requirePermission("task", "view"), updateComment);
+router.delete("/:taskId/comments/:commentId", requirePermission("task", "view"), deleteComment);
 
 export default router;

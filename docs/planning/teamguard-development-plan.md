@@ -595,18 +595,19 @@ Work is sequenced strictly by technical dependencies, security invariants, and r
 - **Linked User Stories**: `US-COLLAB-001`, `US-COLLAB-002`, `US-COLLAB-003`
 - **Linked PRD Features**: `TG-COLLAB-001`, `TG-COLLAB-002`, `TG-COLLAB-003`
 - **Priority**: High (P1)
-- **Status**: Implementation Required
-- **Affected Files**: [backend/prisma/schema.prisma](file:///c:/Users/Abhijeet%20Rawat/Desktop/rbac/backend/prisma/schema.prisma), `backend/src/controllers/comments.controller.js`, `frontend/src/components/TaskCommentsSection.jsx`
+- **Status**: Complete / Verified (TIER-1, TIER-2 & TIER-3)
+- **Affected Files**: [backend/prisma/schema.prisma](file:///c:/Users/Abhijeet%20Rawat/Desktop/rbac/backend/prisma/schema.prisma), `backend/src/controllers/comments.controller.js`, `backend/src/services/comments.service.js`, `frontend/src/features/tasks/TaskCommentsSection.jsx`, `frontend/src/features/tasks/TaskDetailDrawer.jsx`
 - **Implementation Steps**:
-  1. Add `Comment` model (id, content, taskId, authorId, editedAt, createdAt).
-  2. Enforce 15-minute edit window: reject `PATCH /api/comments/:id` if `now() - createdAt > 15 minutes` unless moderator.
-  3. Sanitize markdown input using DOMPurify before storing.
-- **Data/API Impact**: Staged Migration #2 adding `Comment` table.
-- **Security Considerations**: XSS defense on rendered markdown; author privilege enforcement.
+  1. Add `Comment` model (id, organizationId, taskId, authorId, content, editedAt, createdAt, updatedAt) with cascade delete.
+  2. Implement chronological comments CRUD nested under `/api/tasks/:taskId/comments`.
+  3. Enforce 15-minute author edit/deletion window and enable moderator deletion anytime.
+  4. Sanitize markdown/HTML input using sanitizeHtml before database persistence.
+- **Data/API Impact**: Staged Migration #2 adding `Comment` table with foreign key cascade to `Task`, `Organization`, and `User`.
+- **Security Considerations**: XSS defense on stored and rendered markdown; author privilege enforcement; project archival freeze (`PROJECT_ARCHIVED`).
 - **Dependencies & Blockers**: TASK-203.
-- **Test Plan**: Automated test asserting 403 when author attempts edit at 16 minutes.
-- **Acceptance Criteria**: Comments post cleanly; edit window enforced; admin can moderate.
-- **Definition of Done**: Endpoints active, tests passing in `backend/test/comments.test.js`.
+- **Test Plan**: Integration test suite verifying comment posting, XSS sanitization, 15m edit window expiration, non-author rejection, moderator deletion, and audit logging (16/16 pass in `backend/test/comments.test.js`, 7/7 pass in `frontend/src/features/tasks/comments.test.js`).
+- **Acceptance Criteria**: Comments post cleanly; edit window enforced; admin can moderate; live count badges update.
+- **Definition of Done**: Endpoints active, tests passing in `backend/test/comments.test.js` and `frontend/src/features/tasks/comments.test.js`.
 - **Effort Estimate**: M (2 business days).
 - **Risk & Rollback**: Reversible migration.
 
@@ -1108,7 +1109,7 @@ Activated only after stakeholder decisions UD-001 through UD-005 are formally ra
 | **Project Management** | 5 | 5 | 5 Verified, 0 Planned | `TASK-201`, `TASK-202` |
 | **Task Management** | 10 | 10 | 10 Verified, 0 Planned | `TASK-203`, `TASK-204`, `TASK-205`, `TASK-206` |
 | **Subtask Hierarchy** | 2 | 2 | 2 Verified, 0 Planned | `TASK-301` |
-| **Collaboration & Comments** | 4 | 4 | 3 Planned, 1 Blocked (UD-004) | `TASK-302`, `TASK-504 (Blocked)` |
+| **Collaboration & Comments** | 4 | 4 | 3 Verified, 0 Planned, 1 Blocked (UD-004) | `TASK-302`, `TASK-504 (Blocked)` |
 | **Audit Logs & Compliance** | 2 | 2 | 2 Verified | `TASK-303` |
 | **Activity Feeds** | 1 | 1 | 1 Planned | `TASK-303` |
 | **File Management** | 5 | 5 | 1 Verified, 3 Partial, 1 Planned | `TASK-405` |
@@ -1122,7 +1123,7 @@ Activated only after stakeholder decisions UD-001 through UD-005 are formally ra
 | **Reporting & Analytics** | 1 | 1 | 1 Blocked (Reporting Scope) | `TASK-507 (Blocked)` |
 | **Developer Tooling** | 1 | 1 | 1 Verified | `TASK-006` |
 | **State Synchronization** | 2 | 1 | 2 Blocked (UD-003) | `TASK-503 (Blocked)` |
-| **TOTALS RECONCILED** | **79 Stories** | **60 Features** | **33 Verified, 5 Partial, 30 Planned, 11 Blocked** | **35 Tasks across 7 Phases (32 Story-Linked + 3 Operational)** |
+| **TOTALS RECONCILED** | **79 Stories** | **60 Features** | **36 Verified, 5 Partial, 27 Planned, 11 Blocked** | **35 Tasks across 7 Phases (32 Story-Linked + 3 Operational)** |
 
 ---
 

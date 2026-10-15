@@ -296,6 +296,14 @@ export const api = {
   reorderSubtasks: (taskId, subtaskIds) =>
     request(`/tasks/${taskId}/subtasks/reorder`, { method: "PUT", body: { subtaskIds } }),
 
+  // Comments (TASK-302)
+  getComments: (taskId) => request(`/tasks/${taskId}/comments`),
+  createComment: (taskId, body) => request(`/tasks/${taskId}/comments`, { method: "POST", body }),
+  updateComment: (taskId, commentId, body) =>
+    request(`/tasks/${taskId}/comments/${commentId}`, { method: "PATCH", body }),
+  deleteComment: (taskId, commentId) =>
+    request(`/tasks/${taskId}/comments/${commentId}`, { method: "DELETE" }),
+
   // Files
   getFiles: (params = "") => request(`/files${params ? `?${params}` : ""}`),
   createFile: (body) => request("/files", { method: "POST", body }),
