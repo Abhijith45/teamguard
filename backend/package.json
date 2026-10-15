@@ -11,7 +11,7 @@
     "db:migrate": "prisma migrate dev",
     "db:deploy": "prisma migrate deploy",
     "db:seed": "prisma db seed",
-    "test": "node --test"
+    "test": "node --test --test-concurrency=1"
   },
   "keywords": [
     "node",

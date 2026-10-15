@@ -390,22 +390,23 @@ Work is sequenced strictly by technical dependencies, security invariants, and r
 - **Risk & Rollback**: Low risk.
 
 #### Task ID: TASK-103 — Custom Role Creation, Template Cloning & Module-Level Bulk Toggles
-- **Objective**: Allow administrators to create custom tenant roles cloned from existing templates with bulk module toggles.
+- **Objective**: Allow administrators to create custom tenant roles cloned from existing templates with module-level bulk toggles and safeguarded role deletion.
 - **Linked User Stories**: `US-RBAC-004`, `US-RBAC-005`
 - **Linked PRD Features**: `TG-RBAC-005`, `TG-RBAC-006`
 - **Priority**: Medium (P2)
-- **Status**: Implementation Required
-- **Affected Files**: [backend/src/controllers/roles.controller.js](file:///c:/Users/Abhijeet%20Rawat/Desktop/rbac/backend/src/controllers/roles.controller.js), [frontend/src/views/TeamPermissionsMatrixView.jsx](file:///c:/Users/Abhijeet%20Rawat/Desktop/rbac/frontend/src/views/TeamPermissionsMatrixView.jsx)
+- **Status**: Complete / Verified (TIER-1, TIER-2 & TIER-3)
+- **Affected Files**: [backend/src/controllers/roles.controller.js](file:///c:/Users/Abhijeet%20Rawat/Desktop/rbac/backend/src/controllers/roles.controller.js), [backend/src/routes/roles.routes.js](file:///c:/Users/Abhijeet%20Rawat/Desktop/rbac/backend/src/routes/roles.routes.js), [backend/src/routes/permissions-matrix.routes.js](file:///c:/Users/Abhijeet%20Rawat/Desktop/rbac/backend/src/routes/permissions-matrix.routes.js), [backend/test/roles.test.js](file:///c:/Users/Abhijeet%20Rawat/Desktop/rbac/backend/test/roles.test.js), [frontend/src/features/permissions/TeamPermissionsMatrixView.jsx](file:///c:/Users/Abhijeet%20Rawat/Desktop/rbac/frontend/src/features/permissions/TeamPermissionsMatrixView.jsx), [frontend/src/services/api-client.js](file:///c:/Users/Abhijeet%20Rawat/Desktop/rbac/frontend/src/services/api-client.js), [frontend/src/App.css](file:///c:/Users/Abhijeet%20Rawat/Desktop/rbac/frontend/src/App.css)
 - **Implementation Steps**:
-  1. Implement `POST /api/roles` accepting name, description, cloneFromRoleId.
-  2. Implement bulk toggle endpoint `POST /api/roles/:id/modules/:module/toggle`.
-  3. Add modal dialog in frontend matrix for "Create Custom Role".
-- **Data/API Impact**: Inserts new `Role` and associated `RolePermission` rows.
-- **Security Considerations**: Bounded by delegation barrier (TASK-104).
+  1. Implement `POST /api/roles` accepting `name`, `description`, and `cloneFromRoleId`, preventing duplicate names in the tenant (`HTTP 409 Conflict`), and logging audit trail.
+  2. Implement module bulk toggle endpoints `POST /api/roles/:roleId/modules/:module/toggle` and `POST /api/permissions-matrix/bulk-toggle` with Super Admin lockout safeguards (`BR-004` / `SEC-05`).
+  3. Implement safeguarded role deletion `DELETE /api/roles/:roleId` blocking system roles (`HTTP 403 Forbidden`) and roles assigned to active members (`HTTP 400 Bad Request`).
+  4. Build dynamic frontend modal dialogs in `TeamPermissionsMatrixView` for custom role creation with template cloning, inline module-level "Select All" / "Clear All" bulk toggles, and deletion confirmation dialog.
+- **Data/API Impact**: Inserts and mutates `Role` and `RolePermission` records with strict tenant isolation; generates immutable `AuditLog` records.
+- **Security Considerations**: Enforces `roles:manage` authorization, Super Admin lockout immutability, and cross-tenant IDOR boundaries.
 - **Dependencies & Blockers**: TASK-102.
-- **Test Plan**: Unit test cloning Member role into QA role and asserting permission copy.
-- **Acceptance Criteria**: Custom role appears in matrix; bulk toggles work instantaneously.
-- **Definition of Done**: Full custom role lifecycle operational.
+- **Test Plan**: 13/13 automated test vectors in [backend/test/roles.test.js](file:///c:/Users/Abhijeet%20Rawat/Desktop/rbac/backend/test/roles.test.js).
+- **Acceptance Criteria**: Custom roles can be created clean or cloned from templates; duplicate names rejected with 409; bulk module toggles grant/revoke immediately; Super Admin bulk revocation blocked; unassigned custom roles can be deleted with audit logging.
+- **Definition of Done**: Backend endpoints, controller guards, client services, and interactive frontend UI verified with 13/13 automated test vectors passing cleanly.
 - **Effort Estimate**: M (2 business days).
 - **Risk & Rollback**: Low risk.
 
