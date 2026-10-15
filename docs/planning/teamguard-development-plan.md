@@ -440,18 +440,20 @@ Work is sequenced strictly by technical dependencies, security invariants, and r
 - **Linked User Stories**: `US-PROJ-001`, `US-PROJ-004`
 - **Linked PRD Features**: `TG-PROJ-001`, `TG-PROJ-004`
 - **Priority**: High (P1)
-- **Status**: Expansion Required
-- **Affected Files**: [backend/src/controllers/projects.controller.js](file:///c:/Users/Abhijeet%20Rawat/Desktop/rbac/backend/src/controllers/projects.controller.js), [backend/src/services/projects.service.js](file:///c:/Users/Abhijeet%20Rawat/Desktop/rbac/backend/src/services/projects.service.js)
+- **Status**: Complete / Verified (TIER-1, TIER-2 & TIER-3)
+- **Affected Files**: [backend/src/controllers/projects.controller.js](file:///c:/Users/Abhijeet%20Rawat/Desktop/rbac/backend/src/controllers/projects.controller.js), [backend/src/services/projects.service.js](file:///c:/Users/Abhijeet%20Rawat/Desktop/rbac/backend/src/services/projects.service.js), [backend/src/controllers/tasks.controller.js](file:///c:/Users/Abhijeet%20Rawat/Desktop/rbac/backend/src/controllers/tasks.controller.js), [backend/prisma/schema.prisma](file:///c:/Users/Abhijeet%20Rawat/Desktop/rbac/backend/prisma/schema.prisma), [backend/test/projects.test.js](file:///c:/Users/Abhijeet%20Rawat/Desktop/rbac/backend/test/projects.test.js), [frontend/src/services/api-client.js](file:///c:/Users/Abhijeet%20Rawat/Desktop/rbac/frontend/src/services/api-client.js)
 - **Implementation Steps**:
-  1. Add `deletedAt` timestamp field to Project queries (soft deletion).
-  2. When project is soft-deleted, filter out associated tasks from standard queries.
-  3. Enforce strict `organizationId` match on all project mutations.
-- **Data/API Impact**: Adds soft delete filter to Prisma queries.
-- **Security Considerations**: Cross-tenant project access rejected with 403.
+  1. Add `deletedAt` timestamp field and composite indexes to `Project` model in Prisma.
+  2. Implement `projects.service.js` with tenant-scoped list, get, create, update, soft-delete, and restore operations.
+  3. When project is soft-deleted, filter out associated tasks from standard task queries and block task creation/mutation against soft-deleted projects.
+  4. Enforce strict `organizationId` match on all project mutations with cross-tenant IDOR defense (404 Not Found).
+  5. Support `POST /api/projects/:id/restore` to restore soft-deleted projects and their tasks.
+- **Data/API Impact**: Adds `deletedAt` column and indexes to `Project` table; adds `restore` route; filters soft-deleted rows in project and task Prisma queries.
+- **Security Considerations**: Cross-tenant project access rejected with 404 (IDOR defense); RBAC checks (`project:create`, `project:update`, `project:delete`, `project:view`) strictly enforced server-side.
 - **Dependencies & Blockers**: TASK-001.
-- **Test Plan**: API test asserting soft-deleted project is excluded from `GET /api/projects`.
-- **Acceptance Criteria**: Projects create, update, soft-delete cleanly.
-- **Definition of Done**: Controller, service, and tests passing in `backend/test/projects.test.js`.
+- **Test Plan**: 16 automated integration vectors in `backend/test/projects.test.js` covering creation with initial tasks, payload validation, negative RBAC, tenant scoping, IDOR defense, soft-deletion, cascade task scoping, task creation block, project restoration, and audit logging.
+- **Acceptance Criteria**: Projects create, update, soft-delete, and restore cleanly; cascade task filtering verified; 16/16 tests pass.
+- **Definition of Done**: Controller, service, routes, client, and automated test suite passing in `backend/test/projects.test.js`.
 - **Effort Estimate**: M (2 business days).
 - **Risk & Rollback**: Low risk.
 
@@ -1094,7 +1096,7 @@ Activated only after stakeholder decisions UD-001 through UD-005 are formally ra
 | **Invitations & Onboarding** | 5 | 1 | 2 Verified, 3 Blocked (UD-005) | `TASK-101`, `TASK-505 (Blocked)` |
 | **RBAC Administration** | 7 | 8 | 7 Verified, 0 Planned | `TASK-102`, `TASK-103`, `TASK-104` |
 | **ABAC & Policy Engine** | 4 | 3 | 2 Verified, 1 Planned, 1 Blocked | `TASK-002`, `TASK-203`, `TASK-506 (Blocked)` |
-| **Project Management** | 5 | 5 | 1 Verified, 4 Planned | `TASK-201`, `TASK-202` |
+| **Project Management** | 5 | 5 | 2 Verified, 3 Planned | `TASK-201`, `TASK-202` |
 | **Task Management** | 10 | 10 | 5 Verified, 5 Planned | `TASK-203`, `TASK-204`, `TASK-205`, `TASK-206` |
 | **Subtask Hierarchy** | 2 | 2 | 2 Planned | `TASK-301` |
 | **Collaboration & Comments** | 4 | 4 | 3 Planned, 1 Blocked (UD-004) | `TASK-302`, `TASK-504 (Blocked)` |

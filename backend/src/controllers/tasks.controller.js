@@ -28,7 +28,10 @@ export async function listTasks(req, res, next) {
     const orgId = req.organizationId;
     const { projectId, status, priority } = req.query;
 
-    const where = { organizationId: orgId };
+    const where = {
+      organizationId: orgId,
+      project: { deletedAt: null },
+    };
     if (projectId) where.projectId = Number(projectId);
     if (status) where.status = status;
     if (priority) where.priority = priority;
@@ -54,9 +57,9 @@ export async function createTask(req, res, next) {
     const orgId = req.organizationId;
     const actorId = req.auth.userId;
 
-    // Verify project belongs to organization
+    // Verify project belongs to organization and is active (not soft-deleted)
     const project = await prisma.project.findFirst({
-      where: { id: input.projectId, organizationId: orgId },
+      where: { id: input.projectId, organizationId: orgId, deletedAt: null },
     });
     if (!project) {
       return res.status(404).json({ error: "Project not found in this organization" });
@@ -186,9 +189,13 @@ export async function updateTask(req, res, next) {
 
     const input = updateTaskSchema.parse(bodyPayload);
 
-    // Verify task exists in current organization
+    // Verify task exists in current organization and belongs to an active project
     const existing = await prisma.task.findFirst({
-      where: { id: taskId, organizationId: orgId },
+      where: {
+        id: taskId,
+        organizationId: orgId,
+        project: { deletedAt: null },
+      },
     });
     if (!existing) {
       return res.status(404).json({ error: "Task not found in this organization" });
@@ -212,7 +219,7 @@ export async function updateTask(req, res, next) {
     // Target project verification if project is being re-parented by manager
     if (input.projectId !== undefined && input.projectId !== existing.projectId) {
       const targetProject = await prisma.project.findFirst({
-        where: { id: input.projectId, organizationId: orgId },
+        where: { id: input.projectId, organizationId: orgId, deletedAt: null },
       });
       if (!targetProject) {
         return res.status(404).json({ error: "Target project not found in this organization" });
@@ -269,7 +276,11 @@ export async function deleteTask(req, res, next) {
     const orgId = req.organizationId;
 
     const existing = await prisma.task.findFirst({
-      where: { id: taskId, organizationId: orgId },
+      where: {
+        id: taskId,
+        organizationId: orgId,
+        project: { deletedAt: null },
+      },
     });
     if (!existing) {
       return res.status(404).json({ error: "Task not found in this organization" });

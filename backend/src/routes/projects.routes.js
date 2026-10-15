@@ -4,6 +4,7 @@ import {
   deleteProject,
   getProject,
   listProjects,
+  restoreProject,
   updateProject,
 } from "../controllers/projects.controller.js";
 import { authenticate } from "../middleware/authenticate.js";
@@ -19,5 +20,6 @@ router.get("/:projectId", requirePermission("project", "view"), getProject);
 router.post("/", requirePermission("project", "create"), createProject);
 router.patch("/:projectId", requirePermission("project", "update"), updateProject);
 router.delete("/:projectId", requirePermission("project", "delete"), deleteProject);
+router.post("/:projectId/restore", requirePermission("project", "update"), restoreProject);
 
 export default router;

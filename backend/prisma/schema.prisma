@@ -115,6 +115,7 @@ model Project {
   status         String       @default("ACTIVE")
   progress       Int          @default(0)
   priority       String       @default("MEDIUM")
+  deletedAt      DateTime?
   createdAt      DateTime     @default(now())
   updatedAt      DateTime     @updatedAt
   organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
@@ -122,6 +123,8 @@ model Project {
   files          FileAsset[]
 
   @@index([organizationId])
+  @@index([deletedAt])
+  @@index([organizationId, deletedAt])
 }
 
 model Task {
