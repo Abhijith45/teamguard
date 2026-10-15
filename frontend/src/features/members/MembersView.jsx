@@ -1,8 +1,8 @@
 import { useEffect, useState } from "react";
-import { AlertCircle, Building, ShieldCheck, UserCheck, Users } from "lucide-react";
+import { AlertCircle } from "lucide-react";
 import { api } from "../../services/api-client.js";
 
-export function MembersView({ activeOrg, onShowNotice }) {
+export function MembersView({ activeOrg }) {
   const [members, setMembers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -13,6 +13,7 @@ export function MembersView({ activeOrg, onShowNotice }) {
       try {
         setLoading(true);
         setError(null);
+        setMembers([]);
         const res = await api.getMembers();
         if (mounted) setMembers(res.members || []);
       } catch (err) {
@@ -24,6 +25,16 @@ export function MembersView({ activeOrg, onShowNotice }) {
     load();
     return () => { mounted = false; };
   }, [activeOrg?.id]);
+
+  // TASK-003: Broadcast event listener for global workspace cache purges
+  useEffect(() => {
+    function handlePurge() {
+      setMembers([]);
+      setLoading(true);
+    }
+    window.addEventListener("teamguard:workspace-purged", handlePurge);
+    return () => window.removeEventListener("teamguard:workspace-purged", handlePurge);
+  }, []);
 
   if (loading) {
     return (

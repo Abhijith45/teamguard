@@ -84,6 +84,20 @@ export function KanbanBoardView({ user, activeOrg, userPermissions, onShowNotice
     loadTasks();
   }, [activeOrg?.id]);
 
+  // TASK-003: Broadcast event listener for global workspace cache purges
+  useEffect(() => {
+    function handlePurge() {
+      setTasks([]);
+      setProjects([]);
+      setMembers([]);
+      setEditingTask(null);
+      setCreateModalOpen(false);
+      setLoading(true);
+    }
+    window.addEventListener("teamguard:workspace-purged", handlePurge);
+    return () => window.removeEventListener("teamguard:workspace-purged", handlePurge);
+  }, []);
+
   function canEditTask(task) {
     if (canUpdateAny) return true;
     if (canUpdateOwn && (task.assigneeId === user.id || task.creatorId === user.id)) return true;

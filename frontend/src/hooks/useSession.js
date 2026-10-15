@@ -1,5 +1,9 @@
 import { useEffect, useState } from "react";
-import { api, clearAccessToken, setAccessToken } from "../services/api-client.js";
+import {
+  api,
+  clearSessionStorageAndCache,
+  setAccessToken,
+} from "../services/api-client.js";
 
 export function useSession(onRestored) {
   const [user, setUser] = useState(null);
@@ -25,7 +29,7 @@ export function useSession(onRestored) {
 
   async function logout() {
     try { await api.logout(); } catch { /* Complete local sign-out if the API is unavailable. */ }
-    clearAccessToken();
+    clearSessionStorageAndCache();
     setUser(null);
   }
 

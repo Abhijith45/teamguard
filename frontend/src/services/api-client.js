@@ -1,4 +1,4 @@
-const apiBase = import.meta.env.VITE_API_URL ?? "http://localhost:5000/api";
+const apiBase = (typeof import.meta !== "undefined" && import.meta.env?.VITE_API_URL) ?? "http://localhost:5000/api";
 let accessToken = null;
 let activeOrganizationId = null;
 let refreshRequest = null;
@@ -31,6 +31,76 @@ export function getActiveOrgId() {
     }
   }
   return activeOrganizationId;
+}
+
+const queryCache = new Map();
+
+/**
+ * TASK-003: Purges all client-side query caches and in-memory tenant state.
+ * Removes tenant-scoped filter keys, project selections, and caches from localStorage.
+ */
+export function purgeTenantWorkspaceCache(newOrgId = null) {
+  // 1. Invalidate in-memory query cache
+  queryCache.clear();
+
+  // 2. Clear tenant-scoped keys from localStorage
+  try {
+    const keysToRemove = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key && key.startsWith("teamguard_") && key !== "teamguard_active_org") {
+        keysToRemove.push(key);
+      }
+    }
+    for (const key of keysToRemove) {
+      localStorage.removeItem(key);
+    }
+    if (newOrgId) {
+      setActiveOrgId(newOrgId);
+    }
+  } catch {
+    // Graceful fallback if localStorage is blocked
+  }
+
+  // 3. Dispatch broadcast event for active React views to synchronously flush state
+  if (typeof window !== "undefined" && window.dispatchEvent) {
+    window.dispatchEvent(
+      new CustomEvent("teamguard:workspace-purged", {
+        detail: { activeOrgId: newOrgId },
+      })
+    );
+  }
+}
+
+/**
+ * TASK-003 / US-AUTH-004: Complete logout purge.
+ * Wipes access tokens, active organization ID, all localStorage keys, and query cache.
+ */
+export function clearSessionStorageAndCache() {
+  clearAccessToken();
+  activeOrganizationId = null;
+  queryCache.clear();
+  try {
+    const keysToRemove = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key && key.startsWith("teamguard_")) {
+        keysToRemove.push(key);
+      }
+    }
+    for (const key of keysToRemove) {
+      localStorage.removeItem(key);
+    }
+  } catch {
+    // Graceful fallback
+  }
+  if (typeof window !== "undefined" && window.dispatchEvent) {
+    window.dispatchEvent(
+      new CustomEvent("teamguard:workspace-purged", {
+        detail: { activeOrgId: null },
+      })
+    );
+  }
 }
 
 function isTenantScoped(path) {
@@ -76,6 +146,14 @@ export function refreshSession() {
   return refreshRequest;
 }
 
+export function getQueryCacheSize() {
+  return queryCache.size;
+}
+
+export function isQueryCacheEmpty() {
+  return queryCache.size === 0;
+}
+
 async function request(path, options = {}, retry = true) {
   const headers = new Headers(options.headers ?? {});
   if (options.body !== undefined) headers.set("Content-Type", "application/json");
@@ -94,6 +172,18 @@ async function request(path, options = {}, retry = true) {
     headers.set("x-organization-id", String(currentOrgId));
   }
 
+  const method = (options.method || "GET").toUpperCase();
+  const cacheKey = `${currentOrgId || "global"}:${path}`;
+
+  if (method === "GET" && !options.skipCache) {
+    const cached = queryCache.get(cacheKey);
+    if (cached && Date.now() - cached.timestamp < 30000) {
+      return typeof structuredClone === "function"
+        ? structuredClone(cached.data)
+        : JSON.parse(JSON.stringify(cached.data));
+    }
+  }
+
   const response = await fetch(`${apiBase}${path}`, {
     ...options,
     headers,
@@ -105,7 +195,20 @@ async function request(path, options = {}, retry = true) {
     const session = await refreshSession();
     if (session) return request(path, options, false);
   }
-  return readResponse(response);
+  const payload = await readResponse(response);
+
+  if (method === "GET") {
+    queryCache.set(cacheKey, { timestamp: Date.now(), data: payload });
+  } else {
+    // Invalidate queries for current tenant upon mutation
+    for (const k of queryCache.keys()) {
+      if (k.startsWith(`${currentOrgId}:`)) {
+        queryCache.delete(k);
+      }
+    }
+  }
+
+  return payload;
 }
 
 export const api = {

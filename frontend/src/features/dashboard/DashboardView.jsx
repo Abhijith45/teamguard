@@ -24,6 +24,7 @@ export function DashboardView({ activeOrg, onNavigateToTasks, onNavigateToProjec
       try {
         setLoading(true);
         setError(null);
+        setData(null);
         const res = await api.getDashboard();
         if (mounted) setData(res);
       } catch (err) {
@@ -35,6 +36,16 @@ export function DashboardView({ activeOrg, onNavigateToTasks, onNavigateToProjec
     load();
     return () => { mounted = false; };
   }, [activeOrg?.id]);
+
+  // TASK-003: Broadcast event listener for global workspace cache purges
+  useEffect(() => {
+    function handlePurge() {
+      setData(null);
+      setLoading(true);
+    }
+    window.addEventListener("teamguard:workspace-purged", handlePurge);
+    return () => window.removeEventListener("teamguard:workspace-purged", handlePurge);
+  }, []);
 
   if (loading) {
     return (

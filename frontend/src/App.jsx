@@ -9,7 +9,14 @@ import { MembersView } from "./features/members/MembersView.jsx";
 import { TeamPermissionsMatrixView } from "./features/permissions/TeamPermissionsMatrixView.jsx";
 import { ProjectSetupWizardModal } from "./features/projects/ProjectSetupWizardModal.jsx";
 import { AppShell } from "./layout/AppShell.jsx";
-import { api, clearAccessToken, setAccessToken, setActiveOrgId } from "./services/api-client.js";
+import {
+  api,
+  clearAccessToken,
+  clearSessionStorageAndCache,
+  purgeTenantWorkspaceCache,
+  setAccessToken,
+  setActiveOrgId,
+} from "./services/api-client.js";
 import "./App.css";
 
 export default function App() {
@@ -20,6 +27,7 @@ export default function App() {
   const [section, setSection] = useState("dashboard");
   const [wizardOpen, setWizardOpen] = useState(false);
   const [notice, setNotice] = useState(null);
+  const [switchingWorkspace, setSwitchingWorkspace] = useState(false);
 
   const showNotice = useCallback((newNotice) => {
     setNotice(newNotice);
@@ -86,14 +94,21 @@ export default function App() {
     } catch {
       // Local clean up
     }
-    clearAccessToken();
+    clearSessionStorageAndCache();
     setUser(null);
     setActiveOrg(null);
+    setProjects([]);
     setSection("dashboard");
   }
 
   async function handleSwitchPersona(personaId, orgSlug = "acme-corp") {
     try {
+      setSwitchingWorkspace(true);
+      // TASK-003: Purge client-side caches and reset project state
+      purgeTenantWorkspaceCache();
+      setProjects([]);
+      setWizardOpen(false);
+
       const session = await api.switchPersona(personaId, orgSlug);
       setAccessToken(session.accessToken);
       setUser(session.user);
@@ -101,30 +116,46 @@ export default function App() {
         setActiveOrg(session.activeOrganization);
         setActiveOrgId(session.activeOrganization.id);
       }
+
+      const projRes = await api.getProjects().catch(() => ({ projects: [] }));
+      setProjects(projRes.projects || []);
+
       showNotice({
         type: "success",
         message: `Switched test persona to "${session.user.roles?.[0]?.name || personaId}" in ${session.activeOrganization?.name}.`,
       });
-      loadProjects();
     } catch (err) {
       showNotice({ type: "error", message: `Failed to switch persona: ${err.message}` });
+    } finally {
+      setSwitchingWorkspace(false);
     }
   }
 
   async function handleSwitchOrg(orgId) {
+    if (!orgId || orgId === activeOrg?.id) return;
     try {
-      setActiveOrgId(orgId);
+      setSwitchingWorkspace(true);
+      // TASK-003: Purge client-side caches and in-memory tenant state
+      purgeTenantWorkspaceCache(orgId);
+      setProjects([]);
+      setWizardOpen(false);
+
       const res = await api.me();
       setUser(res.user);
       const nextOrg = res.user.activeOrganization || res.user.organizations?.find((o) => o.id === orgId);
       if (nextOrg) setActiveOrg(nextOrg);
+
+      const projRes = await api.getProjects().catch(() => ({ projects: [] }));
+      setProjects(projRes.projects || []);
+
       showNotice({
         type: "success",
         message: `Active workspace switched to "${nextOrg?.name || "Workspace"}".`,
       });
-      loadProjects();
     } catch (err) {
       showNotice({ type: "error", message: `Failed to switch workspace: ${err.message}` });
+    } finally {
+      setSwitchingWorkspace(false);
     }
   }
 
@@ -155,6 +186,7 @@ export default function App() {
       projects={projects}
       section={section}
       setSection={setSection}
+      switchingWorkspace={switchingWorkspace}
       onLogout={handleLogout}
       onSwitchOrg={handleSwitchOrg}
       onSwitchPersona={handleSwitchPersona}
@@ -173,9 +205,10 @@ export default function App() {
         </div>
       )}
 
-      {/* View Routing */}
+      {/* View Routing with TASK-003 Tenant State Isolation Keys */}
       {section === "dashboard" && (
         <DashboardView
+          key={`dashboard-${activeOrg?.id}`}
           user={user}
           activeOrg={activeOrg}
           userPermissions={userPermissions}
@@ -186,6 +219,7 @@ export default function App() {
 
       {section === "tasks" && (
         <KanbanBoardView
+          key={`tasks-${activeOrg?.id}`}
           user={user}
           activeOrg={activeOrg}
           userPermissions={userPermissions}
@@ -195,6 +229,7 @@ export default function App() {
 
       {section === "files" && (
         <FilesBulkView
+          key={`files-${activeOrg?.id}`}
           user={user}
           activeOrg={activeOrg}
           userPermissions={userPermissions}
@@ -204,7 +239,7 @@ export default function App() {
 
       {section === "permissions-matrix" && (
         <TeamPermissionsMatrixView
-          user={user}
+          key={`permissions-${activeOrg?.id}`}
           activeOrg={activeOrg}
           userPermissions={userPermissions}
           onShowNotice={showNotice}
@@ -213,8 +248,8 @@ export default function App() {
 
       {section === "members" && (
         <MembersView
+          key={`members-${activeOrg?.id}`}
           activeOrg={activeOrg}
-          onShowNotice={showNotice}
         />
       )}
 

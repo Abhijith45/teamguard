@@ -1,8 +1,8 @@
 import { useEffect, useState } from "react";
-import { AlertCircle, Check, KeyRound, ShieldAlert, ShieldCheck } from "lucide-react";
+import { AlertCircle, Check, ShieldCheck } from "lucide-react";
 import { api } from "../../services/api-client.js";
 
-export function TeamPermissionsMatrixView({ user, activeOrg, userPermissions, onShowNotice }) {
+export function TeamPermissionsMatrixView({ activeOrg, userPermissions, onShowNotice }) {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -14,6 +14,8 @@ export function TeamPermissionsMatrixView({ user, activeOrg, userPermissions, on
     try {
       setLoading(true);
       setError(null);
+      setData(null);
+      setPendingToggles(new Set());
       const res = await api.getPermissionsMatrix();
       setData(res);
     } catch (err) {
@@ -26,6 +28,17 @@ export function TeamPermissionsMatrixView({ user, activeOrg, userPermissions, on
   useEffect(() => {
     loadMatrix();
   }, [activeOrg?.id]);
+
+  // TASK-003: Broadcast event listener for global workspace cache purges
+  useEffect(() => {
+    function handlePurge() {
+      setData(null);
+      setPendingToggles(new Set());
+      setLoading(true);
+    }
+    window.addEventListener("teamguard:workspace-purged", handlePurge);
+    return () => window.removeEventListener("teamguard:workspace-purged", handlePurge);
+  }, []);
 
   async function handleToggle(roleId, permissionId, currentEnabled, roleName, permName) {
     if (!canManageRoles) {

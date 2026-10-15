@@ -1,6 +1,5 @@
 import { useState } from "react";
 import {
-  Activity,
   BarChart2,
   Bell,
   Calendar,
@@ -11,6 +10,7 @@ import {
   FolderGit2,
   Headphones,
   LayoutDashboard,
+  Loader2,
   LogOut,
   Plus,
   ShieldCheck,
@@ -27,6 +27,7 @@ export function AppShell({
   projects = [],
   section,
   setSection,
+  switchingWorkspace = false,
   onLogout,
   onSwitchOrg,
   onSwitchPersona,
@@ -44,11 +45,23 @@ export function AppShell({
       <aside className="taskora-sidebar">
         {/* Brand & Organization Switcher */}
         <div className="sidebar-brand-container">
-          <div className="brand-org-box" onClick={() => setOrgMenuOpen(!orgMenuOpen)}>
+          <div
+            className={`brand-org-box ${switchingWorkspace ? "busy" : ""}`}
+            onClick={() => !switchingWorkspace && setOrgMenuOpen(!orgMenuOpen)}
+            role="button"
+            aria-busy={switchingWorkspace}
+            aria-label={`Current workspace: ${activeOrg?.name || "Workspace"}. Click to switch.`}
+          >
             <Brand size={30} />
             <div className="org-switcher-arrows">
-              <ChevronUp size={12} className="arrow-up" />
-              <ChevronDown size={12} className="arrow-down" />
+              {switchingWorkspace ? (
+                <Loader2 size={13} className="animate-spin text-emerald" />
+              ) : (
+                <>
+                  <ChevronUp size={12} className="arrow-up" />
+                  <ChevronDown size={12} className="arrow-down" />
+                </>
+              )}
             </div>
           </div>
 
@@ -311,8 +324,24 @@ export function AppShell({
           </div>
         </header>
 
-        {/* Page Content Body */}
-        <main className="taskora-page-body">
+        {/* Page Content Body with TASK-003 Workspace State Isolation */}
+        <main className="taskora-page-body" aria-busy={switchingWorkspace}>
+          {switchingWorkspace && (
+            <div
+              className="workspace-switching-overlay"
+              role="status"
+              aria-live="polite"
+              aria-label="Isolating workspace context and purging caches"
+            >
+              <div className="workspace-switching-card">
+                <Loader2 size={24} className="animate-spin text-emerald" />
+                <div className="workspace-switching-text">
+                  <strong>Switching Workspace Context</strong>
+                  <span>Purging client caches & verifying tenant isolation…</span>
+                </div>
+              </div>
+            </div>
+          )}
           {children}
         </main>
       </div>

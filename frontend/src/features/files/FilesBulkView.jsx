@@ -69,6 +69,18 @@ export function FilesBulkView({ user, activeOrg, userPermissions, onShowNotice }
     loadFiles();
   }, [activeOrg?.id]);
 
+  // TASK-003: Broadcast event listener for global workspace cache purges
+  useEffect(() => {
+    function handlePurge() {
+      setFiles([]);
+      setSelectedIds(new Set());
+      setAddModalOpen(false);
+      setLoading(true);
+    }
+    window.addEventListener("teamguard:workspace-purged", handlePurge);
+    return () => window.removeEventListener("teamguard:workspace-purged", handlePurge);
+  }, []);
+
   function handleSelectAll(e) {
     if (e.target.checked) {
       setSelectedIds(new Set(files.map((f) => f.id)));
