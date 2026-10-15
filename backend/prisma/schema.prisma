@@ -111,10 +111,12 @@ model Project {
   id             Int          @id @default(autoincrement())
   organizationId Int
   name           String
+  key            String?
   description    String?
   status         String       @default("ACTIVE")
   progress       Int          @default(0)
   priority       String       @default("MEDIUM")
+  isArchived     Boolean      @default(false)
   deletedAt      DateTime?
   createdAt      DateTime     @default(now())
   updatedAt      DateTime     @updatedAt
@@ -122,9 +124,11 @@ model Project {
   tasks          Task[]
   files          FileAsset[]
 
+  @@unique([organizationId, key])
   @@index([organizationId])
   @@index([deletedAt])
   @@index([organizationId, deletedAt])
+  @@index([organizationId, isArchived])
 }
 
 model Task {

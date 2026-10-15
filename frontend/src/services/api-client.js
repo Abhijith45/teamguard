@@ -254,13 +254,15 @@ export const api = {
   // Dashboard
   getDashboard: () => request("/dashboard"),
 
-  // Projects (TASK-201)
+  // Projects (TASK-201 & TASK-202)
   getProjects: (params = "") => request(`/projects${params ? `?${params}` : ""}`),
   getProject: (id, params = "") => request(`/projects/${id}${params ? `?${params}` : ""}`),
   createProject: (body) => request("/projects", { method: "POST", body }),
   updateProject: (id, body) => request(`/projects/${id}`, { method: "PATCH", body }),
   deleteProject: (id) => request(`/projects/${id}`, { method: "DELETE" }),
   restoreProject: (id) => request(`/projects/${id}/restore`, { method: "POST" }),
+  archiveProject: (id) => request(`/projects/${id}/archive`, { method: "POST" }),
+  unarchiveProject: (id) => request(`/projects/${id}/unarchive`, { method: "POST" }),
 
   // Tasks
   getTasks: (params = "") => request(`/tasks${params ? `?${params}` : ""}`),

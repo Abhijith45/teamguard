@@ -1,10 +1,12 @@
 import { Router } from "express";
 import {
+  archiveProject,
   createProject,
   deleteProject,
   getProject,
   listProjects,
   restoreProject,
+  unarchiveProject,
   updateProject,
 } from "../controllers/projects.controller.js";
 import { authenticate } from "../middleware/authenticate.js";
@@ -21,5 +23,7 @@ router.post("/", requirePermission("project", "create"), createProject);
 router.patch("/:projectId", requirePermission("project", "update"), updateProject);
 router.delete("/:projectId", requirePermission("project", "delete"), deleteProject);
 router.post("/:projectId/restore", requirePermission("project", "update"), restoreProject);
+router.post("/:projectId/archive", requirePermission("project", "update"), archiveProject);
+router.post("/:projectId/unarchive", requirePermission("project", "update"), unarchiveProject);
 
 export default router;

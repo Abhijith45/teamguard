@@ -239,6 +239,21 @@ export function AppShell({
                 >
                   <FolderGit2 size={16} className="text-emerald" />
                   <span className="truncate">{proj.name}</span>
+                  {proj.key && (
+                    <span
+                      style={{
+                        marginLeft: "auto",
+                        fontSize: "10px",
+                        fontWeight: "700",
+                        color: "#94a3b8",
+                        background: "rgba(148, 163, 184, 0.12)",
+                        padding: "1px 5px",
+                        borderRadius: "3px",
+                      }}
+                    >
+                      {proj.key}
+                    </span>
+                  )}
                 </button>
               ))}
               {projects.length === 0 && (
