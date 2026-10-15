@@ -1,578 +1,236 @@
-# TeamGuard --- RBAC Learning Application
-
-## 1. Project Overview
-
-**TeamGuard** is a multi-tenant team workspace and project-management
-application designed to teach and demonstrate Role-Based Access Control
-(RBAC), resource-level authorization, Attribute-Based Access Control
-(ABAC), tenant isolation, and audit logging.
-
-Each organization has its own members, roles, permissions, projects, and
-tasks. A user may have different roles in different organizations---for
-example, an Admin in Organization A and a Viewer in Organization B.
-
-### Primary learning objective
-
-Build an application where authorization decisions are based on:
-
--   The authenticated user
--   The active organization (tenant)
--   The user's membership in that organization
--   Roles assigned to that membership
--   Permissions granted through those roles
--   Resource attributes such as ownership, assignment, and project
-    membership
-
-Do not rely only on frontend visibility or a role name embedded in a JWT
-to authorize actions.
-
-## 2. Goals and Scope
-
-### Core goals
-
-1.  Understand authentication versus authorization.
-2.  Implement a flexible RBAC model using roles and granular
-    permissions.
-3.  Understand many-to-many relationships through join tables.
-4.  Apply resource-level and attribute-based policies.
-5.  Enforce strict organization/tenant isolation.
-6.  Implement secure role and permission administration.
-7.  Record security-sensitive actions in audit logs.
-8.  Test allowed and denied actions through the API.
-
-### Out of scope for the first version
-
--   Billing and subscriptions
--   Real-time chat
--   File storage
--   Complex workflow automation
--   External enterprise identity providers
--   Microservices
-
-Keep the first version small enough to understand end-to-end.
-
-## 3. Recommended Technology Stack
-
-  -----------------------------------------------------------------------
-  Layer                               Technology
-  ----------------------------------- -----------------------------------
-  Frontend                            React + Vite
-
-  UI                                  Material UI (MUI)
-
-  Client routing                      React Router
-
-  HTTP client                         Axios
-
-  Backend                             Node.js + Express.js
-
-  Database                            PostgreSQL
-
-  ORM                                 Prisma
-
-  Authentication                      JWT with secure cookie-based
-                                      sessions, or a correctly
-                                      implemented access/refresh-token
-                                      flow
-
-  Authorization                       Custom RBAC middleware and
-                                      resource-level ABAC policies
-
-  Validation                          Zod
-
-  Testing                             Vitest or Jest + Supertest
-
-  Frontend hosting                    Vercel
-
-  Backend hosting                     Render
-
-  Database hosting                    Neon PostgreSQL
-  -----------------------------------------------------------------------
-
-Use JavaScript and JSX unless the project requirements later change.
-Keep backend business logic separate from Express controllers.
-
-## 4. Application Modules
-
-### 4.1 Authentication
-
--   Register
--   Log in
--   Log out
--   Password hashing with bcrypt
--   Session creation and expiration
--   Access-token validation
--   Refresh-token rotation and revocation
--   Public-user serialization that never returns password hashes
-
-### 4.2 Organizations and memberships
-
--   Create an organization
--   Add or invite members
--   List members
--   Remove members
--   Switch active organization
--   Assign roles to a membership
--   Allow one user to belong to multiple organizations
-
-A user's effective permissions must be evaluated within the active
-organization.
-
-### 4.3 Projects
-
--   List projects visible to the current user
--   Create projects
--   View project details
--   Edit projects according to permissions and scope
--   Assign project members or teams if required
--   Delete projects according to policy
-
-Every project must belong to an organization.
-
-### 4.4 Tasks
-
--   Create tasks within a project
--   Assign tasks to members
--   View tasks
--   Update task details
--   Allow members to edit their own assigned tasks when policy permits
--   Restrict cross-organization task access
--   Delete tasks only when permitted
-
-Every task must be associated with a project, and its organization
-boundary must be enforced through that project.
-
-### 4.5 Role and permission administration
-
--   List roles
--   Create organization-specific custom roles
--   Edit role names and descriptions
--   Grant or revoke permissions for a role
--   Assign roles to memberships
--   Prevent unauthorized privilege escalation
--   Protect sensitive roles and operations
-
-Only appropriately authorized users should manage roles and permissions.
-
-### 4.6 Audit logs
-
-Record security-sensitive events, such as:
-
--   Membership created or removed
--   Role assigned or removed
--   Permission changed
--   Project created, updated, or deleted
--   Task created, updated, or deleted
--   Authorization failures where useful
-
-Recommended audit fields:
-
--   Actor user ID
--   Organization ID
--   Action
--   Resource type
--   Resource ID
--   Outcome
--   Timestamp
--   Optional request/correlation ID
-
-Avoid recording passwords, access tokens, refresh tokens, or other
-secrets.
-
-## 5. Example Roles and Permissions
-
-Start with these roles:
-
--   **Owner**
--   **Admin**
--   **Manager**
--   **Member**
--   **Viewer**
-
-Example policy matrix:
-
-  Permission              Owner   Admin   Manager   Member   Viewer
-  --------------------- ------- ------- --------- -------- --------
-  View projects             Yes     Yes       Yes      Yes      Yes
-  Create projects           Yes     Yes       Yes       No       No
-  Edit any project          Yes     Yes    Scoped       No       No
-  Create tasks              Yes     Yes       Yes      Yes       No
-  Edit own tasks            Yes     Yes       Yes      Yes       No
-  Manage members            Yes     Yes        No       No       No
-  Manage roles              Yes     Yes        No       No       No
-  View audit logs           Yes     Yes        No       No       No
-  Delete organization       Yes      No        No       No       No
-
-`Scoped` means the Manager can edit only resources inside their
-permitted team or project scope.
-
-These are example learning policies, not universal definitions. The
-implementation should resolve permissions from database relationships
-instead of hardcoding this table into route handlers.
-
-## 6. RBAC, ABAC, and Tenant Isolation
-
-### 6.1 RBAC: Can the user perform this action?
-
-Example permission identifiers:
-
--   `project:read`
--   `project:create`
--   `project:update`
--   `project:delete`
--   `task:read`
--   `task:create`
--   `task:update:own`
--   `task:update:any`
--   `member:read`
--   `member:manage`
--   `role:manage`
--   `audit:read`
--   `organization:delete`
-
-A role grants a collection of permissions. A user receives permissions
-through the roles assigned to their organization membership.
-
-### 6.2 ABAC: Can the user act on this particular resource?
-
-A user may have `task:update` but should not necessarily be able to
-update every task.
-
-Policy attributes can include:
-
--   Task assignee
--   Task creator
--   Project membership
--   Organization ID
--   Resource status
--   User's team
--   Action being attempted
-
-For example, permit a Member to update a task only when the task is
-assigned to that user, while allowing an appropriately privileged user
-to update any task within the authorized scope.
-
-### 6.3 Tenant isolation
-
-Every request involving an organization-owned resource must enforce the
-active organization boundary.
-
-Do not fetch a task solely by task ID and assume that knowing the ID
-grants access. Scope database queries to the organization and verify
-membership and permissions.
-
-A user in Organization A must not access Organization B's projects or
-tasks by changing an ID in a URL or request body.
-
-## 7. Suggested Data Model
-
-Use PostgreSQL with Prisma. A starting model inventory is:
-
-  -----------------------------------------------------------------------
-  Model                               Responsibility
-  ----------------------------------- -----------------------------------
-  `User`                              Identity, name, normalized email,
-                                      normalized username, password hash
-
-  `Organization`                      Tenant/workspace
-
-  `Membership`                        Connects a user to an organization
-
-  `Role`                              Role definition, preferably scoped
-                                      to an organization where custom
-                                      roles are supported
-
-  `Permission`                        Granular action identifier
-
-  `MembershipRole`                    Connects a membership to a role
-
-  `RolePermission`                    Connects a role to a permission
-
-  `Project`                           Organization-owned project
-
-  `Task`                              Project-owned task with optional
-                                      assignee/creator
-
-  `RefreshSession`                    Hashed refresh token, expiry,
-                                      revocation/session metadata
-
-  `AuditLog`                          Security-sensitive action history
-  -----------------------------------------------------------------------
-
-### Core authorization relationship
-
-`User → Membership → MembershipRole → Role → RolePermission → Permission`
-
-This design is important because a user's role belongs to an
-organization membership, not globally to the user. The same user can
-have different roles in different organizations.
-
-### Recommended constraints and indexes
-
--   Unique normalized email, according to the chosen account policy
--   Unique normalized username, if usernames are required
--   Unique organization membership for each `(userId, organizationId)`
-    pair
--   Unique membership-role pair
--   Unique role-permission pair
--   Unique permission identifier where appropriate
--   Foreign keys for all relationships
--   Index organization IDs and commonly queried foreign keys
--   Index refresh-session user IDs and expiry
--   Index audit-log organization, timestamp, and resource identifiers
-
-Use database constraints as the final defense against duplicates and
-invalid relationships.
-
-## 8. Authorization Middleware Concept
-
-An Express middleware can require a permission:
-
-``` javascript
-export const requirePermission = (permission) => {
-  return async (req, res, next) => {
-    try {
-      const allowed = await hasPermission({
-        userId: req.user.id,
-        organizationId: req.organizationId,
-        permission,
-      });
-
-      if (!allowed) {
-        return res.status(403).json({
-          message: "Forbidden",
-        });
-      }
-
-      next();
-    } catch (error) {
-      next(error);
-    }
-  };
-};
+# TeamGuard 🛡️
+### Enterprise Multi-Tenant RBAC & ABAC Access Management Platform
+
+[![Node.js](https://img.shields.io/badge/Node.js-v18+-339933?logo=node.js&logoColor=white)](https://nodejs.org/)
+[![Express.js](https://img.shields.io/badge/Express-v5.3-000000?logo=express&logoColor=white)](https://expressjs.com/)
+[![React](https://img.shields.io/badge/React-v19-61DAFB?logo=react&logoColor=black)](https://react.dev/)
+[![Vite](https://img.shields.io/badge/Vite-v8-646CFF?logo=vite&logoColor=white)](https://vitejs.dev/)
+[![Prisma](https://img.shields.io/badge/Prisma-v7-2D3748?logo=prisma&logoColor=white)](https://www.prisma.io/)
+[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-14+-4169E1?logo=postgresql&logoColor=white)](https://www.postgresql.org/)
+[![License](https://img.shields.io/badge/License-ISC-blue.svg)](LICENSE)
+
+**TeamGuard** is a full-stack, enterprise-grade multi-tenant workspace and authorization engine designed to demonstrate and enforce **Role-Based Access Control (RBAC)**, **Attribute-Based Access Control (ABAC)**, **strict tenant boundary isolation**, and **immutable security audit logging**.
+
+Every organization maintains its own members, custom roles, permissions, projects, tasks, and files. Authorization decisions are resolved dynamically on the server from relational join tables and resource attributes—never trusting client-side visibility flags or static JWT role claims.
+
+---
+
+## 🌟 Key Features
+
+### 🏢 Multi-Tenant Isolation
+- **Fail-Closed Header Enforcement**: Protected routes require explicit `x-organization-id` header context and verify active membership before granting access.
+- **Cross-Tenant Leak Prevention**: Database queries strictly scope resources by `organizationId`. Attempting to access an ID from another tenant returns `404 Not Found` to prevent resource enumeration.
+- **Multi-Organization Membership**: A single user can belong to multiple organizations with distinct roles in each (e.g., **Admin** in Org A and **Viewer** in Org B).
+
+### 🔑 Dynamic RBAC & Fine-Grained ABAC
+- **Relational Permissions Chain**: `User → Membership → MembershipRole → Role → RolePermission → Permission`.
+- **Custom Tenant Roles**: Organizations can define custom roles with granular permission sets (`project:create`, `task:update:own`, `member:manage`, etc.).
+- **Attribute-Based Policies (ABAC)**: Resource operations verify ownership and contextual attributes (e.g. team members can only edit tasks assigned to them, while managers can edit all tasks in their scope).
+
+### 👥 Interactive Persona Switcher (Live Demo Mode)
+- Test and verify permission enforcement in real time with a built-in persona switcher:
+  - 👑 **Super Admin / Owner**: Full governance, role configuration, member invites, and audit log access.
+  - 💼 **Project Manager**: Project lifecycle and scoped task management.
+  - 🛠️ **Team Member**: Task progress updates on assigned items (`task:update:own`).
+  - 👁️ **Stakeholder / Viewer**: Read-only oversight with write operations strictly denied.
+
+### 📊 Modern Management Consoles
+- **Visual Permissions Matrix**: Interactive matrix grid displaying effective privileges for all roles.
+- **Interactive Kanban Board**: Organization-scoped project board with task assignment, status updates, and priority tagging.
+- **Bulk File Operations**: Asset management interface with tenant-isolated upload and delete actions.
+- **Security Audit Log Explorer**: Searchable, tamper-evident audit trail capturing actor, action, resource, timestamp, and outcome.
+
+### 🔒 Hardened Authentication & Session Lifecycle
+- Password hashing with **Bcrypt** ($\ge 10$ salt rounds).
+- Short-lived stateless **JWT Access Tokens** (`15m`).
+- Database-backed **Refresh Sessions** storing cryptographic SHA-256 hashes only.
+- Strict token rotation and instant multi-session revocation upon suspected token reuse or logout.
+- Safe serialization layers guaranteeing credentials and secret hashes are never sent in API responses.
+
+---
+
+## 🏗️ Architecture & Tech Stack
+
+```mermaid
+graph TD
+    Client[React 19 + Vite Frontend] -->|Bearer JWT + x-organization-id| API[Express 5 REST API]
+    API --> Auth[Authentication Middleware]
+    Auth --> Tenant[Tenant & Membership Resolver]
+    Tenant --> RBAC[Dynamic RBAC Middleware]
+    RBAC --> ABAC[Resource ABAC Policies]
+    ABAC --> Audit[Audit Logging Interceptor]
+    Audit --> Prisma[Prisma ORM Client]
+    Prisma --> DB[(PostgreSQL Database)]
 ```
 
-`hasPermission()` is an application service to implement. It must verify
-the user's active organization membership and resolve the roles and
-permissions for that membership. It must fail closed if membership or
-authorization data cannot be verified.
+| Layer | Technologies |
+|---|---|
+| **Frontend** | React 19, Vite 8, Lucide React, Custom CSS Design System |
+| **Backend** | Node.js (ESM), Express 5, Zod Schema Validation, Cookie-Parser, CORS |
+| **Database & ORM** | PostgreSQL, Prisma ORM 7 (`@prisma/client`, `@prisma/adapter-pg`) |
+| **Auth & Security** | JSON Web Tokens (`jsonwebtoken`), Bcrypt.js, SHA-256 Session Hashes |
+| **Testing** | Node.js Test Runner (`node --test`), Custom Assertion Suites |
 
-Example route:
+---
 
-``` javascript
-router.post(
-  "/organizations/:organizationId/projects",
-  authenticate,
-  resolveOrganization,
-  requirePermission("project:create"),
-  createProjectController
-);
+## 📁 Repository Structure
+
+```text
+rbac/
+├── backend/
+│   ├── config/              # Prisma database connection & client setup
+│   ├── prisma/              # Prisma schema, migrations & seed scripts
+│   ├── src/
+│   │   ├── controllers/     # Express route controllers
+│   │   ├── lib/             # JWT token helpers & cookie utilities
+│   │   ├── middleware/      # Auth, tenant resolver, RBAC & error handlers
+│   │   ├── routes/          # REST route declarations
+│   │   ├── services/        # Business logic, permission resolution & audit logging
+│   │   ├── utils/           # Validation schemas & response helpers
+│   │   └── app.js           # Express app setup & route registry
+│   ├── test/                # Automated RBAC & tenant isolation test suite
+│   ├── package.json
+│   └── server.js            # Server entrypoint & graceful shutdown handlers
+├── frontend/
+│   ├── src/
+│   │   ├── components/      # UI primitives, Brand & Persona Switcher
+│   │   ├── features/        # Auth, Dashboard, Kanban, Roles, Members, Files
+│   │   ├── hooks/           # useSession, useAdminWorkspace hooks
+│   │   ├── services/        # Axios / Fetch API client with tenant headers
+│   │   ├── layout/          # AppShell & responsive navigation
+│   │   └── main.jsx         # React application entrypoint
+│   └── vite.config.js
+├── docs/                    # Architectural decisions & product planning records
+├── AGENTS.md                # In-depth technical specifications & agent guide
+├── README.md                # GitHub project documentation
+└── .gitignore               # Strict exclusion rules for secrets, builds & caches
 ```
 
-The example illustrates the intended order. The organization resolver
-must verify that the authenticated user belongs to the requested
-organization before accepting it as the active organization.
+---
 
-### Resource-level policy
+## 🚀 Quickstart Guide
 
-A permission check alone may not be enough:
+### Prerequisites
+- **Node.js** (v18.0.0 or higher)
+- **PostgreSQL** instance running locally or hosted (e.g. Neon, Supabase, Render)
+- **npm** or **pnpm**
 
-``` javascript
-if (
-  task.assigneeId !== req.user.id &&
-  !permissions.includes("task:update:any")
-) {
-  return res.status(403).json({
-    message: "Cannot update this task",
-  });
-}
+---
+
+### 1. Backend Setup
+
+1. **Navigate to the backend directory**:
+   ```bash
+   cd backend
+   ```
+
+2. **Install dependencies**:
+   ```bash
+   npm install
+   ```
+
+3. **Configure environment variables**:
+   Create a `.env` file from the provided example:
+   ```bash
+   cp .env.example .env
+   ```
+   Update `.env` with your PostgreSQL connection string and secrets:
+   ```env
+   DATABASE_URL="postgresql://postgres:postgres@localhost:5432/teamguard"
+   PORT=5000
+   FRONTEND_ORIGIN="http://localhost:5173"
+   JWT_ACCESS_SECRET="your-super-secret-jwt-key-min-32-chars"
+   ACCESS_TOKEN_TTL="15m"
+   REFRESH_TOKEN_TTL_DAYS=30
+   ```
+
+4. **Run database migrations & seed initial data**:
+   ```bash
+   npm run db:generate
+   npm run db:migrate
+   ```
+
+5. **Start the backend development server**:
+   ```bash
+   npm run dev
+   ```
+   The backend API will run at `http://localhost:5000` (Health check: `http://localhost:5000/health`).
+
+---
+
+### 2. Frontend Setup
+
+1. **Navigate to the frontend directory**:
+   ```bash
+   cd ../frontend
+   ```
+
+2. **Install dependencies**:
+   ```bash
+   npm install
+   ```
+
+3. **Start the Vite development server**:
+   ```bash
+   npm run dev
+   ```
+   The application console will be accessible at `http://localhost:5173`.
+
+---
+
+## 🧪 Testing Authorization & Tenant Isolation
+
+TeamGuard includes a dedicated backend test suite to prove that permission rules and tenant boundaries cannot be bypassed via direct API calls:
+
+```bash
+cd backend
+npm test
 ```
 
-This is illustrative. In production, first ensure that the task belongs
-to the active organization, and ensure the permission set was resolved
-for the correct membership.
+### Verified Test Cases
+- 🚫 **Denied Write**: A `Viewer` attempting `POST /api/projects` receives `403 Forbidden`.
+- 🚫 **Cross-Tenant Attack**: A user authenticated in Organization A attempting to read or modify resources belonging to Organization B receives `404 Not Found` or `403 Forbidden`.
+- 🚫 **Privilege Escalation**: Non-administrative users cannot grant roles or assign unheld permissions.
+- 🚫 **Attribute Restrictions**: A `Member` without `task:update:any` cannot edit tasks assigned to other colleagues.
+- 🛡️ **Session Revocation**: Logged out or rotated refresh tokens are immediately rejected.
 
-### Status codes
+---
 
--   `401 Unauthorized`: the request is not authenticated or its
-    credentials are invalid.
--   `403 Forbidden`: the authenticated user lacks the required
-    permission.
--   `404 Not Found`: can be used for inaccessible resources when the
-    policy intentionally hides their existence.
--   `409 Conflict`: useful for duplicate registration or uniqueness
-    conflicts.
--   `400 Bad Request`: invalid request input.
+## 📡 API Overview
 
-Frontend checks are for user experience only. All security-critical
-authorization must be enforced on the backend.
+All protected requests require:
+- `Authorization: Bearer <access_token>`
+- `x-organization-id: <organization_id>`
 
-## 9. Authentication and Session Design
+| Route | Method | Description | Required Permission |
+|---|:---:|---|---|
+| `/api/auth/register` | `POST` | Register a new user account | Public |
+| `/api/auth/login` | `POST` | Authenticate and obtain JWT access token | Public |
+| `/api/auth/refresh` | `POST` | Rotate and refresh access token | Refresh Cookie |
+| `/api/auth/logout` | `POST` | Revoke active refresh session | Authenticated |
+| `/api/demo/switch-persona` | `POST` | Quick-switch active demo persona | Public / Demo |
+| `/api/organizations` | `GET` | List organizations for authenticated user | Authenticated |
+| `/api/projects` | `GET` / `POST` | List projects or create a new project | `project:read` / `project:create` |
+| `/api/tasks` | `GET` / `POST` | Retrieve Kanban tasks or create task | `task:read` / `task:create` |
+| `/api/tasks/:id` | `PATCH` / `DELETE` | Update task status or delete task | `task:update:own` or `task:update:any` |
+| `/api/files` | `GET` / `POST` | Workspace file asset registry & bulk uploads | `file:read` / `file:upload` |
+| `/api/permissions-matrix` | `GET` | Visual role-permission matrix mapping | `role:read` |
+| `/api/dashboard` | `GET` | Aggregated analytics & audit summary | `member:read` |
 
-A possible session flow:
+---
 
-1.  Validate registration input.
-2.  Normalize identifiers such as email and username.
-3.  Hash the password using bcrypt with a suitable cost factor.
-4.  Create the user and initial organization membership/role assignment
-    in a transaction where appropriate.
-5.  Create a refresh session.
-6.  Store only the refresh-token hash in the database.
-7.  Return a safe public user representation and issue the
-    access/refresh credentials using the chosen delivery mechanism.
-8.  Rotate refresh tokens and revoke sessions on logout or suspected
-    reuse.
+## 📖 Deep Architectural Guidance & Specifications
 
-If using cookies, configure `HttpOnly`, `Secure` in production, and an
-appropriate `SameSite` policy. Evaluate CSRF protection based on the
-cookie and request design. Never log credentials or tokens.
+For comprehensive documentation on:
+- Formal authorization contracts & fail-closed error handling
+- Complete PostgreSQL Prisma entity relationships
+- Security audit compliance and token lifecycle policies
+- AI Agent rules and sprint planning roadmaps
 
-If creating a user and session are separate transactions, plan for
-session-creation failure after user creation. Use a deliberate
-transaction boundary or a recovery strategy so the client does not
-receive an unexplained failure while the account has already been
-created.
+Please refer directly to [AGENTS.md](AGENTS.md).
 
-## 10. Development Plan
+---
 
-### Sprint 1 --- Authentication
+## 📄 License
 
--   Registration and login
--   Password hashing
--   Session management
--   Logout
--   Authentication middleware
--   Input validation
-
-### Sprint 2 --- Organizations
-
--   Organization creation
--   Membership creation and listing
--   Organization switching
--   Membership checks
--   Organization ownership rules
-
-### Sprint 3 --- RBAC engine
-
--   Permission catalog
--   Role definitions
--   Membership-role assignments
--   Role-permission assignments
--   Permission-resolution service
--   Authorization middleware
--   Unit tests for permission resolution
-
-### Sprint 4 --- Protected resources
-
--   Project CRUD
--   Task CRUD
--   Ownership and assignment policies
--   Organization-scoped database queries
--   Resource-level authorization
-
-### Sprint 5 --- Administration UI
-
--   Member management
--   Role management
--   Permission assignment interface
--   Guarded admin routes
--   Protection against privilege escalation
-
-### Sprint 6 --- Audit and security
-
--   Audit logging
--   Authorization failure handling
--   Tenant-isolation tests
--   Negative permission tests
--   Session revocation and refresh-token tests
--   Deployment and environment configuration review
-
-## 11. Required Authorization Tests
-
-Test through the actual API, not only through the frontend.
-
--   A Viewer cannot create a project, even by sending a direct HTTP
-    request.
--   A Manager cannot edit a project outside their permitted scope.
--   A user in Organization A cannot access Organization B's tasks by
-    changing a URL or resource ID.
--   A user with different roles in two organizations receives different
-    effective permissions in each.
--   Removing a permission prevents subsequent protected operations once
-    the updated authorization state is expected to apply.
--   A non-admin cannot grant themselves an Admin role.
--   Failed authorization requests do not modify database records.
--   A user without `audit:read` cannot retrieve audit logs.
--   Invalid or expired credentials are rejected.
--   Refresh tokens are rotated and revoked according to policy.
--   Concurrent duplicate registrations cannot create duplicate
-    normalized email or username values.
--   Failed role assignment rolls back user creation when both operations
-    are in the same transaction.
--   Invalid input is rejected before unsafe database operations.
--   No API response exposes password hashes or refresh-token hashes.
-
-## 12. Security and Implementation Checklist
-
--   [ ] Validate all request bodies, route parameters, and query
-    parameters with Zod.
--   [ ] Enforce unique constraints in PostgreSQL.
--   [ ] Normalize email and username consistently.
--   [ ] Never store plaintext passwords.
--   [ ] Never expose password hashes in API responses.
--   [ ] Keep role assignment server-controlled during public
-    registration.
--   [ ] Verify membership in the active organization on every protected
-    organization-scoped request.
--   [ ] Scope resource queries by organization.
--   [ ] Keep authorization logic centralized and testable.
--   [ ] Fail closed when permission evaluation fails.
--   [ ] Prevent users from granting permissions they are not allowed to
-    delegate.
--   [ ] Use transactions for related database writes.
--   [ ] Protect refresh tokens and implement expiration, rotation, and
-    revocation.
--   [ ] Configure secure cookies and assess CSRF risks if cookie-based
-    authentication is used.
--   [ ] Add rate limiting to authentication endpoints.
--   [ ] Avoid returning internal errors or stack traces to clients.
--   [ ] Log security events without logging secrets.
--   [ ] Test negative cases and cross-tenant access explicitly.
--   [ ] Treat frontend permission checks as presentation logic, not
-    security enforcement.
-
-## 13. Definition of Done
-
-TeamGuard's first complete learning version is done when:
-
-1.  Users can authenticate and belong to multiple organizations.
-2.  Each membership can have one or more roles.
-3.  Roles grant granular permissions through database relationships.
-4.  Administrators can manage permitted roles and permissions.
-5.  Protected routes enforce authorization on the server.
-6.  Resource-level rules distinguish actions such as editing one's own
-    task versus any task.
-7.  Organization boundaries prevent cross-tenant access.
-8.  Audit logs capture key administrative and security events.
-9.  Automated tests prove both allowed and denied behavior.
-10. The application is deployed with secrets stored in environment
-    configuration.
-
-## 14. Core Mental Model
-
-Keep these concepts separate:
-
--   **Authentication:** Who is making the request?
--   **Organization membership:** Which tenant is the user acting within?
--   **RBAC:** Which actions are allowed by the user's assigned roles?
--   **ABAC/resource policy:** Is this action allowed on this specific
-    resource under its attributes?
--   **Tenant isolation:** Does the resource belong to the active
-    organization?
--   **Audit logging:** What security-relevant action occurred, by whom,
-    and with what outcome?
-
-The central learning objective is to make authorization decisions from
-the authenticated user, active organization, membership, roles,
-permissions, and resource attributes---not from a frontend button or a
-role string alone.
+This project is licensed under the [ISC License](LICENSE).
