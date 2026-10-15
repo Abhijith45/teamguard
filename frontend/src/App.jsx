@@ -257,6 +257,8 @@ export default function App() {
         <AccountPage
           user={user}
           activeOrg={activeOrg}
+          onUpdateUser={setUser}
+          onShowNotice={showNotice}
         />
       )}
 

@@ -189,6 +189,7 @@ model RefreshSession {
   id                  String    @id @default(cuid())
   userId              Int
   tokenHash           String    @unique
+  familyId            String?
   expiresAt           DateTime
   revokedAt           DateTime?
   rotatedAt           DateTime?
@@ -198,5 +199,7 @@ model RefreshSession {
   createdAt           DateTime  @default(now())
   user                User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 
+  @@index([familyId])
   @@index([userId, expiresAt])
 }
+
