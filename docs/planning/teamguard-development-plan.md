@@ -211,7 +211,7 @@ Work is sequenced strictly by technical dependencies, security invariants, and r
 
 | Phase | Phase Name | Release Track | Included Tasks | Scope & Objective |
 | :---: | :--- | :---: | :---: | :--- |
-| **Phase 0** | Baseline Hardening & Defect Remediation | Track A | `TASK-001`–`TASK-006` | Eliminate tenant header fallback, protect task fields, purge switch cache, deploy baseline Helmet/rate limiting, session rotation, negative test suite. |
+| **Phase 0** | Baseline Hardening & Defect Remediation | Track A | `TASK-001`–`TASK-006` | Eliminate tenant header fallback, protect task fields, purge switch cache, deploy baseline Helmet/rate limiting, session rotation, negative test suite. **[COMPLETE / 100% VERIFIED]** |
 | **Phase 1** | Organization, Membership & RBAC Administration | Track A | `TASK-101`–`TASK-104` | Member directory, last-owner guards, custom roles, template cloning, delegation barriers. |
 | **Phase 2** | Core Workflows: Projects, Tasks & Multi-View Board | Track A | `TASK-201`–`TASK-206` | Project keys, progress aggregation, task CRUD, Kanban board, List/Table views, multi-filters. |
 | **Phase 3** | Collaboration, Subtasks, Activity Streams & Dispatch | Track A | `TASK-301`–`TASK-304` | Subtasks, comments with 15m edit window, task activity stream, real-time notification dispatch. |
@@ -230,7 +230,7 @@ Work is sequenced strictly by technical dependencies, security invariants, and r
 - **Linked User Stories**: `US-TENANT-001`, `US-TENANT-005`
 - **Linked PRD Features**: `TG-TENANT-001`
 - **Priority**: Critical (P0)
-- **Status**: Remediation Implementation Required
+- **Status**: Complete / Verified (TIER-2 & TIER-3)
 - **Affected Files**: [backend/src/middleware/tenant.middleware.js](file:///c:/Users/Abhijeet%20Rawat/Desktop/rbac/backend/src/middleware/tenant.middleware.js)
 - **Implementation Steps**:
   1. Remove lines 18–35 fallback querying first active membership.
@@ -250,7 +250,7 @@ Work is sequenced strictly by technical dependencies, security invariants, and r
 - **Linked User Stories**: `US-ABAC-003`
 - **Linked PRD Features**: `TG-ABAC-003`
 - **Priority**: Critical (P0)
-- **Status**: Remediation Implementation Required
+- **Status**: Complete / Verified (TIER-2 & TIER-3)
 - **Affected Files**: [backend/src/controllers/tasks.controller.js](file:///c:/Users/Abhijeet%20Rawat/Desktop/rbac/backend/src/controllers/tasks.controller.js)
 - **Implementation Steps**:
   1. In `updateTask`, inspect parsed body for `projectId`, `creatorId`, `assigneeId`.
@@ -331,17 +331,17 @@ Work is sequenced strictly by technical dependencies, security invariants, and r
 - **Linked User Stories**: `US-TENANT-005`, `US-DEV-001`
 - **Linked PRD Features**: `TG-TENANT-001`, `TG-DEV-001`
 - **Priority**: Critical (P0)
-- **Status**: Implementation Required
-- **Affected Files**: `backend/test/tenant-security.test.js`, [backend/prisma/seed.js](file:///c:/Users/Abhijeet%20Rawat/Desktop/rbac/backend/prisma/seed.js)
+- **Status**: Complete / Verified (TIER-2: 25/25 Pass in tenant-security.test.js)
+- **Affected Files**: `backend/test/tenant-security.test.js`, [backend/prisma/seed.js](file:///c:/Users/Abhijeet%20Rawat/Desktop/rbac/backend/prisma/seed.js), `backend/config/seed.js`
 - **Implementation Steps**:
-  1. Author 20+ automated test vectors asserting 400/401/403 across tenant scoping, role delegation, and ID manipulation.
-  2. Ensure seed script provisions reproducible multi-tenant test fixtures cleanly.
-- **Data/API Impact**: None (test runner only).
+  1. Author 20+ automated test vectors asserting 400/401/403 across tenant scoping, role delegation, and ID manipulation (25 total vectors implemented).
+  2. Ensure seed script provisions reproducible multi-tenant test fixtures cleanly (Nova Labs fixtures added and verified idempotent).
+- **Data/API Impact**: None (test runner & seed fixtures only).
 - **Security Considerations**: Automates regression defense for RCG-1 through RCG-5.
 - **Dependencies & Blockers**: TASK-001, TASK-002, TASK-004.
 - **Test Plan**: Execute `node --test backend/test/tenant-security.test.js`.
 - **Acceptance Criteria**: 100% of negative security tests pass.
-- **Definition of Done**: Test suite committed and executing cleanly in `npm test`.
+- **Definition of Done**: Test suite committed and executing cleanly in `npm test` (65/65 pass).
 - **Effort Estimate**: M (2 business days).
 - **Risk & Rollback**: Zero risk.
 
