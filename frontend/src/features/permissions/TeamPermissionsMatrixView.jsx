@@ -1,15 +1,20 @@
 import { useEffect, useState, useMemo } from "react";
 import {
   AlertCircle,
+  AlertTriangle,
   Building2,
   Check,
+  Copy,
   Edit3,
   Layers,
   Lock,
+  Plus,
   Search,
+  Shield,
   ShieldAlert,
   ShieldCheck,
   SlidersHorizontal,
+  Trash2,
   X,
 } from "lucide-react";
 import { api } from "../../services/api-client.js";
@@ -24,6 +29,7 @@ export function TeamPermissionsMatrixView({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [pendingToggles, setPendingToggles] = useState(new Set());
+  const [pendingBulkToggles, setPendingBulkToggles] = useState(new Set());
 
   // Filter & Search states
   const [searchQuery, setSearchQuery] = useState("");
@@ -34,6 +40,17 @@ export function TeamPermissionsMatrixView({
   const [renameOrgName, setRenameOrgName] = useState("");
   const [savingOrg, setSavingOrg] = useState(false);
 
+  // Custom Role Modal state
+  const [createRoleModalOpen, setCreateRoleModalOpen] = useState(false);
+  const [newRoleName, setNewRoleName] = useState("");
+  const [newRoleDescription, setNewRoleDescription] = useState("");
+  const [cloneFromRoleId, setCloneFromRoleId] = useState("");
+  const [creatingRole, setCreatingRole] = useState(false);
+
+  // Custom Role Delete Modal state
+  const [roleToDelete, setRoleToDelete] = useState(null);
+  const [deletingRole, setDeletingRole] = useState(false);
+
   const canManageRoles = userPermissions.has("roles:manage");
 
   async function loadMatrix() {
@@ -42,6 +59,7 @@ export function TeamPermissionsMatrixView({
       setError(null);
       setData(null);
       setPendingToggles(new Set());
+      setPendingBulkToggles(new Set());
       const res = await api.getPermissionsMatrix();
       setData(res);
     } catch (err) {
@@ -60,6 +78,7 @@ export function TeamPermissionsMatrixView({
     function handlePurge() {
       setData(null);
       setPendingToggles(new Set());
+      setPendingBulkToggles(new Set());
       setLoading(true);
     }
     window.addEventListener("teamguard:workspace-purged", handlePurge);
@@ -117,6 +136,130 @@ export function TeamPermissionsMatrixView({
         next.delete(toggleKey);
         return next;
       });
+    }
+  }
+
+  async function handleBulkToggle(roleId, moduleId, enabled, roleName, moduleLabel) {
+    if (!canManageRoles) {
+      onShowNotice({
+        type: "error",
+        message: "RBAC Denial: You do not have 'roles:manage' permission to modify roles.",
+      });
+      return;
+    }
+
+    if (roleName === "Super Admin" && !enabled) {
+      onShowNotice({
+        type: "error",
+        message: "Privilege Guard: Super Admin permissions cannot be revoked to prevent administrative lockout.",
+      });
+      return;
+    }
+
+    const bulkKey = `${roleId}:${moduleId}`;
+    try {
+      setPendingBulkToggles((prev) => new Set(prev).add(bulkKey));
+
+      await api.bulkToggleModule(roleId, moduleId, enabled);
+
+      const targetCategory = categories.find((c) => c.id === moduleId);
+      const targetPermIds = (targetCategory?.permissions || []).map((p) => p.id);
+
+      setData((prev) => {
+        if (!prev) return prev;
+        const currentList = prev.matrix[roleId] || [];
+        const nextList = enabled
+          ? Array.from(new Set([...currentList, ...targetPermIds]))
+          : currentList.filter((id) => !targetPermIds.includes(id));
+
+        return {
+          ...prev,
+          matrix: {
+            ...prev.matrix,
+            [roleId]: nextList,
+          },
+        };
+      });
+
+      onShowNotice({
+        type: "success",
+        message: `${enabled ? "Granted all" : "Cleared all"} ${moduleLabel} permissions for ${roleName}.`,
+      });
+    } catch (err) {
+      onShowNotice({ type: "error", message: `Bulk action failed: ${err.message}` });
+    } finally {
+      setPendingBulkToggles((prev) => {
+        const next = new Set(prev);
+        next.delete(bulkKey);
+        return next;
+      });
+    }
+  }
+
+  async function handleCreateRoleSubmit(e) {
+    e.preventDefault();
+    const trimmedName = newRoleName.trim();
+    if (trimmedName.length < 2) return;
+
+    try {
+      setCreatingRole(true);
+      const res = await api.createRole({
+        name: trimmedName,
+        description: newRoleDescription.trim() || undefined,
+        cloneFromRoleId: cloneFromRoleId ? parseInt(cloneFromRoleId, 10) : undefined,
+      });
+
+      setCreateRoleModalOpen(false);
+      setNewRoleName("");
+      setNewRoleDescription("");
+      setCloneFromRoleId("");
+
+      await loadMatrix();
+
+      const cloneMsg = res.clonedPermissionCount
+        ? ` (cloned ${res.clonedPermissionCount} permissions)`
+        : "";
+      onShowNotice({
+        type: "success",
+        message: `Custom role "${res.role.name}" created successfully${cloneMsg}.`,
+      });
+    } catch (err) {
+      onShowNotice({
+        type: "error",
+        message: `Failed to create role: ${err.message}`,
+      });
+    } finally {
+      setCreatingRole(false);
+    }
+  }
+
+  async function handleDeleteRoleConfirm() {
+    if (!roleToDelete) return;
+    if (!canManageRoles) {
+      onShowNotice({
+        type: "error",
+        message: "RBAC Denial: You do not have 'roles:manage' permission to delete roles.",
+      });
+      return;
+    }
+
+    try {
+      setDeletingRole(true);
+      await api.deleteRole(roleToDelete.id);
+      const deletedName = roleToDelete.name;
+      setRoleToDelete(null);
+      await loadMatrix();
+      onShowNotice({
+        type: "success",
+        message: `Custom role "${deletedName}" was successfully deleted.`,
+      });
+    } catch (err) {
+      onShowNotice({
+        type: "error",
+        message: `Cannot delete role: ${err.message}`,
+      });
+    } finally {
+      setDeletingRole(false);
     }
   }
 
@@ -195,7 +338,7 @@ export function TeamPermissionsMatrixView({
         <div className="matrix-header-left">
           <h2>Team & Permissions Matrix</h2>
           <p>
-            Control granular privileges, audit assigned capabilities, and manage role authority across workspace modules.
+            Control granular privileges, audit assigned capabilities, and manage custom role authority across workspace modules.
           </p>
         </div>
 
@@ -206,19 +349,37 @@ export function TeamPermissionsMatrixView({
           </div>
 
           {canManageRoles && (
-            <button
-              type="button"
-              className="button button-quiet"
-              style={{ padding: "6px 12px", fontSize: "0.8rem", display: "inline-flex", alignItems: "center", gap: "6px" }}
-              onClick={() => {
-                setRenameOrgName(activeOrg?.name || "");
-                setEditOrgModalOpen(true);
-              }}
-              title="Edit workspace metadata"
-            >
-              <Edit3 size={14} />
-              <span>Settings</span>
-            </button>
+            <>
+              <button
+                type="button"
+                className="button button-primary"
+                style={{ padding: "6px 14px", fontSize: "0.8rem", display: "inline-flex", alignItems: "center", gap: "6px" }}
+                onClick={() => {
+                  setNewRoleName("");
+                  setNewRoleDescription("");
+                  setCloneFromRoleId("");
+                  setCreateRoleModalOpen(true);
+                }}
+                title="Create a custom role scoped to this workspace"
+              >
+                <Plus size={14} />
+                <span>Add Custom Role</span>
+              </button>
+
+              <button
+                type="button"
+                className="button button-quiet"
+                style={{ padding: "6px 12px", fontSize: "0.8rem", display: "inline-flex", alignItems: "center", gap: "6px" }}
+                onClick={() => {
+                  setRenameOrgName(activeOrg?.name || "");
+                  setEditOrgModalOpen(true);
+                }}
+                title="Edit workspace metadata"
+              >
+                <Edit3 size={14} />
+                <span>Settings</span>
+              </button>
+            </>
           )}
         </div>
       </div>
@@ -346,23 +507,70 @@ export function TeamPermissionsMatrixView({
                     {roles.map((role) => {
                       const rolePerms = new Set(matrix[role.id] || []);
                       const isSuperAdmin = role.name === "Super Admin" || role.slug === "super-admin";
+                      const isBulkPending = pendingBulkToggles.has(`${role.id}:${category.id}`);
 
                       return (
                         <tr key={role.id}>
                           <td className="td-role-name">
-                            <strong>{role.name}</strong>
-                            {isSuperAdmin && (
-                              <small className="superadmin-tag" title="Super Admin permissions are permanently protected against lockout (BR-004)">
-                                <Lock size={10} style={{ display: "inline", marginRight: "3px" }} />
-                                Protected
-                              </small>
-                            )}
+                            <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
+                              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "8px" }}>
+                                <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                                  <strong>{role.name}</strong>
+                                  {isSuperAdmin && (
+                                    <small className="superadmin-tag" title="Super Admin permissions are permanently protected against lockout (BR-004)">
+                                      <Lock size={10} style={{ display: "inline", marginRight: "3px" }} />
+                                      Protected
+                                    </small>
+                                  )}
+                                  {!role.isSystem && (
+                                    <span className="custom-role-badge" title="Workspace-scoped custom role">
+                                      Custom
+                                    </span>
+                                  )}
+                                </div>
+
+                                {!role.isSystem && canManageRoles && (
+                                  <button
+                                    type="button"
+                                    className="delete-role-inline-btn"
+                                    onClick={() => setRoleToDelete(role)}
+                                    title={`Delete custom role "${role.name}"`}
+                                  >
+                                    <Trash2 size={13} />
+                                  </button>
+                                )}
+                              </div>
+
+                              {canManageRoles && !isSuperAdmin && (
+                                <div className="role-module-bulk-btns">
+                                  <span style={{ fontSize: "0.66rem", color: "var(--color-text-muted)", marginRight: "2px" }}>Bulk:</span>
+                                  <button
+                                    type="button"
+                                    className="bulk-pill-btn select-all"
+                                    disabled={isBulkPending}
+                                    onClick={() => handleBulkToggle(role.id, category.id, true, role.name, category.label)}
+                                    title={`Grant all ${category.label} permissions to ${role.name}`}
+                                  >
+                                    Select All
+                                  </button>
+                                  <button
+                                    type="button"
+                                    className="bulk-pill-btn clear-all"
+                                    disabled={isBulkPending}
+                                    onClick={() => handleBulkToggle(role.id, category.id, false, role.name, category.label)}
+                                    title={`Clear all ${category.label} permissions from ${role.name}`}
+                                  >
+                                    Clear All
+                                  </button>
+                                </div>
+                              )}
+                            </div>
                           </td>
 
                           {category.permissions.map((perm) => {
                             const isEnabled = rolePerms.has(perm.id);
                             const toggleKey = `${role.id}:${perm.id}`;
-                            const isPending = pendingToggles.has(toggleKey);
+                            const isPending = pendingToggles.has(toggleKey) || isBulkPending;
 
                             return (
                               <td key={perm.id} className="td-matrix-checkbox">
@@ -398,6 +606,167 @@ export function TeamPermissionsMatrixView({
               </div>
             </div>
           ))}
+        </div>
+      )}
+
+      {/* Create Custom Role Modal */}
+      {createRoleModalOpen && (
+        <div className="member-modal-backdrop" onClick={() => !creatingRole && setCreateRoleModalOpen(false)}>
+          <div className="member-dialog" onClick={(e) => e.stopPropagation()} style={{ maxWidth: "520px" }}>
+            <div className="member-dialog-header">
+              <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                <Shield size={20} style={{ color: "#7C3AED" }} />
+                <h3>Create Custom Role</h3>
+              </div>
+              <button
+                className="member-modal-close"
+                onClick={() => setCreateRoleModalOpen(false)}
+                disabled={creatingRole}
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            <form onSubmit={handleCreateRoleSubmit}>
+              <div className="member-dialog-body">
+                <p style={{ fontSize: "0.85rem", color: "var(--color-text-muted)", marginBottom: "16px", lineHeight: "1.5" }}>
+                  Define a new workspace-scoped custom role. You can start with a clean slate or clone all permissions from an existing template role.
+                </p>
+
+                <div style={{ marginBottom: "14px" }}>
+                  <label style={{ display: "block", fontSize: "0.75rem", fontWeight: "700", textTransform: "uppercase", letterSpacing: "0.04em", color: "var(--color-text-muted)", marginBottom: "6px" }}>
+                    Role Name *
+                  </label>
+                  <input
+                    type="text"
+                    className="filter-search-input"
+                    style={{ width: "100%", padding: "10px 12px" }}
+                    placeholder="e.g. QA Specialist, Security Reviewer, Release Manager"
+                    value={newRoleName}
+                    onChange={(e) => setNewRoleName(e.target.value)}
+                    disabled={creatingRole}
+                    required
+                    autoFocus
+                  />
+                </div>
+
+                <div style={{ marginBottom: "14px" }}>
+                  <label style={{ display: "block", fontSize: "0.75rem", fontWeight: "700", textTransform: "uppercase", letterSpacing: "0.04em", color: "var(--color-text-muted)", marginBottom: "6px" }}>
+                    Description (Optional)
+                  </label>
+                  <input
+                    type="text"
+                    className="filter-search-input"
+                    style={{ width: "100%", padding: "10px 12px" }}
+                    placeholder="Brief description of the role responsibilities"
+                    value={newRoleDescription}
+                    onChange={(e) => setNewRoleDescription(e.target.value)}
+                    disabled={creatingRole}
+                  />
+                </div>
+
+                <div style={{ marginBottom: "14px" }}>
+                  <label style={{ display: "block", fontSize: "0.75rem", fontWeight: "700", textTransform: "uppercase", letterSpacing: "0.04em", color: "var(--color-text-muted)", marginBottom: "6px" }}>
+                    Base Template (Template Cloning)
+                  </label>
+                  <select
+                    className="filter-search-input"
+                    style={{ width: "100%", padding: "10px 12px", background: "var(--color-surface)" }}
+                    value={cloneFromRoleId}
+                    onChange={(e) => setCloneFromRoleId(e.target.value)}
+                    disabled={creatingRole}
+                  >
+                    <option value="">Clean Slate (0 initial permissions)</option>
+                    {roles.map((r) => {
+                      const count = matrix[r.id]?.length || 0;
+                      return (
+                        <option key={r.id} value={r.id}>
+                          Clone from {r.name} ({count} permissions)
+                        </option>
+                      );
+                    })}
+                  </select>
+                </div>
+
+                <div style={{ background: "rgba(124, 58, 237, 0.06)", border: "1px solid rgba(124, 58, 237, 0.2)", padding: "10px 12px", borderRadius: "6px", fontSize: "0.8rem", color: "var(--color-text-muted)" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: "6px", color: "#7C3AED", fontWeight: "600", marginBottom: "3px" }}>
+                    <Copy size={13} />
+                    <span>Template Cloning Advantage</span>
+                  </div>
+                  <span>Selecting a template clones its full atomic privilege set immediately. You can fine-tune or bulk-toggle permissions at any time via the matrix.</span>
+                </div>
+              </div>
+
+              <div className="member-dialog-actions">
+                <button
+                  type="button"
+                  className="button button-quiet"
+                  onClick={() => setCreateRoleModalOpen(false)}
+                  disabled={creatingRole}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="button button-primary"
+                  style={{ background: "#7C3AED", borderColor: "#7C3AED" }}
+                  disabled={creatingRole || newRoleName.trim().length < 2}
+                >
+                  {creatingRole ? "Creating Role…" : "Create Role"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Custom Role Confirmation Modal */}
+      {roleToDelete && (
+        <div className="member-modal-backdrop" onClick={() => !deletingRole && setRoleToDelete(null)}>
+          <div className="member-dialog" onClick={(e) => e.stopPropagation()} style={{ maxWidth: "460px" }}>
+            <div className="member-dialog-header">
+              <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                <AlertTriangle size={20} style={{ color: "#EF4444" }} />
+                <h3>Delete Custom Role</h3>
+              </div>
+              <button
+                className="member-modal-close"
+                onClick={() => setRoleToDelete(null)}
+                disabled={deletingRole}
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            <div className="member-dialog-body">
+              <p style={{ fontSize: "0.88rem", color: "var(--color-text-main)", marginBottom: "12px", lineHeight: "1.5" }}>
+                Are you sure you want to delete the custom role <strong>"{roleToDelete.name}"</strong>?
+              </p>
+              <p style={{ fontSize: "0.82rem", color: "var(--color-text-muted)", lineHeight: "1.5" }}>
+                This action is permanent and cannot be undone. All assigned permissions will be cleared. System default roles cannot be deleted, and custom roles currently assigned to workspace members cannot be removed until members are reassigned.
+              </p>
+            </div>
+
+            <div className="member-dialog-actions">
+              <button
+                type="button"
+                className="button button-quiet"
+                onClick={() => setRoleToDelete(null)}
+                disabled={deletingRole}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="button button-primary"
+                style={{ background: "#EF4444", borderColor: "#EF4444" }}
+                onClick={handleDeleteRoleConfirm}
+                disabled={deletingRole}
+              >
+                {deletingRole ? "Deleting Role…" : "Delete Role"}
+              </button>
+            </div>
+          </div>
         </div>
       )}
 

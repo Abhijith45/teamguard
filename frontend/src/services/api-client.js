@@ -274,6 +274,17 @@ export const api = {
   bulkDuplicateFiles: (fileIds) => request("/files/bulk-duplicate", { method: "POST", body: { fileIds } }),
   deleteFile: (id) => request(`/files/${id}`, { method: "DELETE" }),
 
+  // Roles & Custom Templates (TASK-103)
+  getRoles: () => request("/roles"),
+  createRole: (body) => request("/roles", { method: "POST", body }),
+  updateRole: (id, body) => request(`/roles/${id}`, { method: "PATCH", body }),
+  deleteRole: (id) => request(`/roles/${id}`, { method: "DELETE" }),
+  bulkToggleModule: (roleId, module, enabled) =>
+    request(`/roles/${roleId}/modules/${module}/toggle`, {
+      method: "POST",
+      body: { enabled },
+    }),
+
   // Permissions Matrix
   getPermissionsMatrix: () => request("/permissions-matrix"),
   togglePermission: (roleId, permissionId, enabled) =>
