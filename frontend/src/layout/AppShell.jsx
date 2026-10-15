@@ -198,6 +198,15 @@ export function AppShell({
 
               <button
                 type="button"
+                className={`nav-item-btn ${section === "permissions-matrix" ? "active" : ""}`}
+                onClick={() => setSection("permissions-matrix")}
+              >
+                <ShieldCheck size={17} />
+                <span>Team & Permissions</span>
+              </button>
+
+              <button
+                type="button"
                 className={`nav-item-btn ${section === "reports" ? "active" : ""}`}
                 onClick={() => setSection("reports")}
               >
