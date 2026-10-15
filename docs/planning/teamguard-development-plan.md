@@ -374,18 +374,18 @@ Work is sequenced strictly by technical dependencies, security invariants, and r
 - **Linked User Stories**: `US-TENANT-002`, `US-RBAC-001`, `US-RBAC-002`, `US-RBAC-003`
 - **Linked PRD Features**: `TG-TENANT-002`, `TG-RBAC-001`, `TG-RBAC-002`, `TG-RBAC-003`, `TG-RBAC-004`
 - **Priority**: High (P1)
-- **Status**: Verified in Baseline / Expansion Required
-- **Affected Files**: [backend/src/controllers/permissions-matrix.controller.js](file:///c:/Users/Abhijeet%20Rawat/Desktop/rbac/backend/src/controllers/permissions-matrix.controller.js), [frontend/src/views/TeamPermissionsMatrixView.jsx](file:///c:/Users/Abhijeet%20Rawat/Desktop/rbac/frontend/src/views/TeamPermissionsMatrixView.jsx)
+- **Status**: Complete / Verified (TIER-1, TIER-2 & TIER-3)
+- **Affected Files**: [backend/src/controllers/organizations.controller.js](file:///c:/Users/Abhijeet%20Rawat/Desktop/rbac/backend/src/controllers/organizations.controller.js), [backend/src/controllers/permissions-matrix.controller.js](file:///c:/Users/Abhijeet%20Rawat/Desktop/rbac/backend/src/controllers/permissions-matrix.controller.js), [backend/src/controllers/roles.controller.js](file:///c:/Users/Abhijeet%20Rawat/Desktop/rbac/backend/src/controllers/roles.controller.js), [backend/src/routes/organizations.routes.js](file:///c:/Users/Abhijeet%20Rawat/Desktop/rbac/backend/src/routes/organizations.routes.js), [backend/src/routes/admin.routes.js](file:///c:/Users/Abhijeet%20Rawat/Desktop/rbac/backend/src/routes/admin.routes.js), [backend/test/org.test.js](file:///c:/Users/Abhijeet%20Rawat/Desktop/rbac/backend/test/org.test.js), [frontend/src/features/permissions/TeamPermissionsMatrixView.jsx](file:///c:/Users/Abhijeet%20Rawat/Desktop/rbac/frontend/src/features/permissions/TeamPermissionsMatrixView.jsx), [frontend/src/layout/AppShell.jsx](file:///c:/Users/Abhijeet%20Rawat/Desktop/rbac/frontend/src/layout/AppShell.jsx), [frontend/src/services/api-client.js](file:///c:/Users/Abhijeet%20Rawat/Desktop/rbac/frontend/src/services/api-client.js)
 - **Implementation Steps**:
-  1. Validate organization creation and slug generation.
-  2. Connect permission matrix discrete checkbox toggles to `POST /api/permissions/matrix/toggle`.
-  3. Enforce hard error if caller attempts to remove permissions from the system `Super Admin` role.
-- **Data/API Impact**: Updates `RolePermission` table.
-- **Security Considerations**: Preserves Super Admin administrative authority.
+  1. Validate organization creation and slug generation via `POST /api/organizations` and metadata updates via `PATCH /api/organizations/:id`.
+  2. Connect permission matrix discrete checkbox toggles to `POST /api/permissions/matrix/toggle` with audit logging and immediate dynamic enforcement.
+  3. Enforce hard error (HTTP 403 Forbidden, `SUPER_ADMIN_LOCKOUT_PROTECTION`) if caller attempts to remove permissions from the system `Super Admin` role (`BR-004`).
+- **Data/API Impact**: Updates `Organization`, `Role`, `Membership`, and `RolePermission` tables; records immutable audit events.
+- **Security Considerations**: Preserves Super Admin administrative authority, prevents lockout, and enforces cross-tenant IDOR protection.
 - **Dependencies & Blockers**: TASK-001.
-- **Test Plan**: Test #6 in `backend/test/rbac.test.js` verified; add UI e2e test.
-- **Acceptance Criteria**: Super Admin role permissions cannot be unchecked.
-- **Definition of Done**: Verified pass in automated test suite.
+- **Test Plan**: 13/13 test vectors in `backend/test/org.test.js` and Test #6 in `backend/test/rbac.test.js`.
+- **Acceptance Criteria**: Secondary organizations can be provisioned and updated; Super Admin role permissions display locked indicators and cannot be revoked; discrete permission toggles take effect immediately without token re-issuance.
+- **Definition of Done**: Backend endpoints, controller guards, client services, and elevated matrix/workspace UI connected with automated tests passing (13/13 test vectors).
 - **Effort Estimate**: S (1 business day).
 - **Risk & Rollback**: Low risk.
 

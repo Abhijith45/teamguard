@@ -2,6 +2,7 @@ import { useState } from "react";
 import {
   BarChart2,
   Bell,
+  Building2,
   Calendar,
   CheckSquare,
   ChevronDown,
@@ -16,9 +17,11 @@ import {
   ShieldCheck,
   User,
   Users,
+  X,
 } from "lucide-react";
 import { Brand } from "../components/Brand.jsx";
 import { PersonaSwitcher } from "../components/PersonaSwitcher.jsx";
+import { api } from "../services/api-client.js";
 
 export function AppShell({
   user,
@@ -32,12 +35,41 @@ export function AppShell({
   onSwitchOrg,
   onSwitchPersona,
   onOpenWizard,
+  onShowNotice,
+  onOrgCreated,
   children,
 }) {
   const [orgMenuOpen, setOrgMenuOpen] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
+  const [showCreateOrgModal, setShowCreateOrgModal] = useState(false);
+  const [newOrgName, setNewOrgName] = useState("");
+  const [creatingOrg, setCreatingOrg] = useState(false);
 
   const activeRoleName = user?.roles?.[0]?.name || "Member";
+
+  async function handleCreateOrg(e) {
+    e.preventDefault();
+    const trimmed = newOrgName.trim();
+    if (trimmed.length < 2) return;
+
+    try {
+      setCreatingOrg(true);
+      const res = await api.createOrganization({ name: trimmed });
+      setShowCreateOrgModal(false);
+      setNewOrgName("");
+      if (onOrgCreated) {
+        onOrgCreated(res.organization);
+      } else if (onSwitchOrg) {
+        onSwitchOrg(res.organization.id);
+      }
+    } catch (err) {
+      if (onShowNotice) {
+        onShowNotice({ type: "error", message: `Failed to create workspace: ${err.message}` });
+      }
+    } finally {
+      setCreatingOrg(false);
+    }
+  }
 
   return (
     <div className="taskora-app-layout">
@@ -92,6 +124,22 @@ export function AppShell({
                     </button>
                   );
                 })}
+
+                <div className="org-dropdown-divider" />
+                <button
+                  type="button"
+                  className="org-dropdown-item new-workspace-btn"
+                  onClick={() => {
+                    setOrgMenuOpen(false);
+                    setShowCreateOrgModal(true);
+                  }}
+                >
+                  <Plus size={15} style={{ color: "#10B981", flexShrink: 0 }} />
+                  <div className="org-item-text">
+                    <strong>+ New Workspace</strong>
+                    <small>Provision organization</small>
+                  </div>
+                </button>
               </div>
             </>
           )}
@@ -345,6 +393,78 @@ export function AppShell({
           {children}
         </main>
       </div>
+
+      {/* Create Workspace Modal */}
+      {showCreateOrgModal && (
+        <div className="member-modal-backdrop" onClick={() => !creatingOrg && setShowCreateOrgModal(false)}>
+          <div className="member-dialog create-org-dialog" onClick={(e) => e.stopPropagation()}>
+            <div className="member-dialog-header">
+              <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                <Building2 size={20} style={{ color: "#10B981" }} />
+                <h3>Provision New Workspace</h3>
+              </div>
+              <button
+                className="member-modal-close"
+                onClick={() => setShowCreateOrgModal(false)}
+                disabled={creatingOrg}
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            <form onSubmit={handleCreateOrg}>
+              <div className="member-dialog-body">
+                <p style={{ fontSize: "0.85rem", color: "var(--color-text-muted)", marginBottom: "16px", lineHeight: "1.5" }}>
+                  Create an isolated tenant boundary with dedicated system roles, project channels, and RBAC governance. You will be automatically assigned as the Owner & Super Admin.
+                </p>
+
+                <div style={{ marginBottom: "14px" }}>
+                  <label style={{ display: "block", fontSize: "0.75rem", fontWeight: "700", textTransform: "uppercase", letterSpacing: "0.04em", color: "var(--color-text-muted)", marginBottom: "6px" }}>
+                    Workspace / Organization Name *
+                  </label>
+                  <input
+                    type="text"
+                    className="filter-search-input"
+                    style={{ width: "100%", padding: "10px 12px" }}
+                    placeholder="e.g. Acme EMEA or CyberOps Unit"
+                    value={newOrgName}
+                    onChange={(e) => setNewOrgName(e.target.value)}
+                    disabled={creatingOrg}
+                    autoFocus
+                  />
+                </div>
+
+                {newOrgName.trim().length >= 2 && (
+                  <div className="slug-preview-pill" style={{ display: "flex", alignItems: "center", gap: "6px", background: "var(--color-surface-alt)", padding: "8px 12px", borderRadius: "6px", fontSize: "0.8rem" }}>
+                    <span style={{ color: "var(--color-text-muted)" }}>Generated Slug:</span>
+                    <code style={{ color: "#10B981", fontWeight: "600" }}>
+                      {newOrgName.toLowerCase().replace(/[^a-z0-9]/g, "-").replace(/-+/g, "-")}-****
+                    </code>
+                  </div>
+                )}
+              </div>
+
+              <div className="member-dialog-actions">
+                <button
+                  type="button"
+                  className="button button-quiet"
+                  onClick={() => setShowCreateOrgModal(false)}
+                  disabled={creatingOrg}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="button button-primary"
+                  disabled={creatingOrg || newOrgName.trim().length < 2}
+                >
+                  {creatingOrg ? "Provisioning…" : "Create Workspace"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

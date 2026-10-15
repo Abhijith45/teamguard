@@ -6,7 +6,7 @@ export async function listRoles(_req, res) {
   const roles = await prisma.role.findMany({
     orderBy: { name: "asc" },
     include: {
-      _count: { select: { users: true } },
+      _count: { select: { memberships: true } },
       permissions: { include: { permission: true }, orderBy: { permissionId: "asc" } },
     },
   });
@@ -36,10 +36,12 @@ export async function updateRole(req, res) {
 
 export async function deleteRole(req, res) {
   const roleId = parseId(req.params.roleId);
-  const role = await prisma.role.findUnique({ where: { id: roleId }, include: { _count: { select: { users: true } } } });
+  const role = await prisma.role.findUnique({ where: { id: roleId }, include: { _count: { select: { memberships: true } } } });
   if (!role) throw new HttpError(404, "Role not found");
-  if (["admin", "user"].includes(role.name)) throw new HttpError(409, "Built-in roles cannot be deleted");
-  if (role._count.users > 0) throw new HttpError(409, "Unassign this role from all users first");
+  if (role.isSystem || ["admin", "user", "Super Admin"].includes(role.name) || ["super-admin", "admin", "owner"].includes(role.slug)) {
+    throw new HttpError(403, "Cannot delete protected system role");
+  }
+  if (role._count.memberships > 0) throw new HttpError(409, "Unassign this role from all members first");
   await prisma.role.delete({ where: { id: roleId } });
   return res.status(204).end();
 }

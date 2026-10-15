@@ -183,3 +183,100 @@ export async function listMembers(req, res, next) {
     next(error);
   }
 }
+
+const updateOrgSchema = z.object({
+  name: z.string().trim().min(2, "Name must be at least 2 characters").max(100, "Name must not exceed 100 characters").optional(),
+  slug: z.string().trim().toLowerCase().regex(/^[a-z0-9-]{3,50}$/, "Slug must be 3-50 lowercase alphanumeric or hyphens").optional(),
+});
+
+export async function getOrganization(req, res, next) {
+  try {
+    const targetId = req.params.id ? parseInt(req.params.id, 10) : req.organizationId;
+    if (isNaN(targetId) || targetId !== req.organizationId) {
+      return res.status(404).json({ error: "Organization not found" });
+    }
+
+    const org = await prisma.organization.findUnique({
+      where: { id: targetId },
+      include: {
+        _count: {
+          select: {
+            memberships: { where: { status: "ACTIVE" } },
+            projects: true,
+            tasks: true,
+            roles: true,
+          },
+        },
+      },
+    });
+
+    if (!org) {
+      return res.status(404).json({ error: "Organization not found" });
+    }
+
+    return res.json({
+      organization: {
+        id: org.id,
+        name: org.name,
+        slug: org.slug,
+        createdAt: org.createdAt,
+        counts: {
+          members: org._count.memberships,
+          projects: org._count.projects,
+          tasks: org._count.tasks,
+          roles: org._count.roles,
+        },
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+}
+
+export async function updateOrganization(req, res, next) {
+  try {
+    const targetId = req.params.id ? parseInt(req.params.id, 10) : req.organizationId;
+    if (isNaN(targetId) || targetId !== req.organizationId) {
+      return res.status(404).json({ error: "Organization not found" });
+    }
+
+    const input = updateOrgSchema.parse(req.body);
+    if (!input.name && !input.slug) {
+      return res.status(400).json({ error: "At least one field (name or slug) must be provided" });
+    }
+
+    if (input.slug) {
+      const existing = await prisma.organization.findUnique({
+        where: { slug: input.slug },
+      });
+      if (existing && existing.id !== targetId) {
+        return res.status(409).json({ error: "Organization slug already in use" });
+      }
+    }
+
+    const updated = await prisma.organization.update({
+      where: { id: targetId },
+      data: {
+        ...(input.name ? { name: input.name } : {}),
+        ...(input.slug ? { slug: input.slug } : {}),
+      },
+    });
+
+    await logAuditEvent({
+      organizationId: targetId,
+      actorId: req.auth.userId,
+      action: "organization:update",
+      resourceType: "Organization",
+      resourceId: String(targetId),
+      details: {
+        changes: input,
+        name: updated.name,
+        slug: updated.slug,
+      },
+    });
+
+    return res.json({ organization: updated });
+  } catch (error) {
+    next(error);
+  }
+}

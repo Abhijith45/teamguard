@@ -178,6 +178,20 @@ export default function App() {
     (user.permissions || []).map((p) => `${p.resource}:${p.action}`)
   );
 
+  async function handleOrgCreated(newOrg) {
+    try {
+      const res = await api.me();
+      setUser(res.user);
+      await handleSwitchOrg(newOrg.id);
+      showNotice({
+        type: "success",
+        message: `Workspace "${newOrg.name}" provisioned. You are assigned as Super Admin.`,
+      });
+    } catch (err) {
+      showNotice({ type: "error", message: `Workspace created, but failed to switch: ${err.message}` });
+    }
+  }
+
   return (
     <AppShell
       user={user}
@@ -191,6 +205,8 @@ export default function App() {
       onSwitchOrg={handleSwitchOrg}
       onSwitchPersona={handleSwitchPersona}
       onOpenWizard={() => setWizardOpen(true)}
+      onShowNotice={showNotice}
+      onOrgCreated={handleOrgCreated}
     >
       {/* Toast Notice */}
       {notice && (
@@ -243,6 +259,15 @@ export default function App() {
           activeOrg={activeOrg}
           userPermissions={userPermissions}
           onShowNotice={showNotice}
+          onOrgUpdated={(updatedOrg) => {
+            setActiveOrg(updatedOrg);
+            setUser((prev) => ({
+              ...prev,
+              organizations: (prev.organizations || []).map((o) =>
+                o.id === updatedOrg.id ? { ...o, name: updatedOrg.name, slug: updatedOrg.slug } : o
+              ),
+            }));
+          }}
         />
       )}
 

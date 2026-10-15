@@ -235,9 +235,11 @@ export const api = {
       body: { persona, organizationSlug },
     }),
 
-  // Organizations & Members (TASK-101)
+  // Organizations & Members (TASK-101 / TASK-102)
   getOrganizations: () => request("/organizations"),
   createOrganization: (body) => request("/organizations", { method: "POST", body }),
+  getOrganization: (id) => request(id ? `/organizations/${id}` : "/organizations/current"),
+  updateOrganization: (id, body) => request(`/organizations/${id}`, { method: "PATCH", body }),
   getMembers: (params = "") => request(`/members${params ? `?${params}` : ""}`),
   getMemberRoles: () => request("/members/roles"),
   reassignMemberRole: (membershipId, roleId) =>
