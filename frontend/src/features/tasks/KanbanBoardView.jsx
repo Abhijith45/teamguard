@@ -9,7 +9,10 @@ import {
   Lock,
   MessageSquare,
   Plus,
+  Search,
   Table,
+  User,
+  X,
 } from "lucide-react";
 import { api } from "../../services/api-client.js";
 import { TaskDetailDrawer } from "./TaskDetailDrawer.jsx";
@@ -30,8 +33,18 @@ export function KanbanBoardView({ user, activeOrg, userPermissions, onShowNotice
   const [members, setMembers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [filterPriority, setFilterPriority] = useState("ALL");
   const [viewMode, setViewMode] = useState("board"); // "board" | "list" | "table"
+
+  // Search & Multi-Parameter Filter state (TASK-206)
+  const [searchTerm, setSearchTerm] = useState("");
+  const [filterProject, setFilterProject] = useState("ALL");
+  const [filterAssignee, setFilterAssignee] = useState("ALL");
+  const [filterStatus, setFilterStatus] = useState("ALL");
+  const [filterPriority, setFilterPriority] = useState("ALL");
+
+  // Pagination state (TASK-206)
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
 
   // Create Modal state
   const [createModalOpen, setCreateModalOpen] = useState(false);
@@ -95,6 +108,11 @@ export function KanbanBoardView({ user, activeOrg, userPermissions, onShowNotice
     window.addEventListener("teamguard:workspace-purged", handlePurge);
     return () => window.removeEventListener("teamguard:workspace-purged", handlePurge);
   }, []);
+
+  // Reset pagination page when filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, filterProject, filterAssignee, filterStatus, filterPriority, pageSize]);
 
   function canEditTask(task) {
     if (!task) return false;
@@ -234,10 +252,58 @@ export function KanbanBoardView({ user, activeOrg, userPermissions, onShowNotice
     onShowNotice({ type: "success", message: "Task deleted successfully" });
   }
 
+  // Multi-parameter filter engine (TASK-206)
   const filteredTasks = tasks.filter((t) => {
-    if (filterPriority === "ALL") return true;
-    return t.priority === filterPriority;
+    // 1. Search term
+    if (searchTerm.trim()) {
+      const q = searchTerm.trim().toLowerCase();
+      const titleMatch = (t.title || "").toLowerCase().includes(q);
+      const descMatch = (t.description || "").toLowerCase().includes(q);
+      const keyBadge = `${t.project?.key || "PROJ"}-${t.id}`.toLowerCase();
+      const keyMatch = keyBadge.includes(q) || String(t.id) === q;
+      if (!titleMatch && !descMatch && !keyMatch) return false;
+    }
+
+    // 2. Project filter
+    if (filterProject !== "ALL" && String(t.projectId) !== String(filterProject)) {
+      return false;
+    }
+
+    // 3. Assignee filter
+    if (filterAssignee !== "ALL") {
+      if (filterAssignee === "unassigned") {
+        if (t.assigneeId) return false;
+      } else if (String(t.assigneeId) !== String(filterAssignee)) {
+        return false;
+      }
+    }
+
+    // 4. Status filter
+    if (filterStatus !== "ALL" && t.status !== filterStatus) {
+      return false;
+    }
+
+    // 5. Priority filter
+    if (filterPriority !== "ALL" && t.priority !== filterPriority) {
+      return false;
+    }
+
+    return true;
   });
+
+  // Pagination calculation for List and Table representations (TASK-206)
+  const totalTasks = filteredTasks.length;
+  const totalPages = Math.max(1, Math.ceil(totalTasks / pageSize));
+  const validPage = Math.min(currentPage, totalPages);
+  const startIndex = (validPage - 1) * pageSize;
+  const paginatedTasks = filteredTasks.slice(startIndex, startIndex + pageSize);
+
+  const hasActiveFilters =
+    Boolean(searchTerm.trim()) ||
+    filterProject !== "ALL" ||
+    filterAssignee !== "ALL" ||
+    filterStatus !== "ALL" ||
+    filterPriority !== "ALL";
 
   if (loading) {
     return (
@@ -254,7 +320,7 @@ export function KanbanBoardView({ user, activeOrg, userPermissions, onShowNotice
       <div className="kanban-view-header">
         <div className="kanban-header-left">
           <h2>Task Board & Views</h2>
-          <p>Manage and track team tasks across Kanban Board, Accordion List, and Spreadsheet Table views.</p>
+          <p>Search, filter, sort, and manage team deliverables across Board, List, and Table views.</p>
         </div>
 
         <div className="kanban-header-controls">
@@ -298,40 +364,16 @@ export function KanbanBoardView({ user, activeOrg, userPermissions, onShowNotice
             </button>
           </div>
 
-          <div className="header-action-filters">
+          {canCreateTask && (
             <button
               type="button"
-              className={`filter-btn ${filterPriority !== "ALL" ? "active" : ""}`}
-              onClick={() => {
-                const next =
-                  filterPriority === "ALL"
-                    ? "URGENT"
-                    : filterPriority === "URGENT"
-                    ? "HIGH"
-                    : filterPriority === "HIGH"
-                    ? "MEDIUM"
-                    : filterPriority === "MEDIUM"
-                    ? "LOW"
-                    : "ALL";
-                setFilterPriority(next);
-              }}
-              title="Cycle filter: All -> Urgent -> High -> Medium -> Low"
+              className="btn-primary-emerald"
+              onClick={() => setCreateModalOpen(true)}
             >
-              <Filter size={15} />
-              <span>Priority: {filterPriority}</span>
+              <Plus size={16} />
+              <span>Add Task</span>
             </button>
-
-            {canCreateTask && (
-              <button
-                type="button"
-                className="btn-primary-emerald"
-                onClick={() => setCreateModalOpen(true)}
-              >
-                <Plus size={16} />
-                <span>Add Task</span>
-              </button>
-            )}
-          </div>
+          )}
         </div>
       </div>
 
@@ -341,6 +383,127 @@ export function KanbanBoardView({ user, activeOrg, userPermissions, onShowNotice
           <span>{error}</span>
         </div>
       )}
+
+      {/* Search, Filter & Pagination Toolbar (TASK-206) */}
+      <div className="tasks-filter-toolbar" data-testid="tasks-filter-toolbar">
+        {/* Search Box */}
+        <div className="tasks-search-box">
+          <Search size={15} className="search-icon-muted" />
+          <input
+            type="text"
+            className="tasks-search-input"
+            placeholder="Search by title, description or JIRA key..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            data-testid="tasks-search-input"
+          />
+          {searchTerm && (
+            <button
+              type="button"
+              className="search-clear-btn"
+              onClick={() => setSearchTerm("")}
+              title="Clear search"
+            >
+              <X size={13} />
+            </button>
+          )}
+        </div>
+
+        {/* Dropdown Filters */}
+        <div className="tasks-dropdown-filters">
+          {/* Project Filter */}
+          <div className="filter-dropdown-group">
+            <Layers size={13} className="filter-icon" />
+            <select
+              className="toolbar-select"
+              value={filterProject}
+              onChange={(e) => setFilterProject(e.target.value)}
+              data-testid="filter-project-select"
+              title="Filter by project container"
+            >
+              <option value="ALL">All Projects</option>
+              {projects.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.key ? `[${p.key}] ` : ""}{p.name}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Assignee Filter */}
+          <div className="filter-dropdown-group">
+            <User size={13} className="filter-icon" />
+            <select
+              className="toolbar-select"
+              value={filterAssignee}
+              onChange={(e) => setFilterAssignee(e.target.value)}
+              data-testid="filter-assignee-select"
+              title="Filter by assigned member"
+            >
+              <option value="ALL">All Assignees</option>
+              <option value="unassigned">Unassigned</option>
+              {members.map((m) => (
+                <option key={m.userId} value={m.userId}>
+                  {m.user?.name || `User #${m.userId}`}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Status Filter */}
+          <div className="filter-dropdown-group">
+            <select
+              className="toolbar-select"
+              value={filterStatus}
+              onChange={(e) => setFilterStatus(e.target.value)}
+              data-testid="filter-status-select"
+              title="Filter by task status"
+            >
+              <option value="ALL">All Statuses</option>
+              <option value="TODO">To do</option>
+              <option value="IN_PROGRESS">In Progress</option>
+              <option value="REVISION">Revision</option>
+              <option value="DONE">Done</option>
+            </select>
+          </div>
+
+          {/* Priority Filter */}
+          <div className="filter-dropdown-group">
+            <select
+              className="toolbar-select"
+              value={filterPriority}
+              onChange={(e) => setFilterPriority(e.target.value)}
+              data-testid="filter-priority-select"
+              title="Filter by priority level"
+            >
+              <option value="ALL">All Priorities</option>
+              <option value="URGENT">Urgent</option>
+              <option value="HIGH">High</option>
+              <option value="MEDIUM">Medium</option>
+              <option value="LOW">Low</option>
+            </select>
+          </div>
+
+          {/* Reset Filters */}
+          {hasActiveFilters && (
+            <button
+              type="button"
+              className="btn-reset-filters"
+              onClick={() => {
+                setSearchTerm("");
+                setFilterProject("ALL");
+                setFilterAssignee("ALL");
+                setFilterStatus("ALL");
+                setFilterPriority("ALL");
+              }}
+              data-testid="btn-reset-filters"
+              title="Reset all active search and filters"
+            >
+              Reset
+            </button>
+          )}
+        </div>
+      </div>
 
       {/* View 1: Kanban Board with Native Drag-and-Drop (TASK-204) */}
       {viewMode === "board" && (
@@ -531,7 +694,7 @@ export function KanbanBoardView({ user, activeOrg, userPermissions, onShowNotice
       {/* View 2: Collapsible Accordion List View (TASK-205) */}
       {viewMode === "list" && (
         <TaskListView
-          tasks={filteredTasks}
+          tasks={paginatedTasks}
           projects={projects}
           members={members}
           user={user}
@@ -550,7 +713,7 @@ export function KanbanBoardView({ user, activeOrg, userPermissions, onShowNotice
       {/* View 3: Dense Spreadsheet Table View (TASK-205) */}
       {viewMode === "table" && (
         <TaskTableView
-          tasks={filteredTasks}
+          tasks={paginatedTasks}
           projects={projects}
           members={members}
           user={user}
@@ -560,6 +723,60 @@ export function KanbanBoardView({ user, activeOrg, userPermissions, onShowNotice
           onStatusChange={handleStatusChange}
           onDeleteTask={handleDrawerDelete}
         />
+      )}
+
+      {/* Pagination Bar (TASK-206) for List and Table Views */}
+      {(viewMode === "list" || viewMode === "table") && totalTasks > 0 && (
+        <div className="tasks-pagination-bar" data-testid="tasks-pagination-bar">
+          <div className="pagination-info">
+            <span>
+              Showing {startIndex + 1}–{Math.min(startIndex + pageSize, totalTasks)} of {totalTasks} {totalTasks === 1 ? "task" : "tasks"}
+            </span>
+          </div>
+
+          <div className="pagination-controls">
+            <button
+              type="button"
+              className="pagination-btn"
+              disabled={validPage <= 1}
+              onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+              data-testid="pagination-prev"
+            >
+              Previous
+            </button>
+
+            <span className="pagination-page-indicator">
+              Page {validPage} of {totalPages}
+            </span>
+
+            <button
+              type="button"
+              className="pagination-btn"
+              disabled={validPage >= totalPages}
+              onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+              data-testid="pagination-next"
+            >
+              Next
+            </button>
+
+            <div className="page-size-selector">
+              <label>Per page:</label>
+              <select
+                value={pageSize}
+                onChange={(e) => {
+                  setPageSize(Number(e.target.value));
+                  setCurrentPage(1);
+                }}
+                data-testid="pagination-page-size"
+              >
+                <option value={5}>5</option>
+                <option value={10}>10</option>
+                <option value={20}>20</option>
+                <option value={50}>50</option>
+              </select>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* Slide-Over Task Detail Drawer (TASK-204) */}

@@ -685,3 +685,254 @@ test("TASK-203: Task Core CRUD, Validation, Status Workflow & Priority Engine", 
     assert.ok(actions.includes("task:update"), "Must have audited task:update");
   });
 });
+
+test("TASK-206: Task Search, Filtering, Sorting & Pagination Engine", async (t) => {
+  const superAdmin = await getAuthSession("super-admin", "acme-corp");
+  const novaElena = await getAuthSession("super-admin", "nova-labs");
+
+  // Fetch active project
+  const projectsRes = await api("/api/projects", {
+    headers: {
+      Authorization: `Bearer ${superAdmin.token}`,
+      "x-organization-id": String(superAdmin.orgId),
+    },
+  });
+  const activeProject = projectsRes.data.projects.find((p) => !p.isArchived);
+  assert.ok(activeProject);
+
+  // Seed 4 distinct tasks for predictable search and filter assertions
+  const seed1 = await api("/api/tasks", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${superAdmin.token}`,
+      "x-organization-id": String(superAdmin.orgId),
+    },
+    body: {
+      projectId: activeProject.id,
+      title: "Alpha Searchable Task Optimization",
+      description: "Critical algorithm for checkout latency",
+      status: "TODO",
+      priority: "URGENT",
+      dueDate: "2026-11-01T10:00:00.000Z",
+    },
+  });
+  assert.equal(seed1.status, 201);
+
+  const seed2 = await api("/api/tasks", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${superAdmin.token}`,
+      "x-organization-id": String(superAdmin.orgId),
+    },
+    body: {
+      projectId: activeProject.id,
+      title: "Beta Documentation Review",
+      description: "Review API contracts and guidelines",
+      status: "IN_PROGRESS",
+      priority: "HIGH",
+      dueDate: "2026-11-10T10:00:00.000Z",
+    },
+  });
+  assert.equal(seed2.status, 201);
+
+  const seed3 = await api("/api/tasks", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${superAdmin.token}`,
+      "x-organization-id": String(superAdmin.orgId),
+    },
+    body: {
+      projectId: activeProject.id,
+      title: "Gamma Searchable Payment Gateway",
+      description: "Integrate stripe tokenization",
+      status: "TODO",
+      priority: "LOW",
+      dueDate: "2026-11-20T10:00:00.000Z",
+    },
+  });
+  assert.equal(seed3.status, 201);
+
+  const seed4 = await api("/api/tasks", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${superAdmin.token}`,
+      "x-organization-id": String(superAdmin.orgId),
+    },
+    body: {
+      projectId: activeProject.id,
+      title: "Delta Infrastructure Tuning",
+      description: "Tune redis connection pool and worker memory",
+      status: "DONE",
+      priority: "MEDIUM",
+      dueDate: "2026-10-25T10:00:00.000Z",
+    },
+  });
+  assert.equal(seed4.status, 201);
+
+  await t.test("REQ 1 [TASK-206 / Search]: Case-insensitive search on title and description", async () => {
+    // 1. Search title "alpha searchable" in lowercase
+    const resTitle = await api("/api/tasks?search=alpha%20searchable", {
+      headers: {
+        Authorization: `Bearer ${superAdmin.token}`,
+        "x-organization-id": String(superAdmin.orgId),
+      },
+    });
+    assert.equal(resTitle.status, 200);
+    assert.ok(resTitle.data.tasks.length >= 1);
+    assert.ok(resTitle.data.tasks.some((t) => t.id === seed1.data.task.id));
+
+    // 2. Search description "checkout latency"
+    const resDesc = await api("/api/tasks?search=checkout%20latency", {
+      headers: {
+        Authorization: `Bearer ${superAdmin.token}`,
+        "x-organization-id": String(superAdmin.orgId),
+      },
+    });
+    assert.equal(resDesc.status, 200);
+    assert.ok(resDesc.data.tasks.some((t) => t.id === seed1.data.task.id));
+    assert.ok(!resDesc.data.tasks.some((t) => t.id === seed2.data.task.id));
+  });
+
+  await t.test("REQ 2 [TASK-206 / Filtering]: Status and Priority discrete filtering", async () => {
+    // 1. Filter by status TODO
+    const resStatus = await api("/api/tasks?status=TODO", {
+      headers: {
+        Authorization: `Bearer ${superAdmin.token}`,
+        "x-organization-id": String(superAdmin.orgId),
+      },
+    });
+    assert.equal(resStatus.status, 200);
+    assert.ok(resStatus.data.tasks.length > 0);
+    for (const t of resStatus.data.tasks) {
+      assert.equal(t.status, "TODO");
+    }
+
+    // 2. Filter by priority URGENT
+    const resPriority = await api("/api/tasks?priority=URGENT", {
+      headers: {
+        Authorization: `Bearer ${superAdmin.token}`,
+        "x-organization-id": String(superAdmin.orgId),
+      },
+    });
+    assert.equal(resPriority.status, 200);
+    for (const t of resPriority.data.tasks) {
+      assert.equal(t.priority, "URGENT");
+    }
+
+    // 3. Combined Filter: status=TODO & priority=LOW
+    const resCombined = await api("/api/tasks?status=TODO&priority=LOW", {
+      headers: {
+        Authorization: `Bearer ${superAdmin.token}`,
+        "x-organization-id": String(superAdmin.orgId),
+      },
+    });
+    assert.equal(resCombined.status, 200);
+    assert.ok(resCombined.data.tasks.some((t) => t.id === seed3.data.task.id));
+    for (const t of resCombined.data.tasks) {
+      assert.equal(t.status, "TODO");
+      assert.equal(t.priority, "LOW");
+    }
+  });
+
+  await t.test("REQ 3 [TASK-206 / Project & Assignee Filter]: Filter by project and unassigned status", async () => {
+    const resProj = await api(`/api/tasks?projectId=${activeProject.id}`, {
+      headers: {
+        Authorization: `Bearer ${superAdmin.token}`,
+        "x-organization-id": String(superAdmin.orgId),
+      },
+    });
+    assert.equal(resProj.status, 200);
+    for (const t of resProj.data.tasks) {
+      assert.equal(t.projectId, activeProject.id);
+    }
+
+    // Filter unassigned
+    const resUnassigned = await api("/api/tasks?assigneeId=unassigned", {
+      headers: {
+        Authorization: `Bearer ${superAdmin.token}`,
+        "x-organization-id": String(superAdmin.orgId),
+      },
+    });
+    assert.equal(resUnassigned.status, 200);
+    for (const t of resUnassigned.data.tasks) {
+      assert.equal(t.assigneeId, null);
+    }
+  });
+
+  await t.test("REQ 4 [TASK-206 / Sorting]: Sort tasks by dueDate and title", async () => {
+    // Sort dueDate ascending
+    const resDueAsc = await api("/api/tasks?sortBy=dueDate&order=asc", {
+      headers: {
+        Authorization: `Bearer ${superAdmin.token}`,
+        "x-organization-id": String(superAdmin.orgId),
+      },
+    });
+    assert.equal(resDueAsc.status, 200);
+    const withDueDate = resDueAsc.data.tasks.filter((t) => t.dueDate);
+    for (let i = 0; i < withDueDate.length - 1; i++) {
+      const d1 = new Date(withDueDate[i].dueDate).getTime();
+      const d2 = new Date(withDueDate[i + 1].dueDate).getTime();
+      assert.ok(d1 <= d2, "Tasks with due dates must be sorted ascending");
+    }
+
+    // Sort title descending
+    const resTitleDesc = await api("/api/tasks?sortBy=title&order=desc", {
+      headers: {
+        Authorization: `Bearer ${superAdmin.token}`,
+        "x-organization-id": String(superAdmin.orgId),
+      },
+    });
+    assert.equal(resTitleDesc.status, 200);
+    for (let i = 0; i < resTitleDesc.data.tasks.length - 1; i++) {
+      const t1 = resTitleDesc.data.tasks[i].title.toLowerCase();
+      const t2 = resTitleDesc.data.tasks[i + 1].title.toLowerCase();
+      assert.ok(t1 >= t2, "Tasks must be sorted by title descending");
+    }
+  });
+
+  await t.test("REQ 5 [TASK-206 / Pagination]: Returns page, limit, total, and totalPages slices", async () => {
+    const page1Res = await api("/api/tasks?page=1&limit=2", {
+      headers: {
+        Authorization: `Bearer ${superAdmin.token}`,
+        "x-organization-id": String(superAdmin.orgId),
+      },
+    });
+    assert.equal(page1Res.status, 200);
+    assert.equal(page1Res.data.page, 1);
+    assert.equal(page1Res.data.limit, 2);
+    assert.ok(page1Res.data.total >= 4);
+    assert.equal(page1Res.data.tasks.length, 2);
+    assert.ok(page1Res.data.totalPages >= 2);
+
+    const page2Res = await api("/api/tasks?page=2&limit=2", {
+      headers: {
+        Authorization: `Bearer ${superAdmin.token}`,
+        "x-organization-id": String(superAdmin.orgId),
+      },
+    });
+    assert.equal(page2Res.status, 200);
+    assert.equal(page2Res.data.page, 2);
+    assert.equal(page2Res.data.limit, 2);
+    assert.equal(page2Res.data.tasks.length, 2);
+
+    // Assert disjoint sets between page 1 and page 2
+    const page1Ids = new Set(page1Res.data.tasks.map((t) => t.id));
+    for (const t of page2Res.data.tasks) {
+      assert.ok(!page1Ids.has(t.id), `Task ${t.id} must not appear on both page 1 and page 2`);
+    }
+  });
+
+  await t.test("REQ 6 [TASK-206 / Tenant Isolation]: Search and pagination strictly isolate tenant boundaries", async () => {
+    // Nova Elena searches for "Alpha Searchable" belonging to Acme Corp
+    const resNova = await api("/api/tasks?search=Alpha%20Searchable", {
+      headers: {
+        Authorization: `Bearer ${novaElena.token}`,
+        "x-organization-id": String(novaElena.orgId),
+      },
+    });
+    assert.equal(resNova.status, 200);
+    assert.equal(resNova.data.tasks.length, 0, "Foreign tenant search must yield 0 results (strict isolation)");
+    assert.equal(resNova.data.total, 0);
+  });
+});
+
