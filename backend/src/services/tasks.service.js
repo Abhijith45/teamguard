@@ -287,6 +287,10 @@ export async function listTasksService({ organizationId, query = {} }) {
       assignee: { select: { id: true, name: true, avatarUrl: true, email: true } },
       creator: { select: { id: true, name: true, avatarUrl: true, email: true } },
       project: { select: { id: true, name: true, key: true, isArchived: true, status: true } },
+      subtasks: {
+        select: { id: true, title: true, isCompleted: true, order: true },
+        orderBy: { order: "asc" },
+      },
     },
   };
 
@@ -320,6 +324,10 @@ export async function getTaskService({ organizationId, taskId }) {
       assignee: { select: { id: true, name: true, avatarUrl: true, email: true } },
       creator: { select: { id: true, name: true, avatarUrl: true, email: true } },
       project: { select: { id: true, name: true, key: true, isArchived: true, status: true } },
+      subtasks: {
+        select: { id: true, title: true, isCompleted: true, order: true, createdAt: true },
+        orderBy: { order: "asc" },
+      },
     },
   });
 
@@ -387,6 +395,10 @@ export async function createTaskService({ organizationId, actorId, input, permis
       assignee: { select: { id: true, name: true, avatarUrl: true, email: true } },
       creator: { select: { id: true, name: true, avatarUrl: true, email: true } },
       project: { select: { id: true, name: true, key: true, isArchived: true, status: true } },
+      subtasks: {
+        select: { id: true, title: true, isCompleted: true, order: true },
+        orderBy: { order: "asc" },
+      },
     },
   });
 
@@ -505,6 +517,10 @@ export async function updateTaskService({
       assignee: { select: { id: true, name: true, avatarUrl: true, email: true } },
       creator: { select: { id: true, name: true, avatarUrl: true, email: true } },
       project: { select: { id: true, name: true, key: true, isArchived: true, status: true } },
+      subtasks: {
+        select: { id: true, title: true, isCompleted: true, order: true },
+        orderBy: { order: "asc" },
+      },
     },
   });
 

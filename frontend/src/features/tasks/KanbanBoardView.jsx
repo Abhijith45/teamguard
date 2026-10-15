@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import {
   AlertCircle,
+  CheckSquare,
   Edit3,
   Filter,
   Kanban,
@@ -122,8 +123,33 @@ export function KanbanBoardView({ user, activeOrg, userPermissions, onShowNotice
     return false;
   }
 
-  function openTaskDetail(task) {
+  async function openTaskDetail(task) {
     setEditingTask(task);
+    try {
+      const res = await api.getSubtasks(task.id);
+      if (res && res.subtasks) {
+        setEditingTask((prev) =>
+          prev && prev.id === task.id ? { ...prev, subtasks: res.subtasks } : prev
+        );
+        setTasks((prev) =>
+          prev.map((t) => (t.id === task.id ? { ...t, subtasks: res.subtasks } : t))
+        );
+      }
+    } catch {
+      // Fallback to task's embedded subtasks
+    }
+  }
+
+  function handleSubtasksChange(updatedSubtasks) {
+    if (!editingTask) return;
+    setTasks((prev) =>
+      prev.map((t) =>
+        t.id === editingTask.id ? { ...t, subtasks: updatedSubtasks } : t
+      )
+    );
+    setEditingTask((prev) =>
+      prev ? { ...prev, subtasks: updatedSubtasks } : null
+    );
   }
 
   // Status transition with optimistic update and rollback (TASK-204)
@@ -670,6 +696,21 @@ export function KanbanBoardView({ user, activeOrg, userPermissions, onShowNotice
 
                           <div className="card-meta-counters">
                             <DueDateBadge dueDate={task.dueDate} status={task.status} compact />
+                            {task.subtasks && task.subtasks.length > 0 && (
+                              <span
+                                className={`subtask-card-badge ${
+                                  task.subtasks.every((s) => s.isCompleted)
+                                    ? "subtask-card-badge-complete"
+                                    : ""
+                                }`}
+                                title={`Subtasks: ${task.subtasks.filter((s) => s.isCompleted).length}/${task.subtasks.length} completed`}
+                              >
+                                <CheckSquare size={11} />
+                                <span>
+                                  {task.subtasks.filter((s) => s.isCompleted).length}/{task.subtasks.length}
+                                </span>
+                              </span>
+                            )}
                             <span className="counter-item" title="Associated project">
                               <Layers size={12} /> {task.project?.name || "Project"}
                             </span>
@@ -792,6 +833,7 @@ export function KanbanBoardView({ user, activeOrg, userPermissions, onShowNotice
           onClose={() => setEditingTask(null)}
           onSave={handleDrawerSave}
           onDelete={handleDrawerDelete}
+          onSubtasksChange={handleSubtasksChange}
         />
       )}
 

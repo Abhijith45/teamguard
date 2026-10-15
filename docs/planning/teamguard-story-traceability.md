@@ -32,12 +32,12 @@ To prevent conflating mapping with verification, TeamGuard tracks three independ
    - Exactly **79 of 79 unique user stories** and **60 PRD features** are mapped to implementation tasks and test suites.
    - *Regex Reconciliation Note*: Naive alphabetic-only regex (`US-[A-Z]+-[0-9]+`) identifies only 76 stories because Module Q uses the standard web accessibility numeronym `A11Y` (`US-A11Y-001`, `US-A11Y-002`, `US-A11Y-003`). Alphanumeric regex (`US-[A-Z0-9]+-[0-9]+`) accounts for all 79 stories.
 2. **Implementation Scope Coverage**:
-   - **Verified in Repository**: **31 stories** (39.2%) — Operational in active codebase and local runtime with evidence at `TIER-2` or `TIER-3`.
+   - **Verified in Repository**: **33 stories** (41.8%) — Operational in active codebase and local runtime with evidence at `TIER-2` or `TIER-3`.
    - **Partially Implemented**: **5 stories** (6.3%) — Foundational code or API exists; full acceptance criteria require planned expansion or contain a documented defect (`US-A11Y-002`, `US-A11Y-003`, `US-FILE-002`, `US-FILE-003`, `US-FILE-004`).
-   - **Planned Implementation**: **32 stories** (40.5%) — In-scope for Core v1.0 release (Track A: Phases 1–4).
+   - **Planned Implementation**: **30 stories** (38.0%) — In-scope for Core v1.0 release (Track A: Phases 1–4).
    - **Blocked by Product Decision**: **11 stories** (13.9%) — Quarantined under Track B (Phase 5) awaiting stakeholder decision ratification.
-   - **Sum Reconciled**: **31 + 5 + 32 + 11 = 79 stories** (100.0%).
-   - **Track A In-Scope Core Scope**: Exactly **68 stories** (31 Verified + 5 Partial + 32 Planned).
+   - **Sum Reconciled**: **33 + 5 + 30 + 11 = 79 stories** (100.0%).
+   - **Track A In-Scope Core Scope**: Exactly **68 stories** (33 Verified + 5 Partial + 30 Planned).
 3. **Verification & Test Coverage**:
    - **Passing Automated Tests**: 6 integration tests in `backend/test/rbac.test.js` verifying core auth, persona switching, RBAC permissions, negative PM checks, tenant isolation, and Super Admin lockout guard.
    - **Planned Test Suites**: **28 test suites** specified across all 35 tasks with concrete unit, integration, and negative security test cases (canonical inventory in Development Plan §12.2). The 6 currently passing integration tests demonstrate baseline core RBAC/ABAC coverage only; they do not by themselves establish broad acceptance-criteria coverage across all 68 in-scope stories.
@@ -102,8 +102,8 @@ To prevent conflating mapping with verification, TeamGuard tracks three independ
 | `US-TASK-008` | Multi-View Task Representations: Compact Table View | `TG-TASK-008` | Task Management | Verified in Repository | `TIER-3` (TaskTableView.jsx) | `TASK-205` | Table view sorting test in frontend/src/features/tasks/task-multi-views.test.js | Medium | Unblocked |
 | `US-TASK-009` | Task Due Date Visual Badging & Overdue Alert Styling | `TG-TASK-009` | Task Management | Verified in Repository | `TIER-3` (DueDateBadge.jsx) | `TASK-205` | Overdue badge test in frontend/src/features/tasks/task-multi-views.test.js | Low | Unblocked |
 | `US-TASK-010` | Task Search, Multi-Filter & Column Sort Controls | `TG-TASK-010` | Task Management | Verified in Repository | `TIER-1` (tasks.service.js) & `TIER-3` (KanbanBoardView.jsx) | `TASK-206` | Multi-filter query test in backend/test/tasks.test.js & frontend unit tests | Medium | Unblocked |
-| `US-SUB-001` | Relational Subtask Creation, Nesting & Deletion | `TG-SUB-001` | Subtask Hierarchy | Planned Implementation | PRD Spec Section 7.8 | `TASK-301` | Subtask CRUD test in backend/test/subtasks.test.js | High | Unblocked |
-| `US-SUB-002` | Subtask Checkbox Toggling & Parent Progress Dynamic Rollup | `TG-SUB-002` | Subtask Hierarchy | Planned Implementation | PRD Spec Section 7.8 | `TASK-301` | Progress rollup test in backend/test/subtasks.test.js | Medium | Unblocked |
+| `US-SUB-001` | Relational Subtask Creation, Nesting & Deletion | `TG-SUB-001` | Subtask Hierarchy | Verified in Repository | `TIER-1` (subtasks.service.js) & `TIER-2` (backend/test/subtasks.test.js) & `TIER-3` (SubtaskChecklist.jsx) | `TASK-301` | Subtask CRUD test in backend/test/subtasks.test.js & frontend unit tests | High | Unblocked |
+| `US-SUB-002` | Subtask Checkbox Toggling & Parent Progress Dynamic Rollup | `TG-SUB-002` | Subtask Hierarchy | Verified in Repository | `TIER-1` (subtasks.service.js) & `TIER-2` (backend/test/subtasks.test.js REQ 7, 8, 11) & `TIER-3` (SubtaskChecklist.jsx, KanbanBoardView.jsx) | `TASK-301` | Progress rollup test in backend/test/subtasks.test.js & frontend unit tests | Medium | Unblocked |
 | `US-COLLAB-001` | Task Discussion Comments Posting & Markdown Rendering | `TG-COLLAB-001` | Collaboration & Comments | Planned Implementation | PRD Spec Section 7.9 | `TASK-302` | Comment create & sanitize in backend/test/comments.test.js | High | Unblocked |
 | `US-COLLAB-002` | 15-Minute Author Edit Window & Edit Timestamp Tracking | `TG-COLLAB-002` | Collaboration & Comments | Planned Implementation | PRD Spec Section 7.9 | `TASK-302` | 15m window expiration test in backend/test/comments.test.js | Medium | Unblocked |
 | `US-COLLAB-003` | Comment Deletion Privileges: Author vs. Moderator | `TG-COLLAB-003` | Collaboration & Comments | Planned Implementation | PRD Spec Section 7.9 | `TASK-302` | Moderator deletion test in backend/test/comments.test.js | Medium | Unblocked |

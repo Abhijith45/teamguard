@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import {
   AlertCircle,
+  CheckSquare,
   ChevronDown,
   ChevronRight,
   Edit3,
@@ -190,6 +191,21 @@ export function TaskListView({
                                     }
                                   >
                                     <Lock size={11} />
+                                  </span>
+                                )}
+                                {task.subtasks && task.subtasks.length > 0 && (
+                                  <span
+                                    className={`subtask-card-badge ${
+                                      task.subtasks.every((s) => s.isCompleted)
+                                        ? "subtask-card-badge-complete"
+                                        : ""
+                                    }`}
+                                    title={`Subtasks: ${task.subtasks.filter((s) => s.isCompleted).length}/${task.subtasks.length} completed`}
+                                  >
+                                    <CheckSquare size={11} />
+                                    <span>
+                                      {task.subtasks.filter((s) => s.isCompleted).length}/{task.subtasks.length}
+                                    </span>
                                   </span>
                                 )}
                               </div>
