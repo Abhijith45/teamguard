@@ -286,6 +286,16 @@ export const api = {
   updateTask: (id, body) => request(`/tasks/${id}`, { method: "PATCH", body }),
   deleteTask: (id) => request(`/tasks/${id}`, { method: "DELETE" }),
 
+  // Subtasks (TASK-301)
+  getSubtasks: (taskId) => request(`/tasks/${taskId}/subtasks`),
+  createSubtask: (taskId, body) => request(`/tasks/${taskId}/subtasks`, { method: "POST", body }),
+  updateSubtask: (taskId, subtaskId, body) =>
+    request(`/tasks/${taskId}/subtasks/${subtaskId}`, { method: "PATCH", body }),
+  deleteSubtask: (taskId, subtaskId) =>
+    request(`/tasks/${taskId}/subtasks/${subtaskId}`, { method: "DELETE" }),
+  reorderSubtasks: (taskId, subtaskIds) =>
+    request(`/tasks/${taskId}/subtasks/reorder`, { method: "PUT", body: { subtaskIds } }),
+
   // Files
   getFiles: (params = "") => request(`/files${params ? `?${params}` : ""}`),
   createFile: (body) => request("/files", { method: "POST", body }),

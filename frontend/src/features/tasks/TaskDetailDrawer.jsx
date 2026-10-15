@@ -13,6 +13,7 @@ import {
   User,
   X,
 } from "lucide-react";
+import { SubtaskChecklist } from "./SubtaskChecklist.jsx";
 
 export function TaskDetailDrawer({
   task,
@@ -25,6 +26,7 @@ export function TaskDetailDrawer({
   onClose,
   onSave,
   onDelete,
+  onSubtasksChange,
 }) {
   const [title, setTitle] = useState(task?.title || "");
   const [description, setDescription] = useState(task?.description || "");
@@ -359,26 +361,14 @@ export function TaskDetailDrawer({
             </div>
           </div>
 
-          {/* Subtasks / Checklist Preview (Phase 3 Forward Prep) */}
-          <div
-            style={{
-              padding: "16px",
-              background: "#F8FAFC",
-              borderRadius: "8px",
-              border: "1px dashed var(--color-border)",
-            }}
-          >
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 6, fontWeight: 700, fontSize: "0.82rem" }}>
-                <Layers size={14} />
-                <span>Checklist & Subtasks</span>
-              </div>
-              <span style={{ fontSize: "0.75rem", color: "var(--color-text-muted)" }}>0 / 0 Done</span>
-            </div>
-            <p style={{ fontSize: "0.76rem", color: "var(--color-text-muted)", margin: 0 }}>
-              Break deliverables down into discrete checklist items (collaboration engine enabled in Phase 3).
-            </p>
-          </div>
+          {/* Subtasks / Checklist Section (TASK-301 / TG-SUB-001 & TG-SUB-002) */}
+          <SubtaskChecklist
+            taskId={task.id}
+            initialSubtasks={task.subtasks || []}
+            canEdit={canEdit}
+            isArchived={isArchived}
+            onSubtasksChange={onSubtasksChange}
+          />
 
           {/* Comments Discussion Section Preview */}
           <div

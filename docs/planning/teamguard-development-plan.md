@@ -575,18 +575,18 @@ Work is sequenced strictly by technical dependencies, security invariants, and r
 - **Linked User Stories**: `US-SUB-001`, `US-SUB-002`
 - **Linked PRD Features**: `TG-SUB-001`, `TG-SUB-002`
 - **Priority**: High (P1)
-- **Status**: Implementation Required
-- **Affected Files**: [backend/prisma/schema.prisma](file:///c:/Users/Abhijeet%20Rawat/Desktop/rbac/backend/prisma/schema.prisma), `backend/src/controllers/subtasks.controller.js`, `frontend/src/components/SubtaskChecklist.jsx`
+- **Status**: Complete / Verified (TIER-1, TIER-2 & TIER-3)
+- **Affected Files**: [backend/prisma/schema.prisma](file:///c:/Users/Abhijeet%20Rawat/Desktop/rbac/backend/prisma/schema.prisma), `backend/src/controllers/subtasks.controller.js`, `backend/src/services/subtasks.service.js`, `frontend/src/features/tasks/SubtaskChecklist.jsx`, `frontend/src/features/tasks/TaskDetailDrawer.jsx`, `frontend/src/features/tasks/KanbanBoardView.jsx`
 - **Implementation Steps**:
-  1. Generate Prisma migration adding `Subtask` model (id, title, isCompleted, taskId, createdAt).
-  2. Implement subtask CRUD endpoints nested under `/api/tasks/:taskId/subtasks`.
+  1. Generate Prisma migration adding `Subtask` model (id, organizationId, title, isCompleted, order, taskId, createdAt, updatedAt) with cascade delete.
+  2. Implement subtask CRUD endpoints nested under `/api/tasks/:taskId/subtasks` with parent task ABAC and project archival enforcement.
   3. Recalculate parent task completion progress whenever subtask checkbox is toggled.
-- **Data/API Impact**: Staged Migration #1 adding `Subtask` table with foreign key cascade to `Task`.
-- **Security Considerations**: Subtask mutations guarded by parent task update permissions.
+- **Data/API Impact**: Staged Migration #1 adding `Subtask` table with foreign key cascade to `Task` and `Organization`.
+- **Security Considerations**: Subtask mutations guarded by parent task update permissions (`task:update:any` or own-task ownership under `task:update:own`) and project archival freeze.
 - **Dependencies & Blockers**: TASK-203.
-- **Test Plan**: Unit test verifying that checking 2 of 4 subtasks sets parent progress to 50%.
-- **Acceptance Criteria**: Subtasks create, delete, and toggle with instant UI feedback.
-- **Definition of Done**: Migration applied cleanly, automated tests passing in `backend/test/subtasks.test.js`.
+- **Test Plan**: Unit and integration tests verifying subtask creation, validation, deletion, and progress rollup (17/17 pass in `backend/test/subtasks.test.js`, 5/5 pass in `frontend/src/features/tasks/subtasks.test.js`).
+- **Acceptance Criteria**: Subtasks create, delete, and toggle with instant UI feedback and badge updates.
+- **Definition of Done**: Migration applied cleanly, automated tests passing in `backend/test/subtasks.test.js` and `frontend/src/features/tasks/subtasks.test.js`.
 - **Effort Estimate**: M (2 business days).
 - **Risk & Rollback**: Reversible migration; drop table on rollback.
 
@@ -1107,7 +1107,7 @@ Activated only after stakeholder decisions UD-001 through UD-005 are formally ra
 | **ABAC & Policy Engine** | 4 | 3 | 3 Verified, 0 Planned, 1 Blocked | `TASK-002`, `TASK-203`, `TASK-506 (Blocked)` |
 | **Project Management** | 5 | 5 | 5 Verified, 0 Planned | `TASK-201`, `TASK-202` |
 | **Task Management** | 10 | 10 | 10 Verified, 0 Planned | `TASK-203`, `TASK-204`, `TASK-205`, `TASK-206` |
-| **Subtask Hierarchy** | 2 | 2 | 2 Planned | `TASK-301` |
+| **Subtask Hierarchy** | 2 | 2 | 2 Verified, 0 Planned | `TASK-301` |
 | **Collaboration & Comments** | 4 | 4 | 3 Planned, 1 Blocked (UD-004) | `TASK-302`, `TASK-504 (Blocked)` |
 | **Audit Logs & Compliance** | 2 | 2 | 2 Verified | `TASK-303` |
 | **Activity Feeds** | 1 | 1 | 1 Planned | `TASK-303` |
@@ -1122,7 +1122,7 @@ Activated only after stakeholder decisions UD-001 through UD-005 are formally ra
 | **Reporting & Analytics** | 1 | 1 | 1 Blocked (Reporting Scope) | `TASK-507 (Blocked)` |
 | **Developer Tooling** | 1 | 1 | 1 Verified | `TASK-006` |
 | **State Synchronization** | 2 | 1 | 2 Blocked (UD-003) | `TASK-503 (Blocked)` |
-| **TOTALS RECONCILED** | **79 Stories** | **60 Features** | **31 Verified, 5 Partial, 32 Planned, 11 Blocked** | **35 Tasks across 7 Phases (32 Story-Linked + 3 Operational)** |
+| **TOTALS RECONCILED** | **79 Stories** | **60 Features** | **33 Verified, 5 Partial, 30 Planned, 11 Blocked** | **35 Tasks across 7 Phases (32 Story-Linked + 3 Operational)** |
 
 ---
 

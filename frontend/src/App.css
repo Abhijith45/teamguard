@@ -4500,3 +4500,347 @@ body {
   border: 1px solid var(--color-border);
 }
 
+
+
+/* ==========================================================================
+   TASK-301: Subtask Relational Schema, Checklist CRUD & Progress Propagation
+   ========================================================================== */
+
+.subtasks-container {
+  padding: 16px;
+  background: #F8FAFC;
+  border-radius: 8px;
+  border: 1px solid var(--color-border);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.subtasks-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.subtasks-title-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.subtasks-title {
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: var(--color-text-main);
+  letter-spacing: -0.2px;
+}
+
+.subtasks-complete-tag {
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: #059669;
+  background: #ECFDF5;
+  border: 1px solid #A7F3D0;
+  padding: 1px 6px;
+  border-radius: 4px;
+}
+
+.subtasks-counter-badge {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--color-text-muted);
+}
+
+.subtasks-progress-track {
+  width: 100%;
+  height: 6px;
+  background: #E2E8F0;
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.subtasks-progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #10B981, #059669);
+  border-radius: 999px;
+  transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.progress-fill-complete {
+  background: #10B981;
+}
+
+.subtasks-error-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 10px;
+  background: #FEF2F2;
+  border: 1px solid #FCA5A5;
+  border-radius: 6px;
+  font-size: 0.75rem;
+  color: #B91C1C;
+}
+
+.subtasks-error-dismiss {
+  background: transparent;
+  border: none;
+  color: #B91C1C;
+  cursor: pointer;
+  padding: 2px;
+  display: flex;
+  align-items: center;
+}
+
+.subtasks-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 240px;
+  overflow-y: auto;
+}
+
+.subtasks-empty {
+  padding: 12px;
+  text-align: center;
+  font-size: 0.78rem;
+  color: var(--color-text-muted);
+  font-style: italic;
+}
+
+.subtask-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 10px;
+  background: #FFFFFF;
+  border: 1px solid #E2E8F0;
+  border-radius: 6px;
+  transition: all 0.15s ease;
+}
+
+.subtask-item:hover {
+  border-color: #CBD5E1;
+  background: #FAFAFA;
+}
+
+.subtask-completed {
+  background: #F8FAFC;
+  border-color: #E2E8F0;
+}
+
+.subtask-checkbox {
+  width: 18px;
+  height: 18px;
+  min-width: 18px;
+  border-radius: 4px;
+  border: 1.5px solid #CBD5E1;
+  background: #FFFFFF;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  padding: 0;
+  transition: all 0.15s ease;
+}
+
+.subtask-checkbox:hover:not(:disabled) {
+  border-color: #10B981;
+}
+
+.subtask-checkbox-checked {
+  background: #10B981;
+  border-color: #10B981;
+  color: #FFFFFF;
+}
+
+.subtask-checkbox:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.subtask-content {
+  flex: 1;
+  min-width: 0;
+}
+
+.subtask-title-text {
+  font-size: 0.8rem;
+  color: var(--color-text-main);
+  word-break: break-word;
+  user-select: text;
+  cursor: text;
+}
+
+.subtask-completed .subtask-title-text {
+  text-decoration: line-through;
+  color: var(--color-text-muted);
+}
+
+.subtask-edit-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.subtask-edit-input {
+  flex: 1;
+  font-size: 0.8rem;
+  padding: 3px 6px;
+  border: 1px solid var(--color-primary);
+  border-radius: 4px;
+  outline: none;
+}
+
+.btn-subtask-save {
+  font-size: 0.72rem;
+  font-weight: 600;
+  padding: 3px 8px;
+  background: var(--color-primary);
+  color: #FFFFFF;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.btn-subtask-cancel {
+  font-size: 0.72rem;
+  padding: 3px 6px;
+  background: transparent;
+  color: var(--color-text-muted);
+  border: none;
+  cursor: pointer;
+}
+
+.subtask-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  opacity: 0.4;
+  transition: opacity 0.15s ease;
+}
+
+.subtask-item:hover .subtask-actions {
+  opacity: 1;
+}
+
+.btn-subtask-reorder,
+.btn-subtask-delete {
+  background: transparent;
+  border: none;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  padding: 2px;
+  border-radius: 3px;
+  display: flex;
+  align-items: center;
+}
+
+.btn-subtask-reorder:hover:not(:disabled) {
+  color: var(--color-text-main);
+  background: #F1F5F9;
+}
+
+.btn-subtask-reorder:disabled {
+  opacity: 0.25;
+  cursor: not-allowed;
+}
+
+.btn-subtask-delete:hover:not(:disabled) {
+  color: #DC2626;
+  background: #FEE2E2;
+}
+
+.subtask-add-form {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.subtask-add-input-wrapper {
+  flex: 1;
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.subtask-add-input {
+  width: 100%;
+  font-size: 0.8rem;
+  padding: 6px 10px;
+  padding-right: 55px;
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  outline: none;
+  background: #FFFFFF;
+  color: var(--color-text-main);
+}
+
+.subtask-add-input:focus {
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.15);
+}
+
+.subtask-char-count {
+  position: absolute;
+  right: 8px;
+  font-size: 0.68rem;
+  color: #F59E0B;
+  pointer-events: none;
+}
+
+.btn-subtask-add {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 12px;
+  background: var(--color-primary);
+  color: #FFFFFF;
+  border: none;
+  border-radius: 6px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.btn-subtask-add:hover:not(:disabled) {
+  background: #047857;
+}
+
+.btn-subtask-add:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.subtask-locked-notice {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.74rem;
+  color: var(--color-text-muted);
+  font-style: italic;
+  padding: 4px 0;
+}
+
+/* Card & Row Subtask Badges (US-SUB-002) */
+.subtask-card-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: rgba(100, 116, 139, 0.08);
+  color: #475569;
+  border: 1px solid rgba(100, 116, 139, 0.18);
+  letter-spacing: 0.2px;
+}
+
+.subtask-card-badge-complete {
+  background: rgba(16, 185, 129, 0.12);
+  color: #059669;
+  border-color: rgba(16, 185, 129, 0.25);
+  font-weight: 700;
+}

@@ -3,6 +3,7 @@ import {
   ArrowDown,
   ArrowUp,
   ArrowUpDown,
+  CheckSquare,
   Edit3,
   Layers,
   Lock,
@@ -260,6 +261,21 @@ export function TaskTableView({
                               }
                             >
                               <Lock size={11} />
+                            </span>
+                          )}
+                          {task.subtasks && task.subtasks.length > 0 && (
+                            <span
+                              className={`subtask-card-badge ${
+                                task.subtasks.every((s) => s.isCompleted)
+                                  ? "subtask-card-badge-complete"
+                                  : ""
+                              }`}
+                              title={`Subtasks: ${task.subtasks.filter((s) => s.isCompleted).length}/${task.subtasks.length} completed`}
+                            >
+                              <CheckSquare size={11} />
+                              <span>
+                                {task.subtasks.filter((s) => s.isCompleted).length}/{task.subtasks.length}
+                              </span>
                             </span>
                           )}
                         </div>
