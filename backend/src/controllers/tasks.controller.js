@@ -41,7 +41,7 @@ export async function listTasks(req, res, next) {
       orderBy: [{ order: "asc" }, { updatedAt: "desc" }],
       include: {
         assignee: { select: { id: true, name: true, avatarUrl: true, email: true } },
-        project: { select: { id: true, name: true } },
+        project: { select: { id: true, name: true, key: true, isArchived: true } },
       },
     });
 
@@ -65,6 +65,14 @@ export async function createTask(req, res, next) {
       return res.status(404).json({ error: "Project not found in this organization" });
     }
 
+    // TASK-202: Project Archival Freezing (US-PROJ-005 / BR-009)
+    if (project.isArchived || project.status === "ARCHIVED") {
+      return res.status(400).json({
+        error: "Cannot create tasks in an archived project",
+        code: "PROJECT_ARCHIVED",
+      });
+    }
+
     const task = await prisma.task.create({
       data: {
         organizationId: orgId,
@@ -79,7 +87,7 @@ export async function createTask(req, res, next) {
       },
       include: {
         assignee: { select: { id: true, name: true, avatarUrl: true, email: true } },
-        project: { select: { id: true, name: true } },
+        project: { select: { id: true, name: true, key: true, isArchived: true } },
       },
     });
 
@@ -196,9 +204,20 @@ export async function updateTask(req, res, next) {
         organizationId: orgId,
         project: { deletedAt: null },
       },
+      include: {
+        project: { select: { id: true, isArchived: true, status: true } },
+      },
     });
     if (!existing) {
       return res.status(404).json({ error: "Task not found in this organization" });
+    }
+
+    // TASK-202: Project Archival Freezing (US-PROJ-005 / BR-009)
+    if (existing.project?.isArchived || existing.project?.status === "ARCHIVED") {
+      return res.status(400).json({
+        error: "Cannot modify tasks in an archived project",
+        code: "PROJECT_ARCHIVED",
+      });
     }
 
     // ABAC Resource Policy Check:
@@ -223,6 +242,12 @@ export async function updateTask(req, res, next) {
       });
       if (!targetProject) {
         return res.status(404).json({ error: "Target project not found in this organization" });
+      }
+      if (targetProject.isArchived || targetProject.status === "ARCHIVED") {
+        return res.status(400).json({
+          error: "Cannot move tasks to an archived project",
+          code: "PROJECT_ARCHIVED",
+        });
       }
     }
 
@@ -251,7 +276,7 @@ export async function updateTask(req, res, next) {
       data: updateData,
       include: {
         assignee: { select: { id: true, name: true, avatarUrl: true, email: true } },
-        project: { select: { id: true, name: true } },
+        project: { select: { id: true, name: true, key: true, isArchived: true } },
       },
     });
 
@@ -281,9 +306,20 @@ export async function deleteTask(req, res, next) {
         organizationId: orgId,
         project: { deletedAt: null },
       },
+      include: {
+        project: { select: { id: true, isArchived: true, status: true } },
+      },
     });
     if (!existing) {
       return res.status(404).json({ error: "Task not found in this organization" });
+    }
+
+    // TASK-202: Project Archival Freezing (US-PROJ-005 / BR-009)
+    if (existing.project?.isArchived || existing.project?.status === "ARCHIVED") {
+      return res.status(400).json({
+        error: "Cannot delete tasks in an archived project",
+        code: "PROJECT_ARCHIVED",
+      });
     }
 
     await prisma.task.delete({

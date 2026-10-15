@@ -99,6 +99,7 @@ export function KanbanBoardView({ user, activeOrg, userPermissions, onShowNotice
   }, []);
 
   function canEditTask(task) {
+    if (task.project?.isArchived) return false;
     if (canUpdateAny) return true;
     if (canUpdateOwn && (task.assigneeId === user.id || task.creatorId === user.id)) return true;
     return false;
@@ -349,14 +350,49 @@ export function KanbanBoardView({ user, activeOrg, userPermissions, onShowNotice
                       title={editable ? "Click to view or edit task details" : "ABAC Restricted: Click to view details"}
                     >
                       <div className="kanban-card-top">
-                        <span className={`tag-priority tag-${task.priority.toLowerCase()}`}>
-                          {task.priority}
-                        </span>
+                        <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                          <span
+                            className="task-jira-key-badge"
+                            style={{
+                              fontSize: "11px",
+                              fontWeight: "700",
+                              color: "#64748b",
+                              background: "rgba(100, 116, 139, 0.12)",
+                              padding: "2px 6px",
+                              borderRadius: "4px",
+                              letterSpacing: "0.5px",
+                            }}
+                          >
+                            {(task.project?.key || "PROJ")}-{task.id}
+                          </span>
+                          <span className={`tag-priority tag-${task.priority.toLowerCase()}`}>
+                            {task.priority}
+                          </span>
+                          {task.project?.isArchived && (
+                            <span
+                              style={{
+                                fontSize: "10px",
+                                fontWeight: "700",
+                                color: "#f59e0b",
+                                background: "rgba(245, 158, 11, 0.15)",
+                                padding: "2px 5px",
+                                borderRadius: "4px",
+                              }}
+                              title="Project is archived and read-only"
+                            >
+                              ARCHIVED
+                            </span>
+                          )}
+                        </div>
                         <div className="card-top-actions">
                           {!editable && (
                             <span
                               className="abac-lock-badge"
-                              title={`ABAC Restricted: Assigned to ${task.assignee?.name || "another member"}. You cannot edit this task.`}
+                              title={
+                                task.project?.isArchived
+                                  ? "Project is archived and read-only"
+                                  : `ABAC Restricted: Assigned to ${task.assignee?.name || "another member"}. You cannot edit this task.`
+                              }
                             >
                               <Lock size={12} />
                             </span>
@@ -564,8 +600,8 @@ export function KanbanBoardView({ user, activeOrg, userPermissions, onShowNotice
                         style={{ padding: "7px 10px", fontSize: "0.8rem" }}
                       >
                         {projects.map((p) => (
-                          <option key={p.id} value={p.id}>
-                            {p.name}
+                          <option key={p.id} value={p.id} disabled={p.isArchived}>
+                            {p.key ? `[${p.key}] ` : ""}{p.name}{p.isArchived ? " (Archived - Read Only)" : ""}
                           </option>
                         ))}
                       </select>
@@ -692,8 +728,8 @@ export function KanbanBoardView({ user, activeOrg, userPermissions, onShowNotice
                   required
                 >
                   {projects.map((p) => (
-                    <option key={p.id} value={p.id}>
-                      {p.name}
+                    <option key={p.id} value={p.id} disabled={p.isArchived}>
+                      {p.key ? `[${p.key}] ` : ""}{p.name}{p.isArchived ? " (Archived - Cannot Add Tasks)" : ""}
                     </option>
                   ))}
                 </select>

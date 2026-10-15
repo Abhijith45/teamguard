@@ -28,7 +28,7 @@ export async function getDashboardData(req, res, next) {
 
     // 3. Recent Projects (top 4)
     const recentProjects = await prisma.project.findMany({
-      where: { organizationId: orgId },
+      where: { organizationId: orgId, deletedAt: null },
       orderBy: { updatedAt: "desc" },
       take: 4,
       include: {
@@ -46,28 +46,34 @@ export async function getDashboardData(req, res, next) {
       },
     });
 
-    // Format recent projects with aggregated team avatars and link/comment totals
+    // Format recent projects with aggregated team avatars, dynamic progress, and link/comment totals
     const formattedProjects = recentProjects.map((p) => {
       const uniqueAssignees = [];
       const seen = new Set();
       let totalComments = 0;
       let totalAttachments = 0;
+      let doneCount = 0;
 
       for (const t of p.tasks) {
         totalComments += t.commentsCount;
         totalAttachments += t.attachmentsCount;
+        if (t.status === "DONE") doneCount += 1;
         if (t.assignee && !seen.has(t.assignee.id)) {
           seen.add(t.assignee.id);
           uniqueAssignees.push(t.assignee);
         }
       }
 
+      const progress = p.tasks.length > 0 ? Math.round((doneCount / p.tasks.length) * 100) : p.progress;
+
       return {
         id: p.id,
         name: p.name,
+        key: p.key,
+        isArchived: p.isArchived,
         description: p.description,
         status: p.status,
-        progress: p.progress,
+        progress,
         priority: p.priority,
         team: uniqueAssignees.slice(0, 4),
         commentsCount: totalComments,

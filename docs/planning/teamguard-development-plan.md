@@ -462,18 +462,18 @@ Work is sequenced strictly by technical dependencies, security invariants, and r
 - **Linked User Stories**: `US-PROJ-002`, `US-PROJ-003`, `US-PROJ-005`
 - **Linked PRD Features**: `TG-PROJ-002`, `TG-PROJ-003`, `TG-PROJ-005`
 - **Priority**: Medium (P2)
-- **Status**: Implementation Required
-- **Affected Files**: [backend/src/services/projects.service.js](file:///c:/Users/Abhijeet%20Rawat/Desktop/rbac/backend/src/services/projects.service.js), [frontend/src/views/ProjectsView.jsx](file:///c:/Users/Abhijeet%20Rawat/Desktop/rbac/frontend/src/views/ProjectsView.jsx)
+- **Status**: Complete / Verified (TIER-1, TIER-2 & TIER-3)
+- **Affected Files**: [backend/src/services/projects.service.js](file:///c:/Users/Abhijeet%20Rawat/Desktop/rbac/backend/src/services/projects.service.js), [backend/src/controllers/projects.controller.js](file:///c:/Users/Abhijeet%20Rawat/Desktop/rbac/backend/src/controllers/projects.controller.js), [backend/src/controllers/tasks.controller.js](file:///c:/Users/Abhijeet%20Rawat/Desktop/rbac/backend/src/controllers/tasks.controller.js), [backend/test/projects.test.js](file:///c:/Users/Abhijeet%20Rawat/Desktop/rbac/backend/test/projects.test.js), [frontend/src/features/projects/ProjectSetupWizardModal.jsx](file:///c:/Users/Abhijeet%20Rawat/Desktop/rbac/frontend/src/features/projects/ProjectSetupWizardModal.jsx), [frontend/src/features/tasks/KanbanBoardView.jsx](file:///c:/Users/Abhijeet%20Rawat/Desktop/rbac/frontend/src/features/tasks/KanbanBoardView.jsx)
 - **Implementation Steps**:
-  1. Auto-generate project key from title (`/[A-Z]{2,10}/`) and enforce unique constraint per tenant.
+  1. Auto-generate project key from title (`/^[A-Z][A-Z0-9_]{1,9}$/`) and enforce unique constraint per tenant.
   2. Implement progress calculation: $\frac{\text{DONE tasks}}{\text{total tasks}} \times 100$.
-  3. If `isArchived = true`, reject task creation or status updates with 403.
-- **Data/API Impact**: Adds `key` and `isArchived` fields to Project model.
-- **Security Considerations**: Archived projects remain read-only.
+  3. If `isArchived = true`, reject task creation or mutations with HTTP 400 (`code: "PROJECT_ARCHIVED"`).
+- **Data/API Impact**: Added `key` and `isArchived` fields with indexes to Project model. Endpoints `POST /:id/archive` and `POST /:id/unarchive`.
+- **Security Considerations**: Archived projects remain read-only; mutation freezing enforced in task create, update, and delete.
 - **Dependencies & Blockers**: TASK-201.
-- **Test Plan**: Test asserting mutation rejection on archived project.
+- **Test Plan**: 28 automated tests in `backend/test/projects.test.js` validating key generation, immutability, uniqueness, dynamic progress, and archival protection.
 - **Acceptance Criteria**: Key generated, progress displayed, archived projects protected.
-- **Definition of Done**: Service methods and UI badges operational.
+- **Definition of Done**: Service methods, routes, controller, client, and UI badges operational and 100% verified.
 - **Effort Estimate**: M (2 business days).
 - **Risk & Rollback**: Low risk.
 
@@ -1096,7 +1096,7 @@ Activated only after stakeholder decisions UD-001 through UD-005 are formally ra
 | **Invitations & Onboarding** | 5 | 1 | 2 Verified, 3 Blocked (UD-005) | `TASK-101`, `TASK-505 (Blocked)` |
 | **RBAC Administration** | 7 | 8 | 7 Verified, 0 Planned | `TASK-102`, `TASK-103`, `TASK-104` |
 | **ABAC & Policy Engine** | 4 | 3 | 2 Verified, 1 Planned, 1 Blocked | `TASK-002`, `TASK-203`, `TASK-506 (Blocked)` |
-| **Project Management** | 5 | 5 | 2 Verified, 3 Planned | `TASK-201`, `TASK-202` |
+| **Project Management** | 5 | 5 | 5 Verified, 0 Planned | `TASK-201`, `TASK-202` |
 | **Task Management** | 10 | 10 | 5 Verified, 5 Planned | `TASK-203`, `TASK-204`, `TASK-205`, `TASK-206` |
 | **Subtask Hierarchy** | 2 | 2 | 2 Planned | `TASK-301` |
 | **Collaboration & Comments** | 4 | 4 | 3 Planned, 1 Blocked (UD-004) | `TASK-302`, `TASK-504 (Blocked)` |

@@ -297,10 +297,10 @@ async function main() {
 
   // 6. Projects in Acme Corp
   const projectsData = [
-    { name: "Nova UI Revamp", description: "Complete visual redesign of core web platform", progress: 40, priority: "HIGH" },
-    { name: "Orion SaaS Platform", description: "Enterprise multi-tenant backend infrastructure", progress: 80, priority: "MEDIUM" },
-    { name: "PixelFrame Website", description: "Marketing site and brand guidelines implementation", progress: 65, priority: "MEDIUM" },
-    { name: "Zetta Landing Page", description: "Conversion-optimized product teaser page", progress: 25, priority: "LOW" },
+    { name: "Nova UI Revamp", key: "NOV", description: "Complete visual redesign of core web platform", progress: 40, priority: "HIGH", isArchived: false },
+    { name: "Orion SaaS Platform", key: "ORION", description: "Enterprise multi-tenant backend infrastructure", progress: 80, priority: "MEDIUM", isArchived: false },
+    { name: "PixelFrame Website", key: "PIXEL", description: "Marketing site and brand guidelines implementation", progress: 65, priority: "MEDIUM", isArchived: false },
+    { name: "Zetta Landing Page", key: "ZETTA", description: "Conversion-optimized product teaser page", progress: 25, priority: "LOW", isArchived: false },
   ];
 
   const projects = [];
@@ -309,6 +309,10 @@ async function main() {
       where: { organizationId: acme.id, name: p.name },
     });
     if (existing) {
+      if (!existing.key) {
+        await prisma.project.update({ where: { id: existing.id }, data: { key: p.key } });
+        existing.key = p.key;
+      }
       projects.push(existing);
     } else {
       const created = await prisma.project.create({
@@ -516,8 +520,8 @@ async function main() {
 
   // Nova Labs Projects
   const novaProjectsData = [
-    { name: "Quantum Core Engine", description: "High-performance distributed engine", progress: 50, priority: "HIGH" },
-    { name: "BioSensor Firmware", description: "Embedded firmware and real-time calibration", progress: 20, priority: "MEDIUM" },
+    { name: "Quantum Core Engine", key: "QCE", description: "High-performance distributed engine", progress: 50, priority: "HIGH", isArchived: false },
+    { name: "BioSensor Firmware", key: "BSF", description: "Embedded firmware and real-time calibration", progress: 20, priority: "MEDIUM", isArchived: false },
   ];
   const novaProjects = [];
   for (const p of novaProjectsData) {
@@ -525,6 +529,10 @@ async function main() {
       where: { organizationId: nova.id, name: p.name },
     });
     if (existing) {
+      if (!existing.key) {
+        await prisma.project.update({ where: { id: existing.id }, data: { key: p.key } });
+        existing.key = p.key;
+      }
       novaProjects.push(existing);
     } else {
       const created = await prisma.project.create({

@@ -13,6 +13,7 @@ const STEPS = [
 export function ProjectSetupWizardModal({ isOpen, onClose, onProjectCreated, onShowNotice }) {
   const [currentStep, setCurrentStep] = useState(2); // default to Step 2 as shown in mockup
   const [projectName, setProjectName] = useState("Alpha Redesign 2026");
+  const [projectKey, setProjectKey] = useState("ALPHA");
   const [projectDesc, setProjectDesc] = useState("Visual overhaul and multi-tenant permission integration.");
   const [priority, setPriority] = useState("HIGH");
 
@@ -44,7 +45,7 @@ export function ProjectSetupWizardModal({ isOpen, onClose, onProjectCreated, onS
   async function handleLaunch() {
     try {
       setSubmitting(true);
-      const res = await api.createProject({
+      const payload = {
         name: projectName.trim(),
         description: projectDesc.trim(),
         priority,
@@ -53,7 +54,11 @@ export function ProjectSetupWizardModal({ isOpen, onClose, onProjectCreated, onS
           { title: initialTaskTitle || "Kickoff Sprint Preparation", status: "TODO", priority: "HIGH" },
           { title: "Define Architecture Boundaries", status: "IN_PROGRESS", priority: "MEDIUM" },
         ],
-      });
+      };
+      if (projectKey.trim()) {
+        payload.key = projectKey.trim().toUpperCase();
+      }
+      const res = await api.createProject(payload);
 
       onShowNotice({
         type: "success",
@@ -160,6 +165,25 @@ export function ProjectSetupWizardModal({ isOpen, onClose, onProjectCreated, onS
                     onChange={(e) => setProjectName(e.target.value)}
                     placeholder="e.g. Orion SaaS Platform"
                   />
+                </div>
+                <div className="wizard-input-group">
+                  <label>Project Key (Prefix for tasks, e.g. NOV, ALPHA)</label>
+                  <input
+                    type="text"
+                    value={projectKey}
+                    onChange={(e) =>
+                      setProjectKey(
+                        e.target.value
+                          .toUpperCase()
+                          .replace(/[^A-Z0-9_]/g, "")
+                          .slice(0, 10)
+                      )
+                    }
+                    placeholder="e.g. ALPHA (2–10 uppercase alphanumeric)"
+                  />
+                  <small style={{ color: "#94a3b8", fontSize: "11px", marginTop: "4px" }}>
+                    Used as identifier for tasks (e.g. {projectKey || "PROJ"}-1). Auto-derived if blank.
+                  </small>
                 </div>
                 <div className="wizard-input-group">
                   <label>Description</label>

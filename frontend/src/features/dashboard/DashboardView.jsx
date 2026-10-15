@@ -142,9 +142,41 @@ export function DashboardView({ activeOrg, onNavigateToTasks, onNavigateToProjec
             {recentProjects.map((proj) => (
               <div key={proj.id} className="project-preview-card">
                 <div className="project-preview-top">
-                  <span className={`tag-priority tag-${(proj.priority || "medium").toLowerCase()}`}>
-                    {proj.priority}
-                  </span>
+                  <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                    {proj.key && (
+                      <span
+                        className="project-key-tag"
+                        style={{
+                          fontSize: "11px",
+                          fontWeight: "700",
+                          color: "#10B981",
+                          background: "rgba(16, 185, 129, 0.12)",
+                          padding: "2px 6px",
+                          borderRadius: "4px",
+                          letterSpacing: "0.5px",
+                        }}
+                      >
+                        {proj.key}
+                      </span>
+                    )}
+                    <span className={`tag-priority tag-${(proj.priority || "medium").toLowerCase()}`}>
+                      {proj.priority}
+                    </span>
+                    {proj.isArchived && (
+                      <span
+                        style={{
+                          fontSize: "10px",
+                          fontWeight: "700",
+                          color: "#f59e0b",
+                          background: "rgba(245, 158, 11, 0.15)",
+                          padding: "2px 5px",
+                          borderRadius: "4px",
+                        }}
+                      >
+                        ARCHIVED
+                      </span>
+                    )}
+                  </div>
                   <button type="button" className="icon-btn-ghost"><MoreHorizontal size={14} /></button>
                 </div>
                 <h4 className="project-preview-title">{proj.name}</h4>
