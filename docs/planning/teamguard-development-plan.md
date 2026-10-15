@@ -290,7 +290,7 @@ Work is sequenced strictly by technical dependencies, security invariants, and r
 - **Linked User Stories**: `US-AUTH-002`, `US-TENANT-001`
 - **Linked PRD Features**: `TG-AUTH-002`, `TG-TENANT-001`
 - **Priority**: Critical (P0)
-- **Status**: Implementation Required
+- **Status**: Implemented & Verified (TIER-2 & TIER-3)
 - **Affected Files**: [backend/src/app.js](file:///c:/Users/Abhijeet%20Rawat/Desktop/rbac/backend/src/app.js), `backend/src/middleware/rate-limiter.middleware.js`
 - **Implementation Steps**:
   1. Mount `helmet()` with Content Security Policy, HSTS, frameguard, and referrer policy.
