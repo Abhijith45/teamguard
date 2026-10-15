@@ -3669,4 +3669,125 @@ body {
   to { opacity: 1; transform: scale(1); }
 }
 
+/* ==========================================================================
+   TASK-204: Slide-Over Task Detail Drawer & Native Drag-and-Drop Kanban
+   ========================================================================== */
+
+/* Slide-Over Drawer */
+.drawer-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.45);
+  backdrop-filter: blur(4px);
+  z-index: 1000;
+  display: flex;
+  justify-content: flex-end;
+  animation: drawerFadeIn 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes drawerFadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.task-detail-drawer {
+  width: 100%;
+  max-width: 580px;
+  height: 100%;
+  background: #FFFFFF;
+  box-shadow: -10px 0 35px -5px rgba(0, 0, 0, 0.2);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  animation: drawerSlideIn 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  transform-origin: right center;
+}
+
+@keyframes drawerSlideIn {
+  from { transform: translateX(100%); }
+  to { transform: translateX(0); }
+}
+
+.drawer-header {
+  padding: 18px 24px;
+  border-bottom: 1px solid var(--color-border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: #FFFFFF;
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+.drawer-header-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.drawer-body {
+  padding: 24px;
+  overflow-y: auto;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.drawer-footer {
+  padding: 16px 24px;
+  border-top: 1px solid var(--color-border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: #F8FAFC;
+  position: sticky;
+  bottom: 0;
+  z-index: 10;
+}
+
+.drawer-footer-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+/* Native Drag and Drop Kanban */
+.kanban-card.draggable-card {
+  cursor: grab;
+  user-select: none;
+  transition: transform 0.15s ease, box-shadow 0.15s ease, opacity 0.15s ease, border-color 0.15s ease;
+}
+
+.kanban-card.draggable-card:active {
+  cursor: grabbing;
+}
+
+.kanban-card.is-dragging {
+  opacity: 0.45;
+  transform: rotate(2deg) scale(0.98);
+  box-shadow: 0 12px 24px -4px rgba(0, 0, 0, 0.15);
+  border: 1px dashed #10B981 !important;
+}
+
+.kanban-card.card-non-draggable {
+  cursor: default;
+}
+
+.kanban-column.drag-over-column {
+  background: rgba(16, 185, 129, 0.08) !important;
+  outline: 2px dashed #10B981 !important;
+  outline-offset: -2px;
+  transition: background 0.15s ease, outline 0.15s ease;
+}
+
+.kanban-column-cards.column-drop-zone {
+  min-height: 140px;
+  border-radius: var(--radius-md);
+  transition: background 0.15s ease;
+}
+
+
 

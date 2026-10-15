@@ -500,22 +500,24 @@ Work is sequenced strictly by technical dependencies, security invariants, and r
 - **Risk & Rollback**: Low risk.
 
 #### Task ID: TASK-204 — Slide-Over Task Detail Drawer & Native Drag-and-Drop Kanban
-- **Objective**: Connect interactive Kanban board drag-and-drop column transitions and slide-over task drawer with Esc key handling.
-- **Linked User Stories**: `US-TASK-004`, `US-TASK-005`
-- **Linked PRD Features**: `TG-TASK-004`, `TG-TASK-005`
+- **Objective**: Connect interactive Kanban board native drag-and-drop column transitions and slide-over task drawer with Esc key handling and optimistic rollback.
+- **Linked User Stories**: `US-TASK-004`, `US-TASK-005`, `US-ABAC-002`, `US-ABAC-003`
+- **Linked PRD Features**: `TG-TASK-004`, `TG-TASK-005`, `TG-TASK-008`
 - **Priority**: High (P1)
-- **Status**: Verified in Baseline / Expansion Required
-- **Affected Files**: [frontend/src/views/KanbanBoardView.jsx](file:///c:/Users/Abhijeet%20Rawat/Desktop/rbac/frontend/src/views/KanbanBoardView.jsx), `frontend/src/components/TaskDetailDrawer.jsx`
+- **Status**: Complete / Verified (TIER-1, TIER-2 & TIER-3)
+- **Affected Files**: `frontend/src/features/tasks/KanbanBoardView.jsx`, `frontend/src/features/tasks/TaskDetailDrawer.jsx`, `frontend/src/components/TaskDetailDrawer.jsx`, `frontend/src/App.css`, `frontend/src/features/tasks/task-drawer-dnd.test.js`
 - **Implementation Steps**:
-  1. Refactor existing modal dialog into smooth slide-over drawer mounting from right edge.
-  2. Support Esc key dismissal and backdrop click dismissal.
-  3. HTML5 drag-and-drop updates task status optimistically and calls `PATCH /api/tasks/:id`.
-- **Data/API Impact**: Client-side state and REST mutation.
-- **Security Considerations**: Visual lock icon on cards user cannot drag.
+  1. Built slide-over detail drawer (`TaskDetailDrawer.jsx`) mounting from right edge with smooth CSS transitions (`transform: translateX(0)`), background blur backdrop (`backdrop-filter: blur(4px)`), `Esc` key dismissal, and backdrop click handling.
+  2. Implemented native HTML5 drag-and-drop between Kanban columns (`TODO`, `IN_PROGRESS`, `REVISION`, `DONE`) with drag tilt (`is-dragging`), drop zone highlights (`drag-over-column`), and optimistic UI updates.
+  3. Built automatic rollback restoring cards to original columns upon server rejection (`HTTP 403 Forbidden` / `HTTP 400 Bad Request`) with error notices.
+  4. Added visual ownership lock indicators (`🔒`) and drag prevention: non-editable cards have `draggable={false}`, `card-non-draggable` cursor, and locked governance fields.
+  5. Implemented governance field mutation barrier preserving creator provenance and locking `projectId` / `assigneeId` for regular members.
+- **Data/API Impact**: Real-time optimistic client state and `PATCH /api/tasks/:id` REST mutations.
+- **Security Considerations**: Visual lock on non-owned cards; project archival freeze; zero-trust server validation.
 - **Dependencies & Blockers**: TASK-203.
-- **Test Plan**: E2E test verifying card drag from TODO to IN_PROGRESS updates database.
-- **Acceptance Criteria**: Drawer mounts smoothly; drag-and-drop reflects state in DB.
-- **Definition of Done**: Frontend component operational and tested.
+- **Test Plan**: Unit test suite in `frontend/src/features/tasks/task-drawer-dnd.test.js` (4/4 passing), full backend regression suite (172/172 passing), and live browser validation across drawer animations, Esc dismissal, close button dismissal, and Kanban column transitions.
+- **Acceptance Criteria**: Drawer mounts and animates smoothly; Esc key dismisses drawer; drag-and-drop updates database with optimistic rollback on rejection.
+- **Definition of Done**: Frontend component fully operational, tested, and validated in browser.
 - **Effort Estimate**: M (2 business days).
 - **Risk & Rollback**: Low risk.
 

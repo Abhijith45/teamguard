@@ -8,12 +8,10 @@ import {
   Lock,
   MessageSquare,
   Plus,
-  Shield,
   Table,
-  Trash2,
-  User,
 } from "lucide-react";
 import { api } from "../../services/api-client.js";
+import { TaskDetailDrawer } from "./TaskDetailDrawer.jsx";
 
 const COLUMNS = [
   { id: "TODO", label: "To do", dotColor: "#A855F7" },
@@ -30,7 +28,7 @@ export function KanbanBoardView({ user, activeOrg, userPermissions, onShowNotice
   const [error, setError] = useState(null);
   const [filterPriority, setFilterPriority] = useState("ALL");
   const [viewMode, setViewMode] = useState("board");
-  
+
   // Create Modal state
   const [createModalOpen, setCreateModalOpen] = useState(false);
   const [newTitle, setNewTitle] = useState("");
@@ -39,16 +37,12 @@ export function KanbanBoardView({ user, activeOrg, userPermissions, onShowNotice
   const [newProjectId, setNewProjectId] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
-  // Detail / Edit Modal state (TASK-002 Enhanced Governance UI)
+  // Detail Drawer state (TASK-204)
   const [editingTask, setEditingTask] = useState(null);
-  const [editTitle, setEditTitle] = useState("");
-  const [editDesc, setEditDesc] = useState("");
-  const [editStatus, setEditStatus] = useState("TODO");
-  const [editPriority, setEditPriority] = useState("MEDIUM");
-  const [editProjectId, setEditProjectId] = useState("");
-  const [editAssigneeId, setEditAssigneeId] = useState("");
-  const [modalError, setModalError] = useState(null);
-  const [savingEdit, setSavingEdit] = useState(false);
+
+  // Native HTML5 Drag-and-Drop state (TASK-204)
+  const [draggingTaskId, setDraggingTaskId] = useState(null);
+  const [dragOverColumn, setDragOverColumn] = useState(null);
 
   // Permission checks
   const canCreateTask = userPermissions.has("task:create");
@@ -99,6 +93,7 @@ export function KanbanBoardView({ user, activeOrg, userPermissions, onShowNotice
   }, []);
 
   function canEditTask(task) {
+    if (!task) return false;
     if (task.project?.isArchived) return false;
     if (canUpdateAny) return true;
     if (canUpdateOwn && (task.assigneeId === user.id || task.creatorId === user.id)) return true;
@@ -107,29 +102,38 @@ export function KanbanBoardView({ user, activeOrg, userPermissions, onShowNotice
 
   function openTaskDetail(task) {
     setEditingTask(task);
-    setEditTitle(task.title || "");
-    setEditDesc(task.description || "");
-    setEditStatus(task.status || "TODO");
-    setEditPriority(task.priority || "MEDIUM");
-    setEditProjectId(String(task.projectId));
-    setEditAssigneeId(task.assigneeId ? String(task.assigneeId) : "");
-    setModalError(null);
   }
 
+  // Status transition with optimistic update and rollback (TASK-204)
   async function handleStatusChange(taskId, newStatus, e) {
     if (e) e.stopPropagation();
+    const task = tasks.find((t) => t.id === taskId);
+    if (!task) return;
+    if (task.status === newStatus) return;
+
+    if (!canEditTask(task)) {
+      onShowNotice({
+        type: "error",
+        message: `ABAC Denial: You do not have permission to edit this task (assigned to ${task.assignee?.name || "another user"}). Only the assignee or manager can update it.`,
+      });
+      return;
+    }
+
+    const previousTasks = [...tasks];
+    // Optimistic UI state update
+    setTasks((prev) =>
+      prev.map((t) =>
+        t.id === taskId
+          ? {
+              ...t,
+              status: newStatus,
+              completedAt: newStatus === "DONE" ? new Date().toISOString() : null,
+            }
+          : t
+      )
+    );
+
     try {
-      const task = tasks.find((t) => t.id === taskId);
-      if (!task) return;
-
-      if (!canEditTask(task)) {
-        onShowNotice({
-          type: "error",
-          message: `ABAC Denial: You do not have permission to edit this task (assigned to ${task.assignee?.name || "another user"}). Only the assignee or manager can update it.`,
-        });
-        return;
-      }
-
       const res = await api.updateTask(taskId, { status: newStatus });
       setTasks((prev) => prev.map((t) => (t.id === taskId ? res.task : t)));
       onShowNotice({
@@ -137,8 +141,54 @@ export function KanbanBoardView({ user, activeOrg, userPermissions, onShowNotice
         message: `Task moved to "${COLUMNS.find((c) => c.id === newStatus)?.label}"`,
       });
     } catch (err) {
-      onShowNotice({ type: "error", message: err.message });
+      // Rollback on rejection (HTTP 403 Forbidden / 400 Bad Request)
+      setTasks(previousTasks);
+      onShowNotice({
+        type: "error",
+        message: err.message || "Failed to update task status",
+      });
     }
+  }
+
+  // Native Drag and Drop Event Handlers (TASK-204)
+  function handleCardDragStart(e, task) {
+    if (!canEditTask(task)) {
+      e.preventDefault();
+      return;
+    }
+    setDraggingTaskId(task.id);
+    e.dataTransfer.setData("text/plain", String(task.id));
+    e.dataTransfer.effectAllowed = "move";
+  }
+
+  function handleCardDragEnd() {
+    setDraggingTaskId(null);
+    setDragOverColumn(null);
+  }
+
+  function handleColumnDragOver(e, colId) {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "move";
+    if (dragOverColumn !== colId) {
+      setDragOverColumn(colId);
+    }
+  }
+
+  function handleColumnDragLeave(e, colId) {
+    if (e.currentTarget.contains(e.relatedTarget)) return;
+    if (dragOverColumn === colId) {
+      setDragOverColumn(null);
+    }
+  }
+
+  function handleColumnDrop(e, targetColId) {
+    e.preventDefault();
+    setDragOverColumn(null);
+    const taskIdStr = e.dataTransfer.getData("text/plain") || (draggingTaskId ? String(draggingTaskId) : null);
+    setDraggingTaskId(null);
+    if (!taskIdStr) return;
+    const taskId = Number(taskIdStr);
+    handleStatusChange(taskId, targetColId);
   }
 
   async function handleCreateTask(e) {
@@ -165,66 +215,19 @@ export function KanbanBoardView({ user, activeOrg, userPermissions, onShowNotice
     }
   }
 
-  async function handleSaveTaskEdit(e) {
-    e.preventDefault();
-    if (!editingTask) return;
-    if (!editTitle.trim()) {
-      setModalError("Task title is required.");
-      return;
-    }
-
-    const isEditable = canEditTask(editingTask);
-    if (!isEditable) {
-      setModalError("ABAC Policy Violation: You do not have permission to modify this task.");
-      return;
-    }
-
-    try {
-      setSavingEdit(true);
-      setModalError(null);
-
-      const payload = {
-        title: editTitle.trim(),
-        description: editDesc.trim(),
-        status: editStatus,
-        priority: editPriority,
-      };
-
-      // Only include protected governance fields if user possesses explicit permissions
-      if (canManageProjects && Number(editProjectId) !== editingTask.projectId) {
-        payload.projectId = Number(editProjectId);
-      }
-      if (canAssign) {
-        const newAssignee = editAssigneeId ? Number(editAssigneeId) : null;
-        if (newAssignee !== editingTask.assigneeId) {
-          payload.assigneeId = newAssignee;
-        }
-      }
-
-      const res = await api.updateTask(editingTask.id, payload);
-      setTasks((prev) => prev.map((t) => (t.id === editingTask.id ? res.task : t)));
-      setEditingTask(null);
-      onShowNotice({ type: "success", message: "Task details updated successfully" });
-    } catch (err) {
-      setModalError(err.message || "Failed to update task");
-    } finally {
-      setSavingEdit(false);
-    }
+  // Slide-Over Task Detail Drawer Handlers (TASK-204)
+  async function handleDrawerSave(taskId, payload) {
+    const res = await api.updateTask(taskId, payload);
+    setTasks((prev) => prev.map((t) => (t.id === taskId ? res.task : t)));
+    setEditingTask(null);
+    onShowNotice({ type: "success", message: "Task details updated successfully" });
   }
 
-  async function handleDeleteTask(taskId) {
-    if (!window.confirm("Are you sure you want to permanently delete this task?")) return;
-    try {
-      setSavingEdit(true);
-      await api.deleteTask(taskId);
-      setTasks((prev) => prev.filter((t) => t.id !== taskId));
-      setEditingTask(null);
-      onShowNotice({ type: "success", message: "Task deleted successfully" });
-    } catch (err) {
-      setModalError(err.message || "Failed to delete task");
-    } finally {
-      setSavingEdit(false);
-    }
+  async function handleDrawerDelete(taskId) {
+    await api.deleteTask(taskId);
+    setTasks((prev) => prev.filter((t) => t.id !== taskId));
+    setEditingTask(null);
+    onShowNotice({ type: "success", message: "Task deleted successfully" });
   }
 
   const filteredTasks = tasks.filter((t) => {
@@ -275,7 +278,16 @@ export function KanbanBoardView({ user, activeOrg, userPermissions, onShowNotice
               type="button"
               className={`filter-btn ${filterPriority !== "ALL" ? "active" : ""}`}
               onClick={() => {
-                const next = filterPriority === "ALL" ? "URGENT" : filterPriority === "URGENT" ? "HIGH" : filterPriority === "HIGH" ? "MEDIUM" : filterPriority === "MEDIUM" ? "LOW" : "ALL";
+                const next =
+                  filterPriority === "ALL"
+                    ? "URGENT"
+                    : filterPriority === "URGENT"
+                    ? "HIGH"
+                    : filterPriority === "HIGH"
+                    ? "MEDIUM"
+                    : filterPriority === "MEDIUM"
+                    ? "LOW"
+                    : "ALL";
                 setFilterPriority(next);
               }}
               title="Cycle filter: All -> Urgent -> High -> Medium -> Low"
@@ -305,12 +317,20 @@ export function KanbanBoardView({ user, activeOrg, userPermissions, onShowNotice
         </div>
       )}
 
-      {/* Kanban Board Columns */}
+      {/* Kanban Board Columns with Native Drag-and-Drop (TASK-204) */}
       <div className="kanban-columns-grid">
         {COLUMNS.map((col) => {
           const colTasks = filteredTasks.filter((t) => t.status === col.id);
+          const isOver = dragOverColumn === col.id;
           return (
-            <div key={col.id} className="kanban-column">
+            <div
+              key={col.id}
+              className={`kanban-column ${isOver ? "drag-over-column" : ""}`}
+              onDragOver={(e) => handleColumnDragOver(e, col.id)}
+              onDragLeave={(e) => handleColumnDragLeave(e, col.id)}
+              onDrop={(e) => handleColumnDrop(e, col.id)}
+              data-testid={`kanban-column-${col.id.toLowerCase()}`}
+            >
               <div className="kanban-column-header">
                 <div className="kanban-column-title-group">
                   <span className="column-dot" style={{ backgroundColor: col.dotColor }} />
@@ -331,23 +351,28 @@ export function KanbanBoardView({ user, activeOrg, userPermissions, onShowNotice
                 </div>
               </div>
 
-              <div className="kanban-column-cards">
+              <div className="kanban-column-cards column-drop-zone">
                 {colTasks.map((task) => {
                   const editable = canEditTask(task);
+                  const isDragging = draggingTaskId === task.id;
                   return (
                     <div
                       key={task.id}
-                      className={`kanban-card ${!editable ? "card-abac-restricted" : ""}`}
+                      className={`kanban-card ${editable ? "draggable-card" : "card-non-draggable"} ${isDragging ? "is-dragging" : ""} ${!editable ? "card-abac-restricted" : ""}`}
+                      draggable={editable}
+                      onDragStart={(e) => handleCardDragStart(e, task)}
+                      onDragEnd={handleCardDragEnd}
                       onClick={() => openTaskDetail(task)}
                       tabIndex={0}
                       role="button"
+                      data-testid={`kanban-card-${task.id}`}
                       onKeyDown={(e) => {
                         if (e.key === "Enter" || e.key === " ") {
                           e.preventDefault();
                           openTaskDetail(task);
                         }
                       }}
-                      title={editable ? "Click to view or edit task details" : "ABAC Restricted: Click to view details"}
+                      title={editable ? "Drag to reorder status or click to view details" : "ABAC Restricted: Click to view details"}
                     >
                       <div className="kanban-card-top">
                         <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
@@ -405,7 +430,7 @@ export function KanbanBoardView({ user, activeOrg, userPermissions, onShowNotice
                                 e.stopPropagation();
                                 openTaskDetail(task);
                               }}
-                              title="Edit task details"
+                              title="View or edit task details"
                             >
                               <Edit3 size={13} />
                             </button>
@@ -478,232 +503,20 @@ export function KanbanBoardView({ user, activeOrg, userPermissions, onShowNotice
         })}
       </div>
 
-      {/* Task Details & Edit Modal (TASK-002 Protected Governance Attributes) */}
+      {/* Slide-Over Task Detail Drawer (TASK-204) */}
       {editingTask && (
-        <div
-          className="modal-backdrop"
-          onClick={() => setEditingTask(null)}
-          role="presentation"
-        >
-          <div
-            className="modal-dialog modal-dialog-lg"
-            onClick={(e) => e.stopPropagation()}
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="task-detail-title"
-          >
-            <div className="modal-header">
-              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                <h3 id="task-detail-title">Task Details</h3>
-                <span className={`tag-priority tag-${editingTask.priority.toLowerCase()}`}>
-                  {editingTask.priority}
-                </span>
-                {!canEditTask(editingTask) && (
-                  <span className="badge-locked" title="ABAC restriction: Read-only access">
-                    <Lock size={12} /> Read Only
-                  </span>
-                )}
-              </div>
-              <button
-                type="button"
-                className="icon-btn-ghost"
-                onClick={() => setEditingTask(null)}
-                aria-label="Close dialog"
-              >
-                ✕
-              </button>
-            </div>
-
-            {modalError && (
-              <div className="dialog-error-banner" role="alert">
-                <AlertCircle size={16} />
-                <span>{modalError}</span>
-              </div>
-            )}
-
-            <form onSubmit={handleSaveTaskEdit} className="modal-form">
-              <div className="form-field">
-                <label htmlFor="edit-task-title">Title</label>
-                <input
-                  id="edit-task-title"
-                  type="text"
-                  value={editTitle}
-                  onChange={(e) => setEditTitle(e.target.value)}
-                  disabled={!canEditTask(editingTask)}
-                  required
-                />
-              </div>
-
-              <div className="form-field">
-                <label htmlFor="edit-task-desc">Description</label>
-                <textarea
-                  id="edit-task-desc"
-                  rows={3}
-                  value={editDesc}
-                  onChange={(e) => setEditDesc(e.target.value)}
-                  disabled={!canEditTask(editingTask)}
-                  placeholder="Provide context or acceptance criteria..."
-                />
-              </div>
-
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-                <div className="form-field">
-                  <label htmlFor="edit-task-status">Status</label>
-                  <select
-                    id="edit-task-status"
-                    value={editStatus}
-                    onChange={(e) => setEditStatus(e.target.value)}
-                    disabled={!canEditTask(editingTask)}
-                  >
-                    {COLUMNS.map((c) => (
-                      <option key={c.id} value={c.id}>
-                        {c.label}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div className="form-field">
-                  <label htmlFor="edit-task-priority">Priority</label>
-                  <select
-                    id="edit-task-priority"
-                    value={editPriority}
-                    onChange={(e) => setEditPriority(e.target.value)}
-                    disabled={!canEditTask(editingTask)}
-                  >
-                    <option value="LOW">Low</option>
-                    <option value="MEDIUM">Medium</option>
-                    <option value="HIGH">High</option>
-                    <option value="URGENT">Urgent</option>
-                  </select>
-                </div>
-              </div>
-
-              {/* TASK-002: Protected Governance Fields Mutation Barrier Section */}
-              <div className="governance-block">
-                <div className="governance-header">
-                  <div className="governance-title">
-                    <Shield size={14} className="text-emerald" />
-                    <span>Governance & ABAC Protected Attributes (TASK-002)</span>
-                  </div>
-                  <span className="governance-subtext">Server-enforced immutability barrier</span>
-                </div>
-
-                <div className="governance-fields-grid">
-                  {/* Project Field */}
-                  <div className="governance-field-item">
-                    <span className="governance-field-label">Assigned Project</span>
-                    {canManageProjects ? (
-                      <select
-                        value={editProjectId}
-                        onChange={(e) => setEditProjectId(e.target.value)}
-                        className="status-dropdown"
-                        style={{ padding: "7px 10px", fontSize: "0.8rem" }}
-                      >
-                        {projects.map((p) => (
-                          <option key={p.id} value={p.id} disabled={p.isArchived}>
-                            {p.key ? `[${p.key}] ` : ""}{p.name}{p.isArchived ? " (Archived - Read Only)" : ""}
-                          </option>
-                        ))}
-                      </select>
-                    ) : (
-                      <div className="governance-field-value">
-                        <span>{editingTask.project?.name || `Project #${editingTask.projectId}`}</span>
-                        <span
-                          className="badge-locked"
-                          title="Protected Field: Re-parenting tasks requires Manager or Admin permissions (TASK-002 / SEC-07)"
-                        >
-                          <Lock size={10} /> Locked
-                        </span>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Assignee Field */}
-                  <div className="governance-field-item">
-                    <span className="governance-field-label">Task Assignee</span>
-                    {canAssign ? (
-                      <select
-                        value={editAssigneeId}
-                        onChange={(e) => setEditAssigneeId(e.target.value)}
-                        className="status-dropdown"
-                        style={{ padding: "7px 10px", fontSize: "0.8rem" }}
-                      >
-                        <option value="">Unassigned</option>
-                        {members.map((m) => (
-                          <option key={m.userId} value={m.userId}>
-                            {m.user?.name || `User #${m.userId}`}
-                          </option>
-                        ))}
-                      </select>
-                    ) : (
-                      <div className="governance-field-value">
-                        <span>{editingTask.assignee?.name || "Unassigned"}</span>
-                        <span
-                          className="badge-locked"
-                          title="Protected Field: Modifying assignee requires task:assign permission (TASK-002 / SEC-07)"
-                        >
-                          <Lock size={10} /> Locked
-                        </span>
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-                {/* Creator Provenance */}
-                <div className="governance-field-item" style={{ marginTop: 4 }}>
-                  <span className="governance-field-label">Creator Provenance</span>
-                  <div className="governance-field-value">
-                    <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                      <User size={12} className="text-muted" />
-                      <span>{editingTask.creator?.name || `User #${editingTask.creatorId}`}</span>
-                    </div>
-                    <span className="badge-immutable" title="Provenance invariant: Creator ID cannot be modified by any actor">
-                      <Shield size={10} /> Immutable
-                    </span>
-                  </div>
-                </div>
-              </div>
-
-              <div className="modal-footer" style={{ justifyContent: "space-between" }}>
-                <div>
-                  {canDeleteTask && (
-                    <button
-                      type="button"
-                      className="btn-secondary"
-                      style={{ color: "#EF4444", borderColor: "#FEE2E2", background: "#FEF2F2" }}
-                      onClick={() => handleDeleteTask(editingTask.id)}
-                      disabled={savingEdit}
-                    >
-                      <Trash2 size={14} style={{ marginRight: 4 }} />
-                      <span>Delete</span>
-                    </button>
-                  )}
-                </div>
-
-                <div style={{ display: "flex", gap: 8 }}>
-                  <button
-                    type="button"
-                    className="btn-secondary"
-                    onClick={() => setEditingTask(null)}
-                    disabled={savingEdit}
-                  >
-                    Cancel
-                  </button>
-                  {canEditTask(editingTask) && (
-                    <button
-                      type="submit"
-                      className="btn-primary-emerald"
-                      disabled={savingEdit}
-                    >
-                      {savingEdit ? "Saving…" : "Save Changes"}
-                    </button>
-                  )}
-                </div>
-              </div>
-            </form>
-          </div>
-        </div>
+        <TaskDetailDrawer
+          task={editingTask}
+          projects={projects}
+          members={members}
+          canEdit={canEditTask(editingTask)}
+          canAssign={canAssign}
+          canManageProjects={canManageProjects}
+          canDelete={canDeleteTask}
+          onClose={() => setEditingTask(null)}
+          onSave={handleDrawerSave}
+          onDelete={handleDrawerDelete}
+        />
       )}
 
       {/* Quick Add Task Modal */}
