@@ -19,6 +19,7 @@ import {
   listComments,
   updateComment,
 } from "../controllers/comments.controller.js";
+import { getTaskActivity } from "../controllers/audit.controller.js";
 import { authenticate } from "../middleware/authenticate.js";
 import { resolveTenant } from "../middleware/tenant.middleware.js";
 import { requirePermission } from "../middleware/require-permission.js";
@@ -55,5 +56,8 @@ router.get("/:taskId/comments", requirePermission("task", "view"), listComments)
 router.post("/:taskId/comments", requirePermission("task", "view"), createComment);
 router.patch("/:taskId/comments/:commentId", requirePermission("task", "view"), updateComment);
 router.delete("/:taskId/comments/:commentId", requirePermission("task", "view"), deleteComment);
+
+// Task Activity Stream Route (TASK-303 / US-ACT-001 & TG-ACT-001)
+router.get("/:taskId/activity", requirePermission("task", "view"), getTaskActivity);
 
 export default router;

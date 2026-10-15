@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import { SubtaskChecklist } from "./SubtaskChecklist.jsx";
 import { TaskCommentsSection } from "./TaskCommentsSection.jsx";
+import TaskActivityStream from "./TaskActivityStream.jsx";
 
 export function TaskDetailDrawer({
   task,
@@ -45,6 +46,8 @@ export function TaskDetailDrawer({
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [drawerError, setDrawerError] = useState(null);
+  const [activeDrawerTab, setActiveDrawerTab] = useState("overview");
+  const [activityCount, setActivityCount] = useState(null);
 
   // Esc key dismissal (US-TASK-004)
   useEffect(() => {
@@ -198,8 +201,32 @@ export function TaskDetailDrawer({
           </div>
         )}
 
-        {/* Drawer Scrollable Body */}
-        <form id="task-drawer-form" onSubmit={handleSubmit} className="drawer-body">
+        {/* Drawer Navigation Tabs (TASK-303 / US-ACT-001) */}
+        <div className="drawer-nav-tabs">
+          <button
+            type="button"
+            className={`drawer-nav-tab ${activeDrawerTab === "overview" ? "active" : ""}`}
+            onClick={() => setActiveDrawerTab("overview")}
+          >
+            <Layers size={13} />
+            <span>Task Overview</span>
+          </button>
+          <button
+            type="button"
+            className={`drawer-nav-tab ${activeDrawerTab === "activity" ? "active" : ""}`}
+            onClick={() => setActiveDrawerTab("activity")}
+          >
+            <Clock size={13} />
+            <span>Activity History</span>
+            {activityCount !== null && (
+              <span className="drawer-tab-badge">{activityCount}</span>
+            )}
+          </button>
+        </div>
+
+        {/* Drawer Scrollable Body: Overview Tab vs Activity Tab */}
+        {activeDrawerTab === "overview" ? (
+          <form id="task-drawer-form" onSubmit={handleSubmit} className="drawer-body">
           {/* Metadata Bar */}
           <div
             style={{
@@ -384,57 +411,101 @@ export function TaskDetailDrawer({
             userRoles={userRoles}
             onCommentsCountChange={onCommentsCountChange}
           />
-        </form>
 
-        {/* Drawer Footer Actions */}
-        <div className="drawer-footer">
-          <div>
-            {canDelete && !isArchived && (
+          {/* Quick link to Activity History */}
+          <div className="activity-shortcut-box">
+            <div className="activity-shortcut-text">
+              <Clock size={14} className="text-muted" />
+              <span>Immutable activity timeline & audit history</span>
+            </div>
+            <button
+              type="button"
+              className="btn-shortcut-link"
+              onClick={() => setActiveDrawerTab("activity")}
+            >
+              View Full Timeline →
+            </button>
+          </div>
+        </form>
+      ) : (
+        <div className="drawer-body drawer-activity-body">
+          <TaskActivityStream
+            taskId={task.id}
+            onActivityCountChange={setActivityCount}
+          />
+        </div>
+      )}
+
+      {/* Drawer Footer Actions */}
+      <div className="drawer-footer">
+        {activeDrawerTab === "overview" ? (
+          <>
+            <div>
+              {canDelete && !isArchived && (
+                <button
+                  type="button"
+                  className="btn-danger-ghost"
+                  onClick={handleDelete}
+                  disabled={deleting}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 5,
+                    padding: "7px 12px",
+                    fontSize: "0.82rem",
+                    color: "#DC2626",
+                    border: "1px solid #FCA5A5",
+                    borderRadius: "6px",
+                    background: "transparent",
+                    cursor: "pointer",
+                  }}
+                >
+                  <Trash2 size={14} />
+                  <span>{deleting ? "Deleting..." : "Delete Task"}</span>
+                </button>
+              )}
+            </div>
+
+            <div className="drawer-footer-actions">
               <button
                 type="button"
-                className="btn-danger-ghost"
-                onClick={handleDelete}
-                disabled={deleting}
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 5,
-                  padding: "7px 12px",
-                  fontSize: "0.82rem",
-                  color: "#DC2626",
-                  border: "1px solid #FCA5A5",
-                  borderRadius: "6px",
-                  background: "transparent",
-                  cursor: "pointer",
-                }}
+                className="btn-secondary"
+                onClick={onClose}
+                disabled={saving}
               >
-                <Trash2 size={14} />
-                <span>{deleting ? "Deleting..." : "Delete Task"}</span>
+                Cancel
               </button>
-            )}
-          </div>
-
-          <div className="drawer-footer-actions">
+              {canEdit && !isArchived && (
+                <button
+                  type="submit"
+                  form="task-drawer-form"
+                  className="btn-primary-emerald"
+                  disabled={saving}
+                >
+                  {saving ? "Saving..." : "Save Changes"}
+                </button>
+              )}
+            </div>
+          </>
+        ) : (
+          <div className="drawer-footer-actions" style={{ width: "100%", justifyContent: "space-between" }}>
             <button
               type="button"
               className="btn-secondary"
-              onClick={onClose}
-              disabled={saving}
+              onClick={() => setActiveDrawerTab("overview")}
             >
-              Cancel
+              ← Back to Overview
             </button>
-            {canEdit && !isArchived && (
-              <button
-                type="submit"
-                form="task-drawer-form"
-                className="btn-primary-emerald"
-                disabled={saving}
-              >
-                {saving ? "Saving..." : "Save Changes"}
-              </button>
-            )}
+            <button
+              type="button"
+              className="btn-primary-emerald"
+              onClick={onClose}
+            >
+              Close
+            </button>
           </div>
-        </div>
+        )}
+      </div>
       </div>
     </div>
   );

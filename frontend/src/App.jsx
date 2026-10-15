@@ -8,6 +8,7 @@ import { KanbanBoardView } from "./features/tasks/KanbanBoardView.jsx";
 import { MembersView } from "./features/members/MembersView.jsx";
 import { TeamPermissionsMatrixView } from "./features/permissions/TeamPermissionsMatrixView.jsx";
 import { ProjectSetupWizardModal } from "./features/projects/ProjectSetupWizardModal.jsx";
+import AuditReportsView from "./features/reports/AuditReportsView.jsx";
 import { AppShell } from "./layout/AppShell.jsx";
 import {
   api,
@@ -289,16 +290,23 @@ export default function App() {
         />
       )}
 
-      {["calendar", "reports", "support"].includes(section) && (
+      {section === "reports" && (
+        <AuditReportsView
+          key={`reports-${activeOrg?.id}`}
+          currentUser={user}
+          userPermissions={userPermissions}
+          activeOrg={activeOrg}
+        />
+      )}
+
+      {["calendar", "support"].includes(section) && (
         <div className="section-placeholder-card">
           <h3>
             {section === "calendar" && "Workspace Calendar"}
-            {section === "reports" && "Compliance & Audit Reports"}
             {section === "support" && "TeamGuard Documentation & Policies"}
           </h3>
           <p>
             {section === "calendar" && "Release schedules and milestone sync dates for active projects."}
-            {section === "reports" && "Security-sensitive event logs, login frequencies, and RBAC mutation audits."}
             {section === "support" && "Help desk, role guides, and multi-tenant security architecture documentation."}
           </p>
           <button type="button" className="btn-primary-emerald" onClick={() => setSection("dashboard")}>

@@ -304,6 +304,29 @@ export const api = {
   deleteComment: (taskId, commentId) =>
     request(`/tasks/${taskId}/comments/${commentId}`, { method: "DELETE" }),
 
+  // Task Activity & Timeline (TASK-303 / US-ACT-001)
+  getTaskActivity: (taskId) => request(`/tasks/${taskId}/activity`),
+
+  // Centralized Compliance & Audit Logs (TASK-303 / US-AUDIT-001)
+  getAuditLogs: (params = {}) => {
+    let queryStr = "";
+    if (typeof params === "string") {
+      queryStr = params ? (params.startsWith("?") ? params : `?${params}`) : "";
+    } else if (params && typeof params === "object") {
+      const q = new URLSearchParams();
+      for (const [k, v] of Object.entries(params)) {
+        if (v !== undefined && v !== null && v !== "") {
+          q.set(k, String(v));
+        }
+      }
+      const s = q.toString();
+      queryStr = s ? `?${s}` : "";
+    }
+    return request(`/audit${queryStr}`);
+  },
+  getAuditActions: () => request("/audit/actions"),
+  getAuditStats: () => request("/audit/stats"),
+
   // Files
   getFiles: (params = "") => request(`/files${params ? `?${params}` : ""}`),
   createFile: (body) => request("/files", { method: "POST", body }),

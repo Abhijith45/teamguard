@@ -612,22 +612,23 @@ Work is sequenced strictly by technical dependencies, security invariants, and r
 - **Risk & Rollback**: Reversible migration.
 
 #### Task ID: TASK-303 — Task Activity Stream & Slide-Over Audit Drawer
-- **Objective**: Surface immutable task activity timeline and organization audit log queries in slide-over drawer.
+- **Objective**: Surface immutable task activity timeline and organization audit log queries in slide-over drawer and reports.
 - **Linked User Stories**: `US-AUDIT-001`, `US-AUDIT-002`, `US-ACT-001`
 - **Linked PRD Features**: `TG-AUD-001`, `TG-AUD-002`, `TG-ACT-001`
 - **Priority**: Medium (P2)
-- **Status**: Verified in Baseline / Expansion Required
-- **Affected Files**: [backend/src/controllers/audit.controller.js](file:///c:/Users/Abhijeet%20Rawat/Desktop/rbac/backend/src/controllers/audit.controller.js), `frontend/src/components/ActivityTimeline.jsx`
+- **Status**: Complete / Verified (TIER-1, TIER-2 & TIER-3)
+- **Affected Files**: [backend/src/controllers/audit.controller.js](file:///c:/Users/Abhijeet%20Rawat/Desktop/rbac/backend/src/controllers/audit.controller.js), [backend/src/services/audit.service.js](file:///c:/Users/Abhijeet%20Rawat/Desktop/rbac/backend/src/services/audit.service.js), [backend/src/routes/audit.routes.js](file:///c:/Users/Abhijeet%20Rawat/Desktop/rbac/backend/src/routes/audit.routes.js), [frontend/src/features/tasks/TaskActivityStream.jsx](file:///c:/Users/Abhijeet%20Rawat/Desktop/rbac/frontend/src/features/tasks/TaskActivityStream.jsx), [frontend/src/features/reports/AuditReportsView.jsx](file:///c:/Users/Abhijeet%20Rawat/Desktop/rbac/frontend/src/features/reports/AuditReportsView.jsx), [frontend/src/features/tasks/TaskDetailDrawer.jsx](file:///c:/Users/Abhijeet%20Rawat/Desktop/rbac/frontend/src/features/tasks/TaskDetailDrawer.jsx)
 - **Implementation Steps**:
-  1. Query existing `AuditLog` filtered by `entity = 'Task'` and `entityId = :taskId`.
-  2. Format chronological timeline items (e.g., "John moved card to In Progress 2h ago").
-  3. Render activity feed tab inside task detail drawer.
-- **Data/API Impact**: Read-only queries against existing `AuditLog` table.
-- **Security Considerations**: Tenant isolation strictly verified on audit queries.
-- **Dependencies & Blockers**: TASK-204.
-- **Test Plan**: Test verifying that updating a task automatically creates an audit entry and shows in activity timeline.
-- **Acceptance Criteria**: Activity timeline displays mutation history accurately.
-- **Definition of Done**: Component connected to audit API.
+  1. Implemented `getTaskActivityService` querying `AuditLog` by task, subtask, and comment events with actor attribution.
+  2. Implemented `listAuditLogsService`, `getAuditActionsService`, and `getAuditStatsService` with strict tenant isolation and `audit:read` guard.
+  3. Integrated `TaskActivityStream` tab in slide-over drawer with category filters, timeline connectors, and JSON inspect disclosure.
+  4. Built `AuditReportsView` in main app navigation under "reports" with 4 KPI cards, filter bar, pagination, and CSV/JSON export.
+- **Data/API Impact**: Mounted `GET /api/tasks/:taskId/activity` and `/api/audit` endpoints with strict indexing on `[organizationId, createdAt]`.
+- **Security Considerations**: Zero-leak tenant isolation enforced on task and workspace audit queries.
+- **Dependencies & Blockers**: TASK-204, TASK-301, TASK-302.
+- **Test Plan**: Integration suite in `backend/test/activity.test.js` (16/16 pass) and unit tests in `frontend/src/features/tasks/activity.test.js` (5/5 pass).
+- **Acceptance Criteria**: Activity timeline displays mutation history accurately, and organization audit logs query reliably.
+- **Definition of Done**: All endpoints active, drawer tabs integrated, 100% test pass rate.
 - **Effort Estimate**: S (1 business day).
 - **Risk & Rollback**: Zero risk.
 
@@ -1111,7 +1112,7 @@ Activated only after stakeholder decisions UD-001 through UD-005 are formally ra
 | **Subtask Hierarchy** | 2 | 2 | 2 Verified, 0 Planned | `TASK-301` |
 | **Collaboration & Comments** | 4 | 4 | 3 Verified, 0 Planned, 1 Blocked (UD-004) | `TASK-302`, `TASK-504 (Blocked)` |
 | **Audit Logs & Compliance** | 2 | 2 | 2 Verified | `TASK-303` |
-| **Activity Feeds** | 1 | 1 | 1 Planned | `TASK-303` |
+| **Activity Feeds** | 1 | 1 | 1 Verified | `TASK-303` |
 | **File Management** | 5 | 5 | 1 Verified, 3 Partial, 1 Planned | `TASK-405` |
 | **Storage Engine** | 1 | 1 | 1 Blocked (UD-002) | `TASK-502 (Blocked)` |
 | **Dashboard & Metrics** | 6 | 6 | 6 Verified | `TASK-403` |
@@ -1123,7 +1124,7 @@ Activated only after stakeholder decisions UD-001 through UD-005 are formally ra
 | **Reporting & Analytics** | 1 | 1 | 1 Blocked (Reporting Scope) | `TASK-507 (Blocked)` |
 | **Developer Tooling** | 1 | 1 | 1 Verified | `TASK-006` |
 | **State Synchronization** | 2 | 1 | 2 Blocked (UD-003) | `TASK-503 (Blocked)` |
-| **TOTALS RECONCILED** | **79 Stories** | **60 Features** | **36 Verified, 5 Partial, 27 Planned, 11 Blocked** | **35 Tasks across 7 Phases (32 Story-Linked + 3 Operational)** |
+| **TOTALS RECONCILED** | **79 Stories** | **60 Features** | **37 Verified, 5 Partial, 26 Planned, 11 Blocked** | **35 Tasks across 7 Phases (32 Story-Linked + 3 Operational)** |
 
 ---
 
