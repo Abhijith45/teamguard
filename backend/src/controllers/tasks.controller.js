@@ -18,6 +18,7 @@ const updateTaskSchema = z.object({
   status: z.enum(["TODO", "IN_PROGRESS", "REVISION", "DONE"]).optional(),
   priority: z.enum(["LOW", "MEDIUM", "HIGH"]).optional(),
   assigneeId: z.number().int().positive().nullable().optional(),
+  projectId: z.number().int().positive().optional(),
   dueDate: z.string().datetime().nullable().optional(),
   order: z.number().int().optional(),
 });
@@ -97,10 +98,93 @@ export async function createTask(req, res, next) {
 export async function updateTask(req, res, next) {
   try {
     const taskId = Number(req.params.taskId);
-    const input = updateTaskSchema.parse(req.body);
+    if (!Number.isSafeInteger(taskId) || taskId <= 0) {
+      return res.status(400).json({ error: "Invalid task ID: must be a positive integer" });
+    }
+
     const orgId = req.organizationId;
     const actorId = req.auth.userId;
-    const permissions = req.userPermissions;
+    const permissions = req.userPermissions || new Set();
+
+    // 1. Prototype Pollution Check
+    if (
+      req.body &&
+      typeof req.body === "object" &&
+      (Object.prototype.hasOwnProperty.call(req.body, "__proto__") ||
+        Object.prototype.hasOwnProperty.call(req.body, "constructor") ||
+        Object.prototype.hasOwnProperty.call(req.body, "prototype"))
+    ) {
+      return res.status(403).json({
+        error: "Security violation: prototype pollution attempt detected",
+        code: "PROTOTYPE_POLLUTION_DETECTED",
+      });
+    }
+
+    const rawKeys = [
+      ...Object.keys(req.body || {}),
+      ...Object.keys(req.query || {}),
+    ];
+    for (const k of rawKeys) {
+      if (k === "__proto__" || k === "constructor" || k === "prototype") {
+        return res.status(403).json({
+          error: "Security violation: prototype pollution attempt detected",
+          code: "PROTOTYPE_POLLUTION_DETECTED",
+        });
+      }
+    }
+
+    // 2. Protected Governance Fields Mutation Barrier (TASK-002 / US-ABAC-003 / SEC-07)
+    for (const key of rawKeys) {
+      const normalized = key.toLowerCase().replace(/[^a-z0-9]/g, "");
+
+      // Creator mutation attempt
+      if (normalized === "creatorid") {
+        if (!permissions.has("task:manage")) {
+          return res.status(403).json({
+            error: "Cannot modify protected task field: creatorId is immutable",
+            code: "PROTECTED_FIELD_MUTATION",
+            field: "creatorId",
+          });
+        }
+      }
+
+      // Project re-parenting mutation attempt
+      if (normalized === "projectid") {
+        if (!permissions.has("project:manage") && !permissions.has("task:manage")) {
+          return res.status(403).json({
+            error: "Cannot modify protected task field: projectId requires project management permissions",
+            code: "PROTECTED_FIELD_MUTATION",
+            field: "projectId",
+          });
+        }
+      }
+
+      // Assignee mutation attempt
+      if (normalized === "assigneeid") {
+        const canAssign =
+          permissions.has("task:assign") ||
+          permissions.has("task:manage") ||
+          permissions.has("task:update:any");
+        if (!canAssign) {
+          return res.status(403).json({
+            error: "Cannot modify protected task field: modifying assignee requires task:assign permission",
+            code: "PROTECTED_FIELD_MUTATION",
+            field: "assigneeId",
+          });
+        }
+      }
+    }
+
+    // Normalize incoming snake_case aliases if authorized
+    const bodyPayload = { ...req.body };
+    if (bodyPayload.assignee_id !== undefined && bodyPayload.assigneeId === undefined) {
+      bodyPayload.assigneeId = bodyPayload.assignee_id;
+    }
+    if (bodyPayload.project_id !== undefined && bodyPayload.projectId === undefined) {
+      bodyPayload.projectId = bodyPayload.project_id;
+    }
+
+    const input = updateTaskSchema.parse(bodyPayload);
 
     // Verify task exists in current organization
     const existing = await prisma.task.findFirst({
@@ -113,7 +197,7 @@ export async function updateTask(req, res, next) {
     // ABAC Resource Policy Check:
     // Can update if:
     // 1. Has 'task:update:any' or 'task:manage'
-    // 2. OR has 'task:update:own' AND the task is assigned to the actor
+    // 2. OR has 'task:update:own' AND the task is assigned to or created by the actor
     const hasAnyUpdate = permissions.has("task:update:any") || permissions.has("task:manage");
     const hasOwnUpdate = permissions.has("task:update:own");
     const isOwnerOrAssignee = existing.assigneeId === actorId || existing.creatorId === actorId;
@@ -123,6 +207,31 @@ export async function updateTask(req, res, next) {
         error: "ABAC Policy Violation: You can only update tasks assigned to or created by you.",
         code: "CANNOT_UPDATE_OTHERS_TASK",
       });
+    }
+
+    // Target project verification if project is being re-parented by manager
+    if (input.projectId !== undefined && input.projectId !== existing.projectId) {
+      const targetProject = await prisma.project.findFirst({
+        where: { id: input.projectId, organizationId: orgId },
+      });
+      if (!targetProject) {
+        return res.status(404).json({ error: "Target project not found in this organization" });
+      }
+    }
+
+    // Assignee verification if assignee is being changed by authorized actor
+    if (input.assigneeId !== undefined && input.assigneeId !== null && input.assigneeId !== existing.assigneeId) {
+      const targetMembership = await prisma.membership.findUnique({
+        where: {
+          userId_organizationId: {
+            userId: input.assigneeId,
+            organizationId: orgId,
+          },
+        },
+      });
+      if (!targetMembership || targetMembership.status !== "ACTIVE") {
+        return res.status(400).json({ error: "Assignee must be an active member of this organization" });
+      }
     }
 
     const updateData = { ...input };
