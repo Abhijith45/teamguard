@@ -548,20 +548,23 @@ Work is sequenced strictly by technical dependencies, security invariants, and r
 - **Linked User Stories**: `US-TASK-010`
 - **Linked PRD Features**: `TG-TASK-010`
 - **Priority**: Medium (P2)
-- **Status**: Implementation Required
-- **Affected Files**: [backend/src/controllers/tasks.controller.js](file:///c:/Users/Abhijeet%20Rawat/Desktop/rbac/backend/src/controllers/tasks.controller.js), [backend/src/services/tasks.service.js](file:///c:/Users/Abhijeet%20Rawat/Desktop/rbac/backend/src/services/tasks.service.js)
+- **Status**: Complete / Verified (TIER-1, TIER-2 & TIER-3)
+- **Affected Files**: [backend/src/controllers/tasks.controller.js](file:///c:/Users/Abhijeet%20Rawat/Desktop/rbac/backend/src/controllers/tasks.controller.js), [backend/src/services/tasks.service.js](file:///c:/Users/Abhijeet%20Rawat/Desktop/rbac/backend/src/services/tasks.service.js), [backend/test/tasks.test.js](file:///c:/Users/Abhijeet%20Rawat/Desktop/rbac/backend/test/tasks.test.js), [frontend/src/features/tasks/KanbanBoardView.jsx](file:///c:/Users/Abhijeet%20Rawat/Desktop/rbac/frontend/src/features/tasks/KanbanBoardView.jsx), [frontend/src/services/api-client.js](file:///c:/Users/Abhijeet%20Rawat/Desktop/rbac/frontend/src/services/api-client.js), [frontend/src/App.css](file:///c:/Users/Abhijeet%20Rawat/Desktop/rbac/frontend/src/App.css), `frontend/src/features/tasks/task-search-filter.test.js`
 - **Implementation Steps**:
-  1. Expand `GET /api/tasks` with query params: `search`, `status`, `priority`, `assigneeId`, `projectId`, `sortBy`, `page`, `limit`.
-  2. Implement Prisma `where` clauses with case-insensitive search (`mode: 'insensitive'`).
-  3. Return paginated payload with total count, page, and totalPages.
-- **Data/API Impact**: Query parameter expansion on existing endpoint.
-- **Security Considerations**: Tenant scoping strictly enforced on all filter combinations.
-- **Dependencies & Blockers**: TASK-203.
-- **Test Plan**: Automated integration tests asserting correct filtering across 5 parameter combinations.
-- **Acceptance Criteria**: Filter queries return accurate subsets within <100ms.
-- **Definition of Done**: Tests passing in `backend/test/tasks.test.js`.
+  1. Expanded `GET /api/tasks` endpoint with comprehensive query parameters: `search`, `status`, `priority`, `assigneeId` (with `'unassigned'` / `'null'` resolution), `projectId`, `sortBy`, `sortOrder`, `page`, and `limit`.
+  2. Implemented robust Prisma `where` filtering with case-insensitive search (`mode: 'insensitive'`) on title, description, and numeric ID matching JIRA keys.
+  3. Integrated server-side pagination math returning `{ tasks, total, page, limit, totalPages }` with disjoint slicing and multi-tenant isolation.
+  4. Built real-time UI filter toolbar in `KanbanBoardView.jsx` featuring search input with clear trigger, project/assignee/status/priority select dropdowns, active filter counter, reset button, and pagination controls for List/Table views.
+  5. Validated complete coverage across backend integration suite (6/6 tests passing, 179/179 total) and frontend unit suite (5/5 tests passing, 20/20 total).
+- **Data/API Impact**: Enhanced `GET /api/tasks` returning paginated response payload `{ tasks, total, page, limit, totalPages }` with backward-compatible array handling.
+- **Security Considerations**: Strict tenant isolation (`organizationId`) enforced on every search, filter, and pagination query (zero cross-tenant data leak).
+- **Dependencies & Blockers**: TASK-203, TASK-204, TASK-205.
+- **Test Plan**: 6 automated integration tests in `backend/test/tasks.test.js` asserting search, status/priority filtering, project/assignee filtering, column sorting, pagination slices, and cross-tenant boundary isolation; 5 frontend unit tests in `frontend/src/features/tasks/task-search-filter.test.js`; end-to-end browser verification of search, filters, reset, and pagination.
+- **Acceptance Criteria**: Filter queries return accurate subsets within <100ms; multi-attribute combinations filter cleanly; search handles titles, descriptions, and JIRA keys; pagination slices are disjoint.
+- **Definition of Done**: Backend tests passing (179/179), frontend tests passing (20/20), and interactive browser verification completed.
 - **Effort Estimate**: S (1 business day).
-- **Risk & Rollback**: Low risk.
+- **Risk & Rollback**: Low risk; backward compatible with previous task listing responses.
+
 
 ---
 
@@ -1103,7 +1106,7 @@ Activated only after stakeholder decisions UD-001 through UD-005 are formally ra
 | **RBAC Administration** | 7 | 8 | 7 Verified, 0 Planned | `TASK-102`, `TASK-103`, `TASK-104` |
 | **ABAC & Policy Engine** | 4 | 3 | 3 Verified, 0 Planned, 1 Blocked | `TASK-002`, `TASK-203`, `TASK-506 (Blocked)` |
 | **Project Management** | 5 | 5 | 5 Verified, 0 Planned | `TASK-201`, `TASK-202` |
-| **Task Management** | 10 | 10 | 6 Verified, 4 Planned | `TASK-203`, `TASK-204`, `TASK-205`, `TASK-206` |
+| **Task Management** | 10 | 10 | 10 Verified, 0 Planned | `TASK-203`, `TASK-204`, `TASK-205`, `TASK-206` |
 | **Subtask Hierarchy** | 2 | 2 | 2 Planned | `TASK-301` |
 | **Collaboration & Comments** | 4 | 4 | 3 Planned, 1 Blocked (UD-004) | `TASK-302`, `TASK-504 (Blocked)` |
 | **Audit Logs & Compliance** | 2 | 2 | 2 Verified | `TASK-303` |

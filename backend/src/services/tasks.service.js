@@ -159,38 +159,151 @@ export function verifyProjectNotArchived(project, action = "modify tasks") {
 }
 
 /**
- * Lists tasks for an organization with optional project, status, priority, assignee, and search filters.
+ * Lists tasks for an organization with multi-parameter search, filtering, sorting, and pagination (TASK-206).
  */
 export async function listTasksService({ organizationId, query = {} }) {
-  const { projectId, status, priority, assigneeId, search } = query;
+  const {
+    projectId,
+    status,
+    priority,
+    assigneeId,
+    search,
+    sortBy,
+    sortOrder,
+    order,
+    page,
+    limit,
+  } = query;
 
   const where = {
     organizationId,
     project: { deletedAt: null },
   };
 
-  if (projectId) where.projectId = Number(projectId);
-  if (status) where.status = normalizeTaskStatus(status);
-  if (priority) where.priority = normalizeTaskPriority(priority);
-  if (assigneeId) where.assigneeId = Number(assigneeId);
-  if (search && typeof search === "string" && search.trim()) {
-    where.OR = [
-      { title: { contains: search.trim(), mode: "insensitive" } },
-      { description: { contains: search.trim(), mode: "insensitive" } },
-    ];
+  if (projectId) {
+    const pId = Number(projectId);
+    if (!isNaN(pId)) where.projectId = pId;
   }
 
-  const tasks = await prisma.task.findMany({
+  if (status) {
+    const normalizedStatus = normalizeTaskStatus(status);
+    if (TASK_STATUSES.includes(normalizedStatus)) {
+      where.status = normalizedStatus;
+    }
+  }
+
+  if (priority) {
+    const normalizedPriority = normalizeTaskPriority(priority);
+    if (TASK_PRIORITIES.includes(normalizedPriority)) {
+      where.priority = normalizedPriority;
+    }
+  }
+
+  if (assigneeId !== undefined && assigneeId !== null && assigneeId !== "") {
+    const str = String(assigneeId).trim().toLowerCase();
+    if (str === "unassigned" || str === "null") {
+      where.assigneeId = null;
+    } else {
+      const aId = Number(assigneeId);
+      if (!isNaN(aId)) where.assigneeId = aId;
+    }
+  }
+
+  if (search && typeof search === "string" && search.trim()) {
+    const searchTerm = search.trim();
+    const searchConditions = [
+      { title: { contains: searchTerm, mode: "insensitive" } },
+      { description: { contains: searchTerm, mode: "insensitive" } },
+    ];
+
+    // If search term matches a numeric id or key like "PROJ-12"
+    const keyMatch = searchTerm.match(/(?:[a-zA-Z]+-)?(\d+)/);
+    if (keyMatch && keyMatch[1]) {
+      const parsedId = Number(keyMatch[1]);
+      if (Number.isSafeInteger(parsedId) && parsedId > 0) {
+        searchConditions.push({ id: parsedId });
+      }
+    }
+
+    where.OR = searchConditions;
+  }
+
+  // Sorting
+  let orderBy = [{ order: "asc" }, { updatedAt: "desc" }];
+  if (sortBy) {
+    let field = sortBy;
+    let direction = (sortOrder || order || "asc").toLowerCase();
+
+    if (field.includes(":")) {
+      const parts = field.split(":");
+      field = parts[0];
+      direction = parts[1].toLowerCase();
+    }
+
+    direction = direction === "desc" ? "desc" : "asc";
+
+    switch (field) {
+      case "id":
+        orderBy = [{ id: direction }];
+        break;
+      case "title":
+        orderBy = [{ title: direction }];
+        break;
+      case "dueDate":
+        orderBy = [{ dueDate: direction }];
+        break;
+      case "createdAt":
+        orderBy = [{ createdAt: direction }];
+        break;
+      case "updatedAt":
+        orderBy = [{ updatedAt: direction }];
+        break;
+      case "priority":
+        orderBy = [{ priority: direction }];
+        break;
+      case "status":
+        orderBy = [{ status: direction }];
+        break;
+      case "order":
+        orderBy = [{ order: direction }];
+        break;
+      default:
+        orderBy = [{ order: "asc" }, { updatedAt: "desc" }];
+    }
+  }
+
+  const total = await prisma.task.count({ where });
+
+  // Pagination
+  const isPaginated = page !== undefined || limit !== undefined;
+  const pageNum = Math.max(1, parseInt(page, 10) || 1);
+  const limitNum = limit ? Math.max(1, Math.min(100, parseInt(limit, 10))) : 20;
+  const totalPages = isPaginated ? Math.ceil(total / limitNum) || 1 : 1;
+
+  const findArgs = {
     where,
-    orderBy: [{ order: "asc" }, { updatedAt: "desc" }],
+    orderBy,
     include: {
       assignee: { select: { id: true, name: true, avatarUrl: true, email: true } },
       creator: { select: { id: true, name: true, avatarUrl: true, email: true } },
       project: { select: { id: true, name: true, key: true, isArchived: true, status: true } },
     },
-  });
+  };
 
-  return tasks;
+  if (isPaginated) {
+    findArgs.skip = (pageNum - 1) * limitNum;
+    findArgs.take = limitNum;
+  }
+
+  const tasks = await prisma.task.findMany(findArgs);
+
+  return {
+    tasks,
+    total,
+    page: isPaginated ? pageNum : 1,
+    limit: isPaginated ? limitNum : total,
+    totalPages,
+  };
 }
 
 /**

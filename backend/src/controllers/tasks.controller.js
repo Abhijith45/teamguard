@@ -32,12 +32,12 @@ const updateTaskSchema = z.object({
 export async function listTasks(req, res, next) {
   try {
     const orgId = req.organizationId;
-    const tasks = await listTasksService({
+    const result = await listTasksService({
       organizationId: orgId,
       query: req.query,
     });
 
-    return res.json({ tasks });
+    return res.json(result);
   } catch (error) {
     next(error);
   }

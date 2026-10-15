@@ -265,7 +265,22 @@ export const api = {
   unarchiveProject: (id) => request(`/projects/${id}/unarchive`, { method: "POST" }),
 
   // Tasks
-  getTasks: (params = "") => request(`/tasks${params ? `?${params}` : ""}`),
+  getTasks: (params = "") => {
+    let queryStr = "";
+    if (typeof params === "string") {
+      queryStr = params ? (params.startsWith("?") ? params : `?${params}`) : "";
+    } else if (params && typeof params === "object") {
+      const q = new URLSearchParams();
+      for (const [k, v] of Object.entries(params)) {
+        if (v !== undefined && v !== null && v !== "") {
+          q.set(k, String(v));
+        }
+      }
+      const s = q.toString();
+      queryStr = s ? `?${s}` : "";
+    }
+    return request(`/tasks${queryStr}`);
+  },
   getTask: (id) => request(`/tasks/${id}`),
   createTask: (body) => request("/tasks", { method: "POST", body }),
   updateTask: (id, body) => request(`/tasks/${id}`, { method: "PATCH", body }),
