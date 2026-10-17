@@ -663,8 +663,8 @@ Work is sequenced strictly by technical dependencies, security invariants, and r
 - **Linked User Stories**: `US-CMD-001`, `US-CMD-002`
 - **Linked PRD Features**: `TG-CMD-001`, `TG-CMD-002`
 - **Priority**: Medium (P2)
-- **Status**: Implementation Required
-- **Affected Files**: `frontend/src/components/CommandPaletteModal.jsx`, `backend/src/controllers/search.controller.js`
+- **Status**: Completed
+- **Affected Files**: `frontend/src/features/search/CommandPaletteModal.jsx`, `frontend/src/features/search/commandPaletteUtils.js`, `backend/src/controllers/search.controller.js`, `backend/src/services/search.service.js`, `backend/src/routes/search.routes.js`
 - **Implementation Steps**:
   1. Register global window keydown listener for `Cmd+K` / `Ctrl+K`.
   2. Build `GET /api/search?q=:term` executing parallel tenant queries across projects, tasks, and members.
@@ -1120,7 +1120,7 @@ Activated only after stakeholder decisions UD-001 through UD-005 are formally ra
 | **Dashboard & Metrics** | 6 | 6 | 6 Verified | `TASK-403` |
 | **Calendar & Timeline** | 2 | 2 | 2 Planned | `TASK-402` |
 | **Notifications** | 3 | 3 | 3 Planned | `TASK-304`, `TASK-403` |
-| **Command Palette** | 2 | 2 | 2 Planned | `TASK-401` |
+| **Command Palette** | 2 | 2 | 2 Verified | `TASK-401` |
 | **Accessibility (WCAG AA)** | 3 | 3 | 1 Verified, 2 Partially Implemented | `TASK-404` |
 | **Account Management** | 1 | 1 | 1 Verified | `TASK-005` |
 | **Reporting & Analytics** | 1 | 1 | 1 Blocked (Reporting Scope) | `TASK-507 (Blocked)` |

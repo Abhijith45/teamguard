@@ -371,6 +371,14 @@ export const api = {
   markAllNotificationsAsRead: () => request("/notifications/mark-all-read", { method: "PATCH" }),
   deleteNotification: (id) => request(`/notifications/${id}`, { method: "DELETE" }),
   clearReadNotifications: () => request("/notifications/clear-read", { method: "DELETE" }),
+
+  // Global Multi-Entity Search (TASK-401 / US-CMD-001)
+  globalSearch: (q, limit = 6) => {
+    const params = new URLSearchParams();
+    if (q) params.set("q", q);
+    if (limit) params.set("limit", String(limit));
+    return request(`/search?${params.toString()}`);
+  },
 };
 
 export const apiClient = api;

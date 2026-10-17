@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   BarChart2,
   Bell,
@@ -14,6 +14,7 @@ import {
   Loader2,
   LogOut,
   Plus,
+  Search,
   ShieldCheck,
   User,
   Users,
@@ -22,6 +23,7 @@ import {
 import { Brand } from "../components/Brand.jsx";
 import { PersonaSwitcher } from "../components/PersonaSwitcher.jsx";
 import { NotificationBell } from "../features/notifications/NotificationBell.jsx";
+import { CommandPaletteModal } from "../features/search/CommandPaletteModal.jsx";
 import { api } from "../services/api-client.js";
 
 export function AppShell({
@@ -45,6 +47,26 @@ export function AppShell({
   const [showCreateOrgModal, setShowCreateOrgModal] = useState(false);
   const [newOrgName, setNewOrgName] = useState("");
   const [creatingOrg, setCreatingOrg] = useState(false);
+  const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
+
+  // Global keyboard shortcut (Cmd+K / Ctrl+K) & event listener
+  useEffect(() => {
+    function handleKeyDown(e) {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
+        e.preventDefault();
+        setCommandPaletteOpen((prev) => !prev);
+      }
+    }
+    function handleOpenPalette() {
+      setCommandPaletteOpen(true);
+    }
+    window.addEventListener("keydown", handleKeyDown);
+    window.addEventListener("teamguard:open-command-palette", handleOpenPalette);
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+      window.removeEventListener("teamguard:open-command-palette", handleOpenPalette);
+    };
+  }, []);
 
   const activeRoleName = user?.roles?.[0]?.name || "Member";
 
@@ -333,6 +355,23 @@ export function AppShell({
           </div>
 
           <div className="topbar-right-controls">
+            {/* Command Palette Launcher Button (TASK-401 / US-CMD-001) */}
+            <button
+              type="button"
+              className="topbar-search-trigger"
+              onClick={() => setCommandPaletteOpen(true)}
+              title="Search projects, tasks, members & actions (Cmd+K / Ctrl+K)"
+              aria-label="Open command palette"
+            >
+              <Search size={14} className="topbar-search-icon" />
+              <span className="topbar-search-placeholder">Search workspace…</span>
+              <kbd className="topbar-search-kbd">
+                {typeof navigator !== "undefined" && /Mac|iPod|iPhone|iPad/.test(navigator?.platform || "")
+                  ? "⌘K"
+                  : "Ctrl+K"}
+              </kbd>
+            </button>
+
             {/* Live Demo Persona Switcher */}
             <PersonaSwitcher
               currentRole={activeRoleName}
@@ -494,6 +533,22 @@ export function AppShell({
           </div>
         </div>
       )}
+
+      {/* Global Command Palette (TASK-401 / US-CMD-001 & US-CMD-002) */}
+      <CommandPaletteModal
+        isOpen={commandPaletteOpen}
+        onClose={() => setCommandPaletteOpen(false)}
+        permissions={user?.permissions || []}
+        currentSection={section}
+        onNavigateSection={(newSec) => setSection(newSec)}
+        onNavigateTask={(taskId) => {
+          setSection("tasks");
+          window.dispatchEvent(
+            new CustomEvent("teamguard:navigate-task", { detail: { taskId: Number(taskId) } })
+          );
+        }}
+        onOpenProjectWizard={onOpenWizard}
+      />
     </div>
   );
 }

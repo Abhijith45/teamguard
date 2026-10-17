@@ -17,6 +17,7 @@ import rolesRoutes from "./routes/roles.routes.js";
 import adminRoutes from "./routes/admin.routes.js";
 import auditRoutes from "./routes/audit.routes.js";
 import notificationsRoutes from "./routes/notifications.routes.js";
+import searchRoutes from "./routes/search.routes.js";
 import demoRoutes from "./routes/demo.routes.js";
 import { errorHandler } from "./middleware/error-handler.js";
 
@@ -120,6 +121,7 @@ app.use("/api/roles", rolesRoutes);
 app.use("/api/admin", adminRoutes);
 app.use("/api/audit", auditRoutes);
 app.use("/api/notifications", notificationsRoutes);
+app.use("/api/search", searchRoutes);
 app.use("/api/demo", demoRoutes);
 
 app.use((_req, res) => {
