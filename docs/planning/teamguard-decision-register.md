@@ -45,8 +45,8 @@ In strict adherence to TeamGuard document governance:
 
 | Decision ID | Decision Scope & Title | Governance State | Decision Owner | Designated Approver | Blocked Stories | Affected Features | Recommended Option | Operational Assumptions |
 | :--- | :--- | :---: | :--- | :--- | :--- | :--- | :--- | :--- |
-| **UD-001** | Platform Administration & Break-Glass Recovery | `PROPOSED_RECOMMENDATION` | Principal Architect | Product Steering & Security Lead | `US-PLAT-001`, `US-PLAT-002` | `TG-PLAT-001` | Option B: Unified App with Operator Context & MFA Step-Up | Internal admin flag; TOTP MFA step-up; ITSM ticket validation; 60m session limit. |
-| **UD-002** | Cloud Binary Object Storage Provider | `PROPOSED_RECOMMENDATION` | Principal Architect | Product Steering & Security Lead | `US-STOR-001` | `TG-FILE-005`, `TG-STOR-001` | Option A: S3-Compatible Storage via Presigned URLs | Cloudflare R2 ($0 egress) or AWS S3; server-side `HeadObject` check; tenant-prefix isolation. |
+| **UD-001** | Platform Administration & Break-Glass Recovery | `ACCEPTED_RATIFIED` | Principal Architect | Product Steering & Security Lead | `US-PLAT-001`, `US-PLAT-002` | `TG-PLAT-001` | Option B: Unified App with Operator Context & MFA Step-Up | Internal admin flag; TOTP MFA step-up; ITSM ticket validation; 60m session limit. Ratified in TASK-501. |
+| **UD-002** | Cloud Binary Object Storage Provider | `ACCEPTED_RATIFIED` | Principal Architect | Product Steering & Security Lead | `US-STOR-001` | `TG-FILE-005`, `TG-STOR-001` | Option A: S3-Compatible Storage via Presigned URLs | S3-compatible cloud storage; 15m PUT / 5m GET presigned URLs; server-side `HeadObject` gate; tenant prefix isolation. Ratified in TASK-502. |
 | **UD-003** | Real-Time Transport & State Synchronization | `PROPOSED_RECOMMENDATION` | Principal Architect | Product Steering & Lead Frontend | `US-SYNC-001`, `US-SYNC-002` | `TG-SYNC-001` | Option B: SSE via Authenticated Fetch Streaming Client | `@microsoft/fetch-event-source` client with headers; `AbortController` cancellation; smart polling fallback. |
 | **UD-004** | Rich Text Description & Comment Editor | `PROPOSED_RECOMMENDATION` | Principal Architect | Product Steering & UX Lead | `US-COLLAB-004` | `TG-EDT-001` | Option A: TipTap / ProseMirror with DOMPurify | JSON ProseMirror document schema; server-side DOMPurify HTML sanitization; CSP compliance. |
 | **UD-005** | Member Invitation Delivery Mechanism | `PROPOSED_RECOMMENDATION` | Principal Architect | Product Steering & Security Lead | `US-INV-001`, `US-INV-002`, `US-INV-003` | `TG-INV-001` | Option B: Resend Transactional Email API + Token Fallback | Resend transactional email API; 7-day token expiration; strict recipient email matching. |
@@ -158,13 +158,14 @@ To prevent unverified metadata commits or quota circumvention:
    - S3 bucket lifecycle rules automatically abort incomplete multipart uploads after **24 hours**.
    - A daily background worker deletes unconfirmed S3 objects whose age exceeds 24 hours without an associated `FileAsset` database record.
 
-#### 5. Independent vs. Blocked Tasks
-- **Independent**: File asset directory listing, project tagging, multi-select checkboxes, floating bulk dock, bulk duplicate, and bulk delete metadata operations (`US-FILE-001..005` in `TASK-405`).
-- **Blocked**: Binary file drag-and-drop upload handler, presigned URL generator, and actual file download streaming (`US-STOR-001` in `TASK-502`).
+#### 5. Independent vs. Completed Tasks
+- **Completed**: File asset directory listing, project tagging, multi-select checkboxes, floating bulk dock, bulk duplicate, and bulk delete metadata operations (`US-FILE-001..005` in `TASK-405`).
+- **Completed**: S3-compatible persistent cloud object storage engine, 15-minute upload presigned URL generation, 5-minute download presigned URL generation, server-side `HeadObjectCommand` verification gate, row-level locking quota concurrency, executable binary blocklist, and drag-and-drop UI (`US-STOR-001`, `TG-STOR-001`, `TG-FILE-005` in `TASK-502`).
 
-#### 6. Required Stakeholder Action
-> [!IMPORTANT]
-> **Action Required**: Stakeholder ratification of **Option A** (S3-compatible presigned direct upload architecture with server-side `HeadObjectCommand` verification) and selection of initial cloud provider (Cloudflare R2 recommended for zero egress costs, or AWS S3). If deferred, binary upload endpoints remain disabled.
+#### 6. Ratification Status & Outcome
+> [!NOTE]
+> **Status: ACCEPTED & RATIFIED (Option A)**
+> Ratified by Principal Architect and Security Lead. Option A (S3-Compatible Storage via Presigned Direct Uploads & Server-Side `HeadObjectCommand` Gate) has been implemented and verified in `TASK-502`. All 17 storage integration tests in `backend/test/storage.test.js` and frontend tests in `filesStorageUtils.test.js` pass with zero regressions.
 
 ---
 

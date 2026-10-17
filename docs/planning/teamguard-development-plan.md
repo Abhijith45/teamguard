@@ -789,20 +789,21 @@ Work is sequenced strictly by technical dependencies, security invariants, and r
 - **Dependencies & Blockers**: Resolved (UD-001 Ratified Option B).
 - **Verification**: 16 automated backend tests passing in `backend/test/platform.test.js`, 3 frontend unit tests in `platformGovernance.test.js`, and visual browser recording verified.
 
-#### Task ID: TASK-502 (Blocked) — Persistent S3-Compatible Object Storage Engine & Quotas
+#### Task ID: TASK-502 — Persistent S3-Compatible Object Storage Engine & Quotas (Completed)
 - **Objective**: Ingest file binaries via S3 presigned URLs with server-side HeadObject validation and quota tracking.
 - **Linked User Stories**: `US-STOR-001`
 - **Linked PRD Features**: `TG-STOR-001`, `TG-FILE-005`
 - **Priority**: High (P1)
-- **Status**: Blocked by Product Decision UD-002
-- **Affected Files**: `backend/src/services/storage.service.js`, `backend/src/controllers/files.controller.js`
-- **Provisional Specification**:
-  - Presigned PUT URL generated with 15m expiration and sanitized RFC 5987 filename.
-  - Confirmation endpoint `POST /api/files/confirm` executes AWS S3 `HeadObjectCommand` to verify existence, byte size <= quota, permitted MIME type, and tenant path prefix (`tenants/{orgId}/projects/{projId}/files/`) before inserting `FileAsset`.
-  - Quota concurrency enforced via row-level locking (`SELECT remainingStorageBytes ... FOR UPDATE`).
-  - S3 lifecycle rule purges incomplete multipart uploads after 24h; cron cleans up orphaned objects.
-- **Dependencies & Blockers**: **UD-002 Ratification Required**.
-- **Effort Estimate Range**: M–L (3–5 business days).
+- **Status**: Completed (Unblocked via Ratification of UD-002 Option A)
+- **Affected Files**: `backend/src/services/storage.service.js`, `backend/src/controllers/files.controller.js`, `backend/src/routes/files.routes.js`, `backend/test/storage.test.js`, `frontend/src/features/files/FilesBulkView.jsx`, `frontend/src/features/files/filesStorageUtils.test.js`
+- **Implemented Specification**:
+  - Presigned PUT URL generated with 15m expiration and sanitized RFC 5987 filename (`tenants/{orgId}/projects/{projId}/files/{uuid}-{filename}`).
+  - Executable binary blocklist (`.exe`, `.sh`, `.bat`, `.cmd`, `.bin`, etc.) rejected at URL issuance with HTTP 400. Max file size bounded to 50 MB.
+  - Confirmation endpoint `POST /api/files/confirm` executes server-side AWS S3 `HeadObjectCommand` to verify existence, actual byte size <= quota, permitted MIME type, and tenant path prefix before activating `FileAsset` with `status: "READY"`.
+  - Quota concurrency enforced via PostgreSQL row-level locking (`SELECT ... FROM "Organization" WHERE id = :orgId FOR UPDATE`).
+  - Presigned download GET URL generated with 5m expiration, strictly scoped to active tenant (cross-tenant requests return 404).
+  - Frontend drag-and-drop dropzone with direct presigned S3 PUT upload, storage quota progress bar banner, and download button.
+- **Verification**: 17 automated backend integration tests passing in `backend/test/storage.test.js`, 5 frontend unit tests in `filesStorageUtils.test.js`, and browser visual verification recorded.
 
 #### Task ID: TASK-503 (Blocked) — Real-Time State Synchronization via Authenticated Fetch Streams / SSE
 - **Objective**: Deliver multi-client real-time Kanban updates via SSE using an authenticated fetch streaming client.
@@ -1121,7 +1122,7 @@ Activated only after stakeholder decisions UD-001 through UD-005 are formally ra
 | **Audit Logs & Compliance** | 2 | 2 | 2 Verified | `TASK-303` |
 | **Activity Feeds** | 1 | 1 | 1 Verified | `TASK-303` |
 | **File Management** | 5 | 5 | 1 Verified, 3 Partial, 1 Planned | `TASK-405` |
-| **Storage Engine** | 1 | 1 | 1 Blocked (UD-002) | `TASK-502 (Blocked)` |
+| **Storage Engine** | 1 | 1 | 1 Verified | `TASK-502` |
 | **Dashboard & Metrics** | 6 | 6 | 6 Verified | `TASK-403` |
 | **Calendar & Timeline** | 2 | 2 | 2 Verified | `TASK-402` |
 | **Notifications** | 3 | 3 | 3 Verified | `TASK-304`, `TASK-403` |

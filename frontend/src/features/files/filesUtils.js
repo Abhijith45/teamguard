@@ -119,3 +119,56 @@ export function getFileTypeCategory(type = "") {
   if (t.includes("pdf")) return "pdf";
   return "document";
 }
+
+export const DISALLOWED_BINARY_EXTENSIONS = [
+  ".exe",
+  ".sh",
+  ".bat",
+  ".cmd",
+  ".bin",
+  ".msi",
+  ".vbs",
+  ".js",
+  ".py",
+  ".php",
+];
+export const CLIENT_MAX_FILE_SIZE = 50 * 1024 * 1024; // 50 MB
+
+/**
+ * Validates a client-side file before attempting presigned S3 upload.
+ * Returns null if valid, or an error string if invalid.
+ */
+export function validateClientFileSafety(filename, sizeBytes, quotaRemainingBytes) {
+  if (!filename || typeof filename !== "string") {
+    return "Invalid filename";
+  }
+
+  const lower = filename.toLowerCase();
+  for (const ext of DISALLOWED_BINARY_EXTENSIONS) {
+    if (lower.endsWith(ext)) {
+      return "Disallowed file type: executable binaries cannot be uploaded";
+    }
+  }
+
+  const size = Number(sizeBytes) || 0;
+  if (size > CLIENT_MAX_FILE_SIZE) {
+    return "File exceeds maximum size limit of 50 MB";
+  }
+
+  if (quotaRemainingBytes !== undefined && quotaRemainingBytes !== null && size > Number(quotaRemainingBytes)) {
+    return "Storage quota exceeded for this organization";
+  }
+
+  return null;
+}
+
+/**
+ * Calculates storage percentage formatted to 1 decimal place.
+ */
+export function calculateStoragePercentage(usedBytes, quotaBytes) {
+  const used = Number(usedBytes) || 0;
+  const quota = Number(quotaBytes) || 0;
+  if (quota <= 0) return 0;
+  return Math.min(100, Math.round((used / quota) * 1000) / 10);
+}
+
