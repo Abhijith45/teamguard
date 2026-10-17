@@ -10,7 +10,7 @@ import {
 import { getPublicUser } from "../services/auth.service.js";
 
 const switchSchema = z.object({
-  persona: z.enum(["super-admin", "project-manager", "team-member", "stakeholder"]),
+  persona: z.enum(["super-admin", "project-manager", "team-member", "stakeholder", "platform-operator"]),
   organizationSlug: z.string().optional().default("acme-corp"),
 });
 
@@ -19,6 +19,7 @@ const personaEmailMap = {
   "project-manager": "manager@teamguard.io",
   "team-member": "member@teamguard.io",
   "stakeholder": "viewer@teamguard.io",
+  "platform-operator": "platform-operator@teamguard.internal",
 };
 
 export async function switchPersona(req, res, next) {
@@ -27,6 +28,21 @@ export async function switchPersona(req, res, next) {
     let targetEmail = personaEmailMap[persona];
     if (organizationSlug === "nova-labs" && persona === "super-admin") {
       targetEmail = "elena@novalabs.io";
+    }
+
+    if (persona === "platform-operator") {
+      await prisma.user.upsert({
+        where: { email: targetEmail },
+        update: { isPlatformAdmin: true, isActive: true },
+        create: {
+          name: "Platform Operator",
+          username: "platform_operator",
+          email: targetEmail,
+          passwordHash: "demo-hash",
+          isPlatformAdmin: true,
+          isActive: true,
+        },
+      });
     }
 
     const user = await prisma.user.findUnique({

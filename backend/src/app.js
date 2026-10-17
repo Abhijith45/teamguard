@@ -19,6 +19,7 @@ import auditRoutes from "./routes/audit.routes.js";
 import notificationsRoutes from "./routes/notifications.routes.js";
 import searchRoutes from "./routes/search.routes.js";
 import demoRoutes from "./routes/demo.routes.js";
+import platformRoutes from "./routes/platform.routes.js";
 import { errorHandler } from "./middleware/error-handler.js";
 
 const app = express();
@@ -76,6 +77,7 @@ app.use(
       "Content-Type",
       "Authorization",
       "x-organization-id",
+      "x-mfa-token",
       "X-Requested-With",
       "Accept",
     ],
@@ -123,6 +125,8 @@ app.use("/api/audit", auditRoutes);
 app.use("/api/notifications", notificationsRoutes);
 app.use("/api/search", searchRoutes);
 app.use("/api/demo", demoRoutes);
+app.use("/api/platform", platformRoutes);
+app.use("/api/v1/platform", platformRoutes);
 
 app.use((_req, res) => {
   res.status(404).json({ error: "Route not found" });

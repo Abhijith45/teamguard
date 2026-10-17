@@ -16,6 +16,7 @@ import {
   LogOut,
   Plus,
   Search,
+  ShieldAlert,
   ShieldCheck,
   User,
   Users,
@@ -286,6 +287,23 @@ export function AppShell({
                 <BarChart2 size={17} />
                 <span>Reports</span>
               </button>
+
+              {user?.isPlatformAdmin && (
+                <button
+                  type="button"
+                  className={`nav-item-btn ${section === "platform-admin" ? "active" : ""}`}
+                  onClick={() => setSection("platform-admin")}
+                  style={{
+                    color: section === "platform-admin" ? "#f87171" : "#fca5a5",
+                    background: section === "platform-admin" ? "rgba(239, 68, 68, 0.15)" : "transparent",
+                    borderLeft: section === "platform-admin" ? "3px solid #ef4444" : "3px solid transparent",
+                    fontWeight: "600",
+                  }}
+                >
+                  <ShieldAlert size={17} style={{ color: "#ef4444" }} />
+                  <span>Platform Governance</span>
+                </button>
+              )}
             </nav>
           </div>
 
@@ -389,6 +407,7 @@ export function AppShell({
               {section === "calendar" && "Workspace Calendar"}
               {section === "members" && "Organization Members"}
               {section === "reports" && "Performance Reports"}
+              {section === "platform-admin" && "Platform Governance & Break-Glass"}
               {section === "support" && "Help & Support"}
             </h1>
             <p className="topbar-subtitle">
@@ -400,6 +419,7 @@ export function AppShell({
               {section === "calendar" && "View scheduled release milestones and meetings."}
               {section === "members" && "Directory of collaborators in this active organization."}
               {section === "reports" && "Audit events and security metrics."}
+              {section === "platform-admin" && "Global tenant oversight, administrative hold management, and audited break-glass recovery (UD-001)."}
               {section === "support" && "Documentation and role policy guides."}
             </p>
           </div>

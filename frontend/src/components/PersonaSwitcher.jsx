@@ -30,6 +30,13 @@ const PERSONAS = [
     desc: "Read-only access (no edits)",
     badgeColor: "badge-purple",
   },
+  {
+    id: "platform-operator",
+    name: "Platform Operator",
+    role: "Platform Admin",
+    desc: "Global tenant overview & audited break-glass recovery (UD-001)",
+    badgeColor: "badge-red",
+  },
 ];
 
 export function PersonaSwitcher({ currentRole, onSwitch, activeOrgSlug = "acme-corp" }) {

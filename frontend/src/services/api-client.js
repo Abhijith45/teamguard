@@ -106,6 +106,7 @@ export function clearSessionStorageAndCache() {
 function isTenantScoped(path) {
   if (path.startsWith("/auth/") || path.startsWith("/demo/")) return false;
   if (path === "/organizations" || path === "/organizations/") return false;
+  if (path.startsWith("/platform")) return false;
   return true;
 }
 
@@ -168,7 +169,7 @@ async function request(path, options = {}, retry = true) {
       error.code = "NO_ORGANIZATION_SELECTED";
       throw error;
     }
-  } else if (currentOrgId && !headers.has("x-organization-id")) {
+  } else if (!path.startsWith("/platform") && currentOrgId && !headers.has("x-organization-id")) {
     headers.set("x-organization-id", String(currentOrgId));
   }
 
@@ -398,6 +399,26 @@ export const api = {
     if (limit) params.set("limit", String(limit));
     return request(`/search?${params.toString()}`);
   },
+
+  // Platform Super Admin Governance & Break-Glass Recovery (TASK-501 / UD-001)
+  getPlatformTenants: () => request("/platform/tenants", { skipCache: true }),
+  updateTenantStatus: (tenantId, isSuspended, reason) =>
+    request(`/platform/tenants/${tenantId}/status`, {
+      method: "PATCH",
+      body: { isSuspended, reason },
+    }),
+  verifyPlatformMfa: (totpCode, targetOrganizationId) =>
+    request("/platform/mfa/verify", {
+      method: "POST",
+      body: { totpCode, targetOrganizationId },
+    }),
+  executeBreakGlass: ({ targetOrganizationId, designatedMemberId, ticketId, justification, mfaToken }) =>
+    request("/platform/break-glass", {
+      method: "POST",
+      headers: mfaToken ? { "x-mfa-token": mfaToken } : {},
+      body: { targetOrganizationId, designatedMemberId, ticketId, justification, mfaToken },
+    }),
+  getPlatformAuditLogs: () => request("/platform/audit-logs", { skipCache: true }),
 };
 
 export const apiClient = api;

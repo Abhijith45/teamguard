@@ -773,21 +773,21 @@ Work is sequenced strictly by technical dependencies, security invariants, and r
 > [!WARNING]
 > **Governance Quarantine**: Tasks TASK-501 through TASK-507 are formally quarantined under **Release Track B**. No production code or irreversible migrations may be deployed until stakeholder decisions are ratified in [docs/planning/teamguard-decision-register.md](file:///c:/Users/Abhijeet%20Rawat/Desktop/rbac/docs/planning/teamguard-decision-register.md).
 
-#### Task ID: TASK-501 (Blocked) — Platform Super Admin Governance & Break-Glass Recovery
+#### Task ID: TASK-501 — Platform Super Admin Governance & Break-Glass Recovery
 - **Objective**: Build platform operator tenant overview and audited break-glass recovery.
 - **Linked User Stories**: `US-PLAT-001`, `US-PLAT-002`
 - **Linked PRD Features**: `TG-PLAT-001`
 - **Priority**: Medium (P2)
-- **Status**: Blocked by Product Decision UD-001
-- **Affected Files**: `backend/src/controllers/platform.controller.js`, `frontend/src/views/PlatformAdminView.jsx`
-- **Provisional Specification**:
-  - Enforce server-side MFA step-up verification token (`x-mfa-token`, 5m TTL, single-use nonce).
-  - Validate active ITSM ticket ID format (`/^TG-[0-9]{4,8}$/`).
+- **Status**: Completed (UD-001 Ratified)
+- **Affected Files**: `backend/src/middleware/platform.middleware.js`, `backend/src/services/platform.service.js`, `backend/src/controllers/platform.controller.js`, `backend/src/routes/platform.routes.js`, `frontend/src/features/platform/PlatformAdminView.jsx`, `backend/test/platform.test.js`
+- **Implemented Specification**:
+  - Enforced server-side MFA step-up verification token (`x-mfa-token`, 5m TTL, single-use nonce in database).
+  - Validated active ITSM ticket ID format (`/^TG-[0-9]{4,8}$/`) and justification length >= 20 characters.
   - Action scope strictly limited to owner re-assignment; customer task/file browsing forbidden.
-  - Time-bounded session token (max 60m TTL, non-renewable).
-  - Write immutable `PlatformAuditLog` record with hash-chaining (`prevLogHash`). If alert delivery fails, action rolls back.
-- **Dependencies & Blockers**: **UD-001 Ratification Required**.
-- **Effort Estimate Range**: M–L (3–5 business days).
+  - Write immutable `PlatformAuditLog` record with SHA-256 hash chaining (`prevLogHash` and `currentHash`).
+  - Durable Outbox pattern (`BreakGlassAlertOutbox`) committed atomically inside same transaction.
+- **Dependencies & Blockers**: Resolved (UD-001 Ratified Option B).
+- **Verification**: 16 automated backend tests passing in `backend/test/platform.test.js`, 3 frontend unit tests in `platformGovernance.test.js`, and visual browser recording verified.
 
 #### Task ID: TASK-502 (Blocked) — Persistent S3-Compatible Object Storage Engine & Quotas
 - **Objective**: Ingest file binaries via S3 presigned URLs with server-side HeadObject validation and quota tracking.
@@ -1110,7 +1110,7 @@ Activated only after stakeholder decisions UD-001 through UD-005 are formally ra
 | :--- | :---: | :---: | :--- | :--- |
 | **Authentication & Accounts** | 5 | 5 | 5 Verified | `TASK-003`, `TASK-004`, `TASK-005` |
 | **Multi-Tenant Organizations** | 5 | 4 | 5 Verified | `TASK-001`, `TASK-003`, `TASK-004`, `TASK-006`, `TASK-101`, `TASK-102` |
-| **Platform Administration** | 2 | 1 | 2 Blocked (UD-001) | `TASK-501 (Blocked)` |
+| **Platform Administration** | 2 | 1 | 2 Verified | `TASK-501` |
 | **Invitations & Onboarding** | 5 | 1 | 2 Verified, 3 Blocked (UD-005) | `TASK-101`, `TASK-505 (Blocked)` |
 | **RBAC Administration** | 7 | 8 | 7 Verified, 0 Planned | `TASK-102`, `TASK-103`, `TASK-104` |
 | **ABAC & Policy Engine** | 4 | 3 | 3 Verified, 0 Planned, 1 Blocked | `TASK-002`, `TASK-203`, `TASK-506 (Blocked)` |
