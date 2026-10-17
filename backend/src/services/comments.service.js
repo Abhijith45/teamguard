@@ -1,6 +1,6 @@
 import { prisma } from "../../config/prisma.js";
 import { logAuditEvent } from "./audit.service.js";
-import { sanitizeCommentContent } from "../utils/sanitize.js";
+import { sanitizeCommentContent, validateCommentSize } from "../utils/sanitize.js";
 import { dispatchWorkspaceEvent } from "./event-dispatcher.service.js";
 
 export const EDIT_WINDOW_MS = 15 * 60 * 1000; // 15 minutes in milliseconds
@@ -135,8 +135,8 @@ export async function createCommentService({
     throw error;
   }
 
-  if (content.length > 5000) {
-    const error = new Error("Comment content cannot exceed 5000 characters");
+  if (!validateCommentSize(content)) {
+    const error = new Error("Comment exceeds maximum allowed size of 16KB");
     error.statusCode = 400;
     error.code = "VALIDATION_ERROR";
     throw error;
@@ -241,8 +241,8 @@ export async function updateCommentService({
     throw error;
   }
 
-  if (content.length > 5000) {
-    const error = new Error("Comment content cannot exceed 5000 characters");
+  if (!validateCommentSize(content)) {
+    const error = new Error("Comment exceeds maximum allowed size of 16KB");
     error.statusCode = 400;
     error.code = "VALIDATION_ERROR";
     throw error;

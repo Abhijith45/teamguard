@@ -17,6 +17,7 @@ import { SubtaskChecklist } from "./SubtaskChecklist.jsx";
 import { TaskCommentsSection } from "./TaskCommentsSection.jsx";
 import TaskActivityStream from "./TaskActivityStream.jsx";
 import { useFocusTrap } from "../../hooks/useFocusTrap.js";
+import { RichTextEditor } from "../../components/RichTextEditor.jsx";
 
 export function TaskDetailDrawer({
   task,
@@ -271,15 +272,15 @@ export function TaskDetailDrawer({
             />
           </div>
 
-          {/* Description Field */}
+          {/* Description Field (TASK-504 Rich Text WYSIWYG Editor) */}
           <div className="form-field">
             <label htmlFor="drawer-task-desc">Description</label>
-            <textarea
+            <RichTextEditor
               id="drawer-task-desc"
-              rows={4}
               value={description}
-              onChange={(e) => setDescription(e.target.value)}
+              onChange={setDescription}
               disabled={!canEdit || isArchived}
+              maxBytes={64 * 1024}
               placeholder="Detailed task description, acceptance criteria, or technical notes..."
             />
           </div>

@@ -185,7 +185,7 @@ All 7 unresolved decisions are preserved as explicit blockers in [teamguard-deci
 3. **UD-003: Real-Time Transport & State Synchronization** (Blocks `US-SYNC-001`, `US-SYNC-002`):
    - Provisional Design: SSE via Authenticated Fetch Streaming Client (`@microsoft/fetch-event-source`) with `AbortController` cancellation, `Last-Event-ID` reconnect, and smart polling fallback.
 4. **UD-004: Rich Text Editor Integration** (Blocks `US-COLLAB-004`):
-   - Provisional Design: TipTap / ProseMirror with strict DOMPurify HTML sanitization.
+   - Status: **RATIFIED & IMPLEMENTED (Option A)** under `TASK-504`. TipTap / ProseMirror with dual-layer DOMPurify and sanitize-html sanitization, 64KB/16KB bounding.
 5. **UD-005: Member Invitation Delivery Mechanism** (Blocks `US-INV-001`, `US-INV-002`, `US-INV-003`):
    - Provisional Design: Resend Transactional Email API with secure 7-day token link fallback.
 6. **DP-TASK-001: Task Creator vs. Assignee Policy Bifurcation** (Blocks `US-ABAC-004`):
@@ -823,17 +823,21 @@ Work is sequenced strictly by technical dependencies, security invariants, and r
   - Live Sync animated indicator badge displayed in header toolbar.
 - **Verification**: 13 automated backend tests in `backend/test/sync.test.js` and 5 frontend unit tests in `frontend/src/features/sync/syncUtils.test.js` passing with 100% success.
 
-#### Task ID: TASK-504 (Blocked) — TipTap Rich Text Editor Integration
+#### Task ID: TASK-504 — TipTap Rich Text Editor Integration (UD-004)
 - **Objective**: Integrate TipTap / ProseMirror rich text WYSIWYG editor for task descriptions and comments.
 - **Linked User Stories**: `US-COLLAB-004`
 - **Linked PRD Features**: `TG-EDT-001`
 - **Priority**: Low (P3)
-- **Status**: Blocked by Product Decision UD-004
-- **Affected Files**: `frontend/src/components/RichTextEditor.jsx`
-- **Provisional Specification**:
-  - Ingest JSON Prosemirror document schema; sanitize HTML via DOMPurify; CSP compliance.
-- **Dependencies & Blockers**: **UD-004 Ratification Required**.
-- **Effort Estimate Range**: S–M (2–3 business days).
+- **Status**: Complete / Verified (TIER-1, TIER-2 & TIER-3)
+- **Affected Files**: `frontend/src/components/RichTextEditor.jsx`, `frontend/src/components/RichTextViewer.jsx`, `frontend/src/features/editor/editorUtils.js`, `frontend/src/features/editor/editorUtils.test.js`, `frontend/src/features/tasks/TaskDetailDrawer.jsx`, `frontend/src/features/tasks/TaskCommentsSection.jsx`, `backend/src/utils/sanitize.js`, `backend/src/services/tasks.service.js`, `backend/src/services/comments.service.js`, `backend/test/rich-text.test.js`
+- **Delivered Capabilities**:
+  - Headless TipTap / ProseMirror rich text WYSIWYG editor with accessible toolbar (Bold, Italic, Strikethrough, Inline Code, H1-H3, Lists, Blockquote, Link modal, Undo/Redo).
+  - Native markdown input rules (`#`, `##`, `*`, `1.`, `>`, ```` ``` ````).
+  - Real-time payload size bounding counter with visual warning/danger badges.
+  - Strict payload size limit enforcement: 64 KB maximum for task descriptions and 16 KB maximum for comments (exceeding payloads rejected with HTTP 400 Bad Request).
+  - Dual-layer stored XSS defense: server-side `sanitize-html` parsing with whitelisted semantic tags/attributes and client-side DOMPurify sanitization.
+  - Safe rich text rendering in `RichTextViewer` with responsive typography and empty fallback state.
+- **Verification**: 8 automated tests in `backend/test/rich-text.test.js`, 3 frontend unit tests in `frontend/src/features/editor/editorUtils.test.js`, and 86/86 frontend tests passing.
 
 #### Task ID: TASK-505 (Blocked) — Transactional Email Member Invitations & Expiration Lifecycle
 - **Objective**: Dispatch email invitations via Resend API with 7-day token expiration and recipient identity match.
@@ -1122,7 +1126,7 @@ Activated only after stakeholder decisions UD-001 through UD-005 are formally ra
 | **Project Management** | 5 | 5 | 5 Verified, 0 Planned | `TASK-201`, `TASK-202` |
 | **Task Management** | 10 | 10 | 10 Verified, 0 Planned | `TASK-203`, `TASK-204`, `TASK-205`, `TASK-206` |
 | **Subtask Hierarchy** | 2 | 2 | 2 Verified, 0 Planned | `TASK-301` |
-| **Collaboration & Comments** | 4 | 4 | 3 Verified, 0 Planned, 1 Blocked (UD-004) | `TASK-302`, `TASK-504 (Blocked)` |
+| **Collaboration & Comments** | 4 | 4 | 4 Verified, 0 Planned | `TASK-302`, `TASK-504` |
 | **Audit Logs & Compliance** | 2 | 2 | 2 Verified | `TASK-303` |
 | **Activity Feeds** | 1 | 1 | 1 Verified | `TASK-303` |
 | **File Management** | 5 | 5 | 1 Verified, 3 Partial, 1 Planned | `TASK-405` |
@@ -1146,7 +1150,7 @@ Prior to expanding into Phase 5, stakeholder sign-off is required on the 7 archi
 1. **UD-001**: Approve Unified Application with Operator Context & MFA Step-Up for platform administration.
 2. **UD-002**: Ratify S3-compatible cloud storage provider (Cloudflare R2 or AWS S3) with server-side HeadObject validation.
 3. **UD-003**: Approve Server-Sent Events via authenticated fetch streaming client for real-time broadcasts.
-4. **UD-004**: Approve TipTap / ProseMirror rich text editor with strict DOMPurify sanitization.
+4. **UD-004**: Ratified (Option A: TipTap / ProseMirror rich text editor with strict DOMPurify sanitization — `TASK-504` Completed).
 5. **UD-005**: Ratify Resend transactional email API with 7-day token link fallback for invitations.
 6. **DP-TASK-001**: Approve discrete permission bifurcation (`task:update:own` vs. `task:update:assigned`).
 7. **DP-REP-001**: Confirm Phase 1 CSV export scope for task velocity and audit logs.

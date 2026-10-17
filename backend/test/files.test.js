@@ -82,7 +82,7 @@ test("TASK-405: File Asset Directory, Project Association & Bulk Metadata Operat
     data: {
       organizationId: adminAcme.orgId,
       name: `Test Project B ${Date.now()}`,
-      key: `TPB${Date.now()}`.slice(0, 10),
+      key: `B${Date.now().toString().slice(-7)}`,
     },
   });
 

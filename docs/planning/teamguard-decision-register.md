@@ -224,15 +224,24 @@ Task descriptions and comment feeds require structured text formatting (bold, it
 #### 2. Affected User Stories & PRD Features
 - **User Stories**: [`US-COLLAB-004`](file:///c:/Users/Abhijeet%20Rawat/Desktop/rbac/docs/product/teamguard-user-stories.md#L2043)
 - **PRD Feature**: `TG-EDT-001` (Section 7.10, Section 16.2)
-- **Blocked Engineering Task**: `TASK-504 (Blocked)`
+- **Engineering Task**: `TASK-504 (Completed & Verified)`
 
-#### 3. Options Under Consideration
-- **Option A (Recommended)**: TipTap / ProseMirror with strict DOMPurify HTML sanitization. Ingests structured JSON ProseMirror document schema; persists sanitized HTML; enforces strict Content Security Policy.
-- **Option B**: Lightweight Markdown-only textarea with client-side preview.
+#### 3. Options Evaluated
+- **Option A (Recommended & Ratified)**: TipTap / ProseMirror with dual-layer DOMPurify and sanitize-html sanitization. Features headless TipTap editor with accessible formatting toolbar (Bold, Italic, Strike, Code, H1-H3, Lists, Blockquote, Links, Undo/Redo) and native markdown input shortcuts. Enforces strict payload bounding (64 KB for task descriptions, 16 KB for comments) and renders stored XSS vectors (`<script>`, `javascript:`, inline handlers, `<iframe>`) completely inert.
+- **Option B**: Lightweight Markdown-only textarea with client-side preview. Rejected because ProseMirror provides superior WYSIWYG typing ergonomics, reliable real-time bounding, and structured DOMPurify protection without external preview rendering friction.
 
-#### 4. Required Stakeholder Action
-> [!IMPORTANT]
-> **Action Required**: Stakeholder ratification of **Option A** (TipTap / ProseMirror) or **Option B** (Markdown-only). If deferred, comments and descriptions remain standard plaintext/markdown.
+#### 4. Architecture & Security Invariants
+1. **Server-Side Sanitization**: All incoming HTML/rich-text is parsed and stripped by `sanitize-html` (`sanitizeRichTextContent`) prior to database insertion. Only whitelisted semantic tags (`h1`-`h6`, `p`, `b`, `i`, `u`, `s`, `em`, `strong`, `ul`, `ol`, `li`, `code`, `pre`, `blockquote`, `a`, `table`, etc.) and safe attributes (`href`, `name`, `target`, `rel`, `title`, `class`) are permitted. All `<a>` tags are automatically transformed to include `target="_blank"` and `rel="noopener noreferrer"`.
+2. **Client-Side Defense-in-Depth**: `RichTextViewer` passes all content through `DOMPurify.sanitize` before DOM insertion to safeguard against any legacy unsanitized content.
+3. **Payload Size Bounding**:
+   - Task descriptions: Maximum 64 KB (65,536 bytes). Excess payloads return HTTP 400 Bad Request (`{ "error": "Description exceeds maximum allowed size of 64KB" }`).
+   - Comments: Maximum 16 KB (16,384 bytes). Excess payloads return HTTP 400 Bad Request (`{ "error": "Comment exceeds maximum allowed size of 16KB" }`).
+4. **Isolated Dependency**: TipTap and DOMPurify are encapsulated within `RichTextEditor`, `RichTextViewer`, and `editorUtils`, leaving standard single-line text inputs across the application completely lightweight.
+
+#### 5. Implementation Status
+> [!NOTE]
+> **Status: RATIFIED & IMPLEMENTED (Option A)**
+> Ratified by Lead Architect and Product Owner. Full implementation completed in `TASK-504`. Verified via 8 automated tests in `backend/test/rich-text.test.js`, 3 frontend unit tests in `frontend/src/features/editor/editorUtils.test.js`, and 86 total frontend tests passing.
 
 ---
 
