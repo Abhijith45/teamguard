@@ -805,19 +805,23 @@ Work is sequenced strictly by technical dependencies, security invariants, and r
   - Frontend drag-and-drop dropzone with direct presigned S3 PUT upload, storage quota progress bar banner, and download button.
 - **Verification**: 17 automated backend integration tests passing in `backend/test/storage.test.js`, 5 frontend unit tests in `filesStorageUtils.test.js`, and browser visual verification recorded.
 
-#### Task ID: TASK-503 (Blocked) — Real-Time State Synchronization via Authenticated Fetch Streams / SSE
+#### Task ID: TASK-503 — Real-Time State Synchronization via Authenticated Fetch Streams / SSE
 - **Objective**: Deliver multi-client real-time Kanban updates via SSE using an authenticated fetch streaming client.
 - **Linked User Stories**: `US-SYNC-001`, `US-SYNC-002`
 - **Linked PRD Features**: `TG-SYNC-001`
 - **Priority**: Medium (P2)
-- **Status**: Blocked by Product Decision UD-003
-- **Affected Files**: `backend/src/controllers/sync.controller.js`, `frontend/src/services/eventStream.js`
-- **Provisional Specification**:
-  - Unidirectional SSE stream (`GET /api/v1/events/stream`) authenticated via Bearer JWT and `x-organization-id` headers using `@microsoft/fetch-event-source`.
-  - Clean stream cancellation via `AbortController` on unmount or workspace switch.
-  - Client invalidates React Query cache on event receipt; smart polling fallback.
-- **Dependencies & Blockers**: **UD-003 Ratification Required**.
-- **Effort Estimate Range**: M–L (3–4 business days).
+- **Status**: Completed (UD-003 Ratified)
+- **Affected Files**: `backend/src/services/sync.service.js`, `backend/src/controllers/sync.controller.js`, `backend/src/routes/sync.routes.js`, `frontend/src/services/eventStream.js`, `frontend/src/features/sync/syncUtils.js`, `frontend/src/features/tasks/KanbanBoardView.jsx`
+- **Delivered Capabilities**:
+  - SSE endpoint `GET /api/events/stream` and `/api/v1/events/stream` protected by JWT authentication and strict `x-organization-id` tenant isolation (cross-tenant access rejected with 403; missing header with 400).
+  - In-memory multi-tenant broker maintaining per-tenant subscriber sets and 100-event ring buffer for reconnection replay.
+  - Standard SSE headers (`Content-Type: text/event-stream`, `Cache-Control: no-cache, no-transform`, `Connection: keep-alive`, `X-Accel-Buffering: no`).
+  - Heartbeat pings (`: ping\n\n`) emitted every 15s to keep connections alive through proxies with zero memory leaks on disconnect.
+  - `Last-Event-ID` cursor tracking & replay: clients replaying from cursor receive missed events; if buffer overflowed, server emits `sync:reconcile` prompting full state refresh.
+  - Native fetch `ReadableStream` reader client in frontend passing `Authorization: Bearer <token>` and `x-organization-id` headers, supporting exponential backoff reconnection and `AbortController` cancellation.
+  - Optimistic UI updates on Kanban card drag-and-drop with automatic rollback on server error.
+  - Live Sync animated indicator badge displayed in header toolbar.
+- **Verification**: 13 automated backend tests in `backend/test/sync.test.js` and 5 frontend unit tests in `frontend/src/features/sync/syncUtils.test.js` passing with 100% success.
 
 #### Task ID: TASK-504 (Blocked) — TipTap Rich Text Editor Integration
 - **Objective**: Integrate TipTap / ProseMirror rich text WYSIWYG editor for task descriptions and comments.
@@ -1131,8 +1135,8 @@ Activated only after stakeholder decisions UD-001 through UD-005 are formally ra
 | **Account Management** | 1 | 1 | 1 Verified | `TASK-005` |
 | **Reporting & Analytics** | 1 | 1 | 1 Blocked (Reporting Scope) | `TASK-507 (Blocked)` |
 | **Developer Tooling** | 1 | 1 | 1 Verified | `TASK-006` |
-| **State Synchronization** | 2 | 1 | 2 Blocked (UD-003) | `TASK-503 (Blocked)` |
-| **TOTALS RECONCILED** | **79 Stories** | **60 Features** | **40 Verified, 5 Partial, 23 Planned, 11 Blocked** | **35 Tasks across 7 Phases (32 Story-Linked + 3 Operational)** |
+| **State Synchronization** | 2 | 1 | 2 Verified | `TASK-503` |
+| **TOTALS RECONCILED** | **79 Stories** | **60 Features** | **42 Verified, 5 Partial, 23 Planned, 9 Blocked** | **35 Tasks across 7 Phases (32 Story-Linked + 3 Operational)** |
 
 ---
 

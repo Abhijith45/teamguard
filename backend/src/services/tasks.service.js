@@ -607,6 +607,15 @@ export async function updateTaskService({
     });
   }
 
+  dispatchWorkspaceEvent("task:updated", {
+    organizationId,
+    taskId: updated.id,
+    actorId,
+    task: updated,
+    projectId: updated.projectId,
+    changes: input,
+  });
+
   return updated;
 }
 
@@ -645,6 +654,13 @@ export async function deleteTaskService({ organizationId, actorId, taskId, permi
     resourceType: "Task",
     resourceId: String(taskId),
     details: { title: existing.title },
+  });
+
+  dispatchWorkspaceEvent("task:deleted", {
+    organizationId,
+    taskId,
+    actorId,
+    projectId: existing.projectId,
   });
 
   return true;

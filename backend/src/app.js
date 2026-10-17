@@ -20,6 +20,7 @@ import notificationsRoutes from "./routes/notifications.routes.js";
 import searchRoutes from "./routes/search.routes.js";
 import demoRoutes from "./routes/demo.routes.js";
 import platformRoutes from "./routes/platform.routes.js";
+import syncRoutes from "./routes/sync.routes.js";
 import { errorHandler } from "./middleware/error-handler.js";
 
 const app = express();
@@ -80,6 +81,7 @@ app.use(
       "x-mfa-token",
       "X-Requested-With",
       "Accept",
+      "Last-Event-ID",
     ],
     maxAge: 86400,
   })
@@ -124,6 +126,8 @@ app.use("/api/projects", projectsRoutes);
 app.use("/api/tasks", tasksRoutes);
 app.use("/api/files", filesRoutes);
 app.use("/api/v1/files", filesRoutes);
+app.use("/api/events", syncRoutes);
+app.use("/api/v1/events", syncRoutes);
 app.use("/api/permissions-matrix", permissionsMatrixRoutes);
 app.use("/api/roles", rolesRoutes);
 app.use("/api/admin", adminRoutes);

@@ -16,6 +16,12 @@ import {
   X,
 } from "lucide-react";
 import { api } from "../../services/api-client.js";
+import { getWorkspaceEventStream } from "../../services/eventStream.js";
+import {
+  applyRealtimeTaskCreate,
+  applyRealtimeTaskUpdate,
+  applyRealtimeTaskDelete,
+} from "../sync/syncUtils.js";
 import { TaskDetailDrawer } from "./TaskDetailDrawer.jsx";
 import { TaskListView } from "./TaskListView.jsx";
 import { TaskTableView } from "./TaskTableView.jsx";
@@ -36,6 +42,7 @@ export function KanbanBoardView({ user, activeOrg, userPermissions, onShowNotice
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [viewMode, setViewMode] = useState("board"); // "board" | "list" | "table"
+  const [syncStatus, setSyncStatus] = useState("disconnected"); // TASK-503 / UD-003
 
   // Search & Multi-Parameter Filter state (TASK-206)
   const [searchTerm, setSearchTerm] = useState("");
@@ -102,6 +109,55 @@ export function KanbanBoardView({ user, activeOrg, userPermissions, onShowNotice
 
   useEffect(() => {
     loadTasks();
+  }, [activeOrg?.id]);
+
+  // TASK-503: Real-Time State Synchronization via SSE Streams (UD-003)
+  useEffect(() => {
+    if (!activeOrg?.id) return;
+
+    const stream = getWorkspaceEventStream();
+    const unsubStatus = stream.onStatusChange((status) => {
+      setSyncStatus(status);
+    });
+
+    const unsubCreate = stream.on("task:created", (payload) => {
+      if (!payload?.task) return;
+      setTasks((prev) => applyRealtimeTaskCreate(prev, payload.task));
+    });
+
+    const unsubUpdate = stream.on("task:updated", (payload) => {
+      if (!payload) return;
+      setTasks((prev) => applyRealtimeTaskUpdate(prev, payload));
+      const targetId = Number(payload.taskId || payload.task?.id);
+      setEditingTask((prev) =>
+        prev && Number(prev.id) === targetId
+          ? { ...prev, ...(payload.task || {}), ...(payload.changes || {}) }
+          : prev
+      );
+    });
+
+    const unsubDelete = stream.on("task:deleted", (payload) => {
+      if (!payload?.taskId) return;
+      setTasks((prev) => applyRealtimeTaskDelete(prev, payload.taskId));
+      setEditingTask((prev) =>
+        prev && Number(prev.id) === Number(payload.taskId) ? null : prev
+      );
+    });
+
+    const unsubReconcile = stream.on("sync:reconcile", () => {
+      loadTasks();
+    });
+
+    stream.connect();
+
+    return () => {
+      unsubStatus();
+      unsubCreate();
+      unsubUpdate();
+      unsubDelete();
+      unsubReconcile();
+      stream.disconnect();
+    };
   }, [activeOrg?.id]);
 
   // TASK-003: Broadcast event listener for global workspace cache purges
@@ -400,6 +456,22 @@ export function KanbanBoardView({ user, activeOrg, userPermissions, onShowNotice
         </div>
 
         <div className="kanban-header-controls">
+          {/* Real-time State Synchronization Badge (TASK-503 / UD-003) */}
+          <div
+            className={`live-sync-indicator ${syncStatus}`}
+            title={`Real-Time SSE Sync: ${syncStatus}`}
+            data-testid="live-sync-indicator"
+          >
+            <span className="live-sync-dot" />
+            <span className="live-sync-label">
+              {syncStatus === "connected"
+                ? "Live Sync Active"
+                : syncStatus === "reconnecting"
+                ? "Reconnecting..."
+                : "Sync Offline"}
+            </span>
+          </div>
+
           {/* Multi-View Mode Tabs (TASK-205) */}
           <div className="view-mode-tabs" role="tablist" aria-label="Task View Modes">
             <button
