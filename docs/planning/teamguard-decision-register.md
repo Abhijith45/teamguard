@@ -49,7 +49,7 @@ In strict adherence to TeamGuard document governance:
 | **UD-002** | Cloud Binary Object Storage Provider | `ACCEPTED_RATIFIED` | Principal Architect | Product Steering & Security Lead | `US-STOR-001` | `TG-FILE-005`, `TG-STOR-001` | Option A: S3-Compatible Storage via Presigned URLs | S3-compatible cloud storage; 15m PUT / 5m GET presigned URLs; server-side `HeadObject` gate; tenant prefix isolation. Ratified in TASK-502. |
 | **UD-003** | Real-Time Transport & State Synchronization | `ACCEPTED_RATIFIED` | Principal Architect | Product Steering & Lead Frontend | `US-SYNC-001`, `US-SYNC-002` | `TG-SYNC-001` | Option B: SSE via Authenticated Fetch Streaming Client | SSE via authenticated fetch streaming client (`ReadableStream`); `Last-Event-ID` cursor replay buffer; heartbeat pings; zero cross-tenant leakage. Ratified in TASK-503. |
 | **UD-004** | Rich Text Description & Comment Editor | `PROPOSED_RECOMMENDATION` | Principal Architect | Product Steering & UX Lead | `US-COLLAB-004` | `TG-EDT-001` | Option A: TipTap / ProseMirror with DOMPurify | JSON ProseMirror document schema; server-side DOMPurify HTML sanitization; CSP compliance. |
-| **UD-005** | Member Invitation Delivery Mechanism | `PROPOSED_RECOMMENDATION` | Principal Architect | Product Steering & Security Lead | `US-INV-001`, `US-INV-002`, `US-INV-003` | `TG-INV-001` | Option B: Resend Transactional Email API + Token Fallback | Resend transactional email API; 7-day token expiration; strict recipient email matching. |
+| **UD-005** | Member Invitation Delivery Mechanism | `ACCEPTED_RATIFIED` | Principal Architect | Product Steering & Security Lead | `US-INV-001`, `US-INV-002`, `US-INV-003` | `TG-INV-001` | Option B: Resend Transactional Email API + Token Fallback | Resend transactional email API; 7-day token expiration; strict recipient email matching; SHA-256 token hashing; Universal Delegation Barrier. Ratified in TASK-505. |
 | **DP-TASK-001** | Task Creator vs. Assignee Policy Bifurcation | `PROPOSED_RECOMMENDATION` | Principal Architect | Product Steering Committee | `US-ABAC-004` | `TG-ABAC-001` | Option B: Discrete Bifurcation (`task:update:own` vs. `assigned`) | Discrete permissions; ABAC ownership check evaluates creator vs assignee status. |
 | **DP-REP-001** | Reporting Scope, Metrics & Export Formats | `PROPOSED_RECOMMENDATION` | Principal Architect | Product Steering Committee | `US-REP-001` | `TG-REP-001` | Option A: Streaming CSV Export of Task Velocity & Audit History | Direct database streaming of CSV format (`text/csv`); zero heavy binary PDF dependencies. |
 
@@ -248,20 +248,41 @@ Task descriptions and comment feeds require structured text formatting (bold, it
 ### Decision UD-005: Member Invitation Delivery Mechanism
 
 #### 1. Context & Problem Statement
-Inviting new team members into an organization requires generating cryptographically secure invitations and delivering them via email or shareable links without opening unauthorized registration vectors.
+Inviting new team members into an organization requires generating cryptographically secure invitations and delivering them via email or shareable links without opening unauthorized registration vectors or privilege escalation paths.
 
 #### 2. Affected User Stories & PRD Features
 - **User Stories**: [`US-INV-001`](file:///c:/Users/Abhijeet%20Rawat/Desktop/rbac/docs/product/teamguard-user-stories.md#L931), [`US-INV-002`](file:///c:/Users/Abhijeet%20Rawat/Desktop/rbac/docs/product/teamguard-user-stories.md#L975), [`US-INV-003`](file:///c:/Users/Abhijeet%20Rawat/Desktop/rbac/docs/product/teamguard-user-stories.md#L1015)
 - **PRD Feature**: `TG-INV-001` (Section 7.4, Section 16.2)
-- **Blocked Engineering Task**: `TASK-505 (Blocked)`
+- **Engineering Task**: `TASK-505 (Completed & Verified)`
 
-#### 3. Options Under Consideration
-- **Option A**: Manual Shareable Token Link Only (In-App Copy Link).
-- **Option B (Recommended)**: Resend Transactional Email API + Shareable Token Link Fallback. Server dispatches email with unique 7-day token link; acceptance validates that authenticated account email matches invitation recipient.
+#### 3. Options Evaluated
+- **Option A**: Manual Shareable Token Link Only (In-App Copy Link). Rejected as sole delivery mechanism because unauthenticated token delivery lacks automated recipient dispatch and verification notifications.
+- **Option B (Recommended & Ratified)**: Resend Transactional Email API + Shareable Token Link Fallback. Server dispatches email with unique 7-day token link; acceptance validates that authenticated account email matches invitation recipient. Stored tokens are cryptographically hashed via SHA-256. Includes fallback sandbox outbox when `RESEND_API_KEY` is omitted or in test mode.
 
-#### 4. Required Stakeholder Action
-> [!IMPORTANT]
-> **Action Required**: Stakeholder ratification of **Option B** (Resend Transactional Email API) and provisioning of email sending domain. If deferred, invitation endpoints remain unmounted.
+#### 4. Architecture & Security Invariants
+1. **Cryptographic Token Hashing**:
+   - Single-use random 32-byte hex token generated per invitation (`crypto.randomBytes(32).toString('hex')`).
+   - Stored in database strictly as a cryptographic SHA-256 hash (`tokenHash`). Raw token is never stored in persistent storage.
+   - Raw token is sent in email and returned to client only upon invitation creation/resend.
+2. **Strict Expiration Window**:
+   - Each invitation token is valid for strictly 7 days (`expiresAt = now + 7 days`).
+   - Expired invitations return HTTP 400 Bad Request (`{ "error": "Invitation has expired" }`) and transition to `EXPIRED` status.
+3. **Identity Matching Invariant (`SEC-11`)**:
+   - When a user accepts an invitation via `POST /api/invitations/accept`, the backend verifies that the authenticated user's email matches the exact recipient email of the invitation (`userEmail.toLowerCase() === invitation.email.toLowerCase()`).
+   - Mismatched user sessions are rejected with HTTP 403 Forbidden (`{ "error": "This invitation was sent to a different email address" }`).
+4. **Universal Privilege Delegation Barrier**:
+   - An administrator or manager cannot invite a user with a role possessing permissions that the inviter does not personally possess (`DELEGATION_BARRIER_BREACH`).
+5. **Existing Active Member Protection**:
+   - Attempting to invite a user who already possesses an active membership in the organization is rejected with HTTP 400 Bad Request (`{ "error": "User is already a member of this organization" }`).
+6. **Concurrency Guard**:
+   - Acceptance uses atomic database transaction with optimistic concurrency check (`where: { id, status: "PENDING" }`), preventing race conditions or duplicate role grants (HTTP 409 Conflict).
+7. **Immutable Audit Trail**:
+   - Security audit entries are recorded for `INVITATION_CREATE`, `INVITATION_ACCEPT`, `INVITATION_REVOKE`, and `INVITATION_RESEND`.
+
+#### 5. Implementation Status
+> [!NOTE]
+> **Status: RATIFIED & IMPLEMENTED (Option B)**
+> Ratified by Principal Architect and Security Lead. Implemented in `TASK-505`. Verified via 13 automated tests in `backend/test/invitations.test.js`, 5 frontend unit tests in `frontend/test/invitations.test.js`, and comprehensive UI in `MembersView.jsx` and `AcceptInvitationModal.jsx`.
 
 ---
 

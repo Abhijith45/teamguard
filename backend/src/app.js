@@ -13,6 +13,7 @@ import tasksRoutes from "./routes/tasks.routes.js";
 import filesRoutes from "./routes/files.routes.js";
 import permissionsMatrixRoutes from "./routes/permissions-matrix.routes.js";
 import membersRoutes from "./routes/members.routes.js";
+import invitationsRoutes from "./routes/invitations.routes.js";
 import rolesRoutes from "./routes/roles.routes.js";
 import adminRoutes from "./routes/admin.routes.js";
 import auditRoutes from "./routes/audit.routes.js";
@@ -121,6 +122,8 @@ BigInt.prototype.toJSON = function () {
 
 app.use("/api/organizations", organizationsRoutes);
 app.use("/api/members", membersRoutes);
+app.use("/api/invitations", invitationsRoutes);
+app.use("/api/v1/invitations", invitationsRoutes);
 app.use("/api/dashboard", dashboardRoutes);
 app.use("/api/projects", projectsRoutes);
 app.use("/api/tasks", tasksRoutes);

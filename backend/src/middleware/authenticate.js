@@ -22,12 +22,13 @@ export async function authenticate(req, res, next) {
 
   const user = await prisma.user.findUnique({
     where: { id: userId },
-    select: { isActive: true, isPlatformAdmin: true },
+    select: { id: true, email: true, name: true, isActive: true, isPlatformAdmin: true },
   });
   if (!user?.isActive) {
     return res.status(401).json({ error: "User account is inactive or no longer exists" });
   }
 
   req.auth = { userId, isPlatformAdmin: Boolean(user.isPlatformAdmin) };
+  req.user = user;
   return next();
 }

@@ -254,6 +254,14 @@ export const api = {
   removeMember: (membershipId) =>
     request(`/members/${membershipId}`, { method: "DELETE" }),
 
+  // Member Invitations via Resend (TASK-505 / UD-005)
+  getInvitations: (params = "") => request(`/invitations${params ? `?${params}` : ""}`, { skipCache: true }),
+  createInvitation: (body) => request("/invitations", { method: "POST", body }),
+  revokeInvitation: (id) => request(`/invitations/${id}/revoke`, { method: "POST" }),
+  resendInvitation: (id) => request(`/invitations/${id}/resend`, { method: "POST" }),
+  acceptInvitation: (token) => request("/invitations/accept", { method: "POST", body: { token } }),
+  verifyInvitation: (token) => request(`/invitations/verify?token=${encodeURIComponent(token)}`),
+
   // Dashboard
   getDashboard: () => request("/dashboard"),
 

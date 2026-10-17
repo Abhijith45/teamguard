@@ -839,18 +839,36 @@ Work is sequenced strictly by technical dependencies, security invariants, and r
   - Safe rich text rendering in `RichTextViewer` with responsive typography and empty fallback state.
 - **Verification**: 8 automated tests in `backend/test/rich-text.test.js`, 3 frontend unit tests in `frontend/src/features/editor/editorUtils.test.js`, and 86/86 frontend tests passing.
 
-#### Task ID: TASK-505 (Blocked) — Transactional Email Member Invitations & Expiration Lifecycle
-- **Objective**: Dispatch email invitations via Resend API with 7-day token expiration and recipient identity match.
+#### Task ID: TASK-505 (Completed & Verified) — Transactional Email Member Invitations & Expiration Lifecycle
+- **Objective**: Dispatch email invitations via Resend API with 7-day token expiration, identity match verification, and pending invitation lifecycle management.
 - **Linked User Stories**: `US-INV-001`, `US-INV-002`, `US-INV-003`
 - **Linked PRD Features**: `TG-INV-001`
 - **Priority**: High (P1)
-- **Status**: Blocked by Product Decision UD-005
-- **Affected Files**: `backend/src/controllers/invitations.controller.js`, `backend/src/services/email.service.js`
-- **Provisional Specification**:
-  - Resend transactional email API dispatching cryptographically random invitation token.
-  - Acceptance validates that authenticated account email matches invitation recipient.
-- **Dependencies & Blockers**: **UD-005 Ratification Required**.
-- **Effort Estimate Range**: M (3 business days).
+- **Status**: Completed & Verified (UD-005 Ratified)
+- **Affected Files**:
+  - `backend/prisma/schema.prisma`
+  - `backend/src/services/email.service.js`
+  - `backend/src/services/invitations.service.js`
+  - `backend/src/controllers/invitations.controller.js`
+  - `backend/src/routes/invitations.routes.js`
+  - `backend/src/middleware/authenticate.js`
+  - `backend/src/app.js`
+  - `frontend/src/services/api-client.js`
+  - `frontend/src/features/invitations/invitation-utils.js`
+  - `frontend/src/features/invitations/AcceptInvitationModal.jsx`
+  - `frontend/src/features/members/MembersView.jsx`
+  - `frontend/src/App.jsx`
+- **Architectural & Security Invariants**:
+  - Resend transactional email API (`POST https://api.resend.com/emails`) dispatching cryptographically secure 32-byte hexadecimal invitation tokens (`crypto.randomBytes(32).toString("hex")`).
+  - Single-use token security: token is stored exclusively as an immutable SHA-256 hash (`tokenHash`), never in plaintext.
+  - In-memory sandbox outbox fallback when `RESEND_API_KEY` is omitted or in test environments (`NODE_ENV === "test"`).
+  - Strict recipient email matching invariant (`SEC-11`): authenticated user session email must match `invitation.email` exactly, returning `403 Forbidden` (`"This invitation was sent to a different email address"`) on mismatch.
+  - Universal Privilege Delegation Barrier (`DELEGATION_BARRIER_BREACH` HTTP 403) blocking inviters from assigning roles containing permissions exceeding their personal authority.
+  - Active member re-invitation defense: rejects invitation creation with HTTP 400 (`"User is already a member of this organization"`).
+  - Atomic acceptance transaction: assigns membership & role, updates invitation status to `ACCEPTED`, logs audit event, and guards against concurrent race conditions with HTTP 409 Conflict.
+  - Pending invitation management: admin revocation (`POST /api/invitations/:id/revoke`), single-use token refresh on resend (`POST /api/invitations/:id/resend`), and auto-expiration on read operations.
+  - Frontend UI: Members directory tab switching ("Members Directory" vs "Pending Invitations"), "Invite Member" modal with shareable link copy fallback, and URL search parameter token listener launching `AcceptInvitationModal`.
+- **Verification**: 13 automated tests in `backend/test/invitations.test.js`, 5 frontend unit tests in `frontend/test/invitations.test.js`, and comprehensive UI in `MembersView.jsx` and `AcceptInvitationModal.jsx`.
 
 #### Task ID: TASK-506 (Blocked) — Task Creator vs. Assignee Permission Bifurcation
 - **Objective**: Bifurcate task update permissions into discrete `task:update:own` (creator) and `task:update:assigned` (assignee).
@@ -1120,7 +1138,7 @@ Activated only after stakeholder decisions UD-001 through UD-005 are formally ra
 | **Authentication & Accounts** | 5 | 5 | 5 Verified | `TASK-003`, `TASK-004`, `TASK-005` |
 | **Multi-Tenant Organizations** | 5 | 4 | 5 Verified | `TASK-001`, `TASK-003`, `TASK-004`, `TASK-006`, `TASK-101`, `TASK-102` |
 | **Platform Administration** | 2 | 1 | 2 Verified | `TASK-501` |
-| **Invitations & Onboarding** | 5 | 1 | 2 Verified, 3 Blocked (UD-005) | `TASK-101`, `TASK-505 (Blocked)` |
+| **Invitations & Onboarding** | 5 | 1 | 5 Verified | `TASK-101`, `TASK-505` |
 | **RBAC Administration** | 7 | 8 | 7 Verified, 0 Planned | `TASK-102`, `TASK-103`, `TASK-104` |
 | **ABAC & Policy Engine** | 4 | 3 | 3 Verified, 0 Planned, 1 Blocked | `TASK-002`, `TASK-203`, `TASK-506 (Blocked)` |
 | **Project Management** | 5 | 5 | 5 Verified, 0 Planned | `TASK-201`, `TASK-202` |
@@ -1140,7 +1158,7 @@ Activated only after stakeholder decisions UD-001 through UD-005 are formally ra
 | **Reporting & Analytics** | 1 | 1 | 1 Blocked (Reporting Scope) | `TASK-507 (Blocked)` |
 | **Developer Tooling** | 1 | 1 | 1 Verified | `TASK-006` |
 | **State Synchronization** | 2 | 1 | 2 Verified | `TASK-503` |
-| **TOTALS RECONCILED** | **79 Stories** | **60 Features** | **42 Verified, 5 Partial, 23 Planned, 9 Blocked** | **35 Tasks across 7 Phases (32 Story-Linked + 3 Operational)** |
+| **TOTALS RECONCILED** | **79 Stories** | **60 Features** | **45 Verified, 5 Partial, 23 Planned, 6 Blocked** | **35 Tasks across 7 Phases (32 Story-Linked + 3 Operational)** |
 
 ---
 
@@ -1151,7 +1169,7 @@ Prior to expanding into Phase 5, stakeholder sign-off is required on the 7 archi
 2. **UD-002**: Ratify S3-compatible cloud storage provider (Cloudflare R2 or AWS S3) with server-side HeadObject validation.
 3. **UD-003**: Approve Server-Sent Events via authenticated fetch streaming client for real-time broadcasts.
 4. **UD-004**: Ratified (Option A: TipTap / ProseMirror rich text editor with strict DOMPurify sanitization — `TASK-504` Completed).
-5. **UD-005**: Ratify Resend transactional email API with 7-day token link fallback for invitations.
+5. **UD-005**: Ratified (Option B: Resend Transactional Email API with 7-Day Token Link Fallback — `TASK-505` Completed & Verified).
 6. **DP-TASK-001**: Approve discrete permission bifurcation (`task:update:own` vs. `task:update:assigned`).
 7. **DP-REP-001**: Confirm Phase 1 CSV export scope for task velocity and audit logs.
 

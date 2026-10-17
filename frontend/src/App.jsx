@@ -11,6 +11,7 @@ import { ProjectSetupWizardModal } from "./features/projects/ProjectSetupWizardM
 import AuditReportsView from "./features/reports/AuditReportsView.jsx";
 import { CalendarView } from "./features/calendar/CalendarView.jsx";
 import { PlatformAdminView } from "./features/platform/PlatformAdminView.jsx";
+import { AcceptInvitationModal } from "./features/invitations/AcceptInvitationModal.jsx";
 import { AppShell } from "./layout/AppShell.jsx";
 import {
   api,
@@ -31,6 +32,13 @@ export default function App() {
   const [wizardOpen, setWizardOpen] = useState(false);
   const [notice, setNotice] = useState(null);
   const [switchingWorkspace, setSwitchingWorkspace] = useState(false);
+  const [inviteToken, setInviteToken] = useState(() => {
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search);
+      return params.get("token") || null;
+    }
+    return null;
+  });
 
   const showNotice = useCallback((newNotice) => {
     setNotice(newNotice);
@@ -350,6 +358,31 @@ export default function App() {
         }}
         onShowNotice={showNotice}
       />
+
+      {/* Member Invitation Acceptance Modal (TASK-505) */}
+      {inviteToken && (
+        <AcceptInvitationModal
+          token={inviteToken}
+          currentUser={user}
+          onClose={() => {
+            setInviteToken(null);
+            if (typeof window !== "undefined" && window.history?.replaceState) {
+              window.history.replaceState({}, document.title, window.location.pathname);
+            }
+          }}
+          onAccepted={async (newOrg) => {
+            setInviteToken(null);
+            if (typeof window !== "undefined" && window.history?.replaceState) {
+              window.history.replaceState({}, document.title, window.location.pathname);
+            }
+            if (newOrg?.id) {
+              await handleSwitchOrg(newOrg.id);
+            }
+            setSection("members");
+          }}
+          onShowNotice={showNotice}
+        />
+      )}
     </AppShell>
   );
 }

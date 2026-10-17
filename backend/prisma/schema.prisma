@@ -27,6 +27,7 @@ model Organization {
   notificationPreferences NotificationPreference[]
   platformAuditLogs PlatformAuditLog[]
   breakGlassAlerts BreakGlassAlertOutbox[]
+  invitations     MembershipInvitation[]
   createdAt       DateTime     @default(now())
   updatedAt       DateTime     @updatedAt
 }
@@ -53,6 +54,8 @@ model User {
   platformAuditLogs PlatformAuditLog[] @relation("PlatformOperator")
   breakGlassOutboxes BreakGlassAlertOutbox[] @relation("BreakGlassOperator")
   designatedBreakGlasses BreakGlassAlertOutbox[] @relation("BreakGlassDesignee")
+  invitationsSent        MembershipInvitation[]  @relation("InvitationInviter")
+  invitationsAccepted    MembershipInvitation[]  @relation("InvitationAcceptedBy")
   createdAt       DateTime         @default(now())
   updatedAt       DateTime         @updatedAt
 }
@@ -87,6 +90,7 @@ model Role {
   organization   Organization?    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   memberships    MembershipRole[]
   permissions    RolePermission[]
+  invitations    MembershipInvitation[]
 
   @@unique([organizationId, name])
   @@index([organizationId])
@@ -377,6 +381,33 @@ model PlatformMfaNonce {
   createdAt            DateTime  @default(now())
 
   @@index([nonce])
+  @@index([expiresAt])
+}
+
+model MembershipInvitation {
+  id             Int          @id @default(autoincrement())
+  organizationId Int
+  inviterId      Int
+  roleId         Int
+  email          String
+  department     String?
+  tokenHash      String       @unique
+  status         String       @default("PENDING")
+  expiresAt      DateTime
+  acceptedAt     DateTime?
+  acceptedById   Int?
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  inviter        User         @relation("InvitationInviter", fields: [inviterId], references: [id], onDelete: Cascade)
+  role           Role         @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  acceptedBy     User?        @relation("InvitationAcceptedBy", fields: [acceptedById], references: [id], onDelete: SetNull)
+
+  @@index([organizationId])
+  @@index([email])
+  @@index([status])
+  @@index([tokenHash])
   @@index([expiresAt])
 }
 
