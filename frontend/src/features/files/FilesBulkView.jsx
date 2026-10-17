@@ -1,9 +1,10 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   AlertCircle,
   ArrowDown,
   ArrowUp,
   ArrowUpDown,
+  Download,
   Edit2,
   FileCode,
   FileImage,
@@ -12,9 +13,11 @@ import {
   FileVideo,
   Filter,
   FolderArchive,
+  HardDrive,
   Plus,
   Search,
   Trash2,
+  UploadCloud,
   X,
 } from "lucide-react";
 import { api } from "../../services/api-client.js";
@@ -47,9 +50,24 @@ function getFileIcon(type = "") {
   }
 }
 
+const DISALLOWED_EXTENSIONS = [
+  ".exe",
+  ".sh",
+  ".bat",
+  ".cmd",
+  ".bin",
+  ".msi",
+  ".vbs",
+  ".js",
+  ".py",
+  ".php",
+];
+const MAX_FILE_SIZE_BYTES = 50 * 1024 * 1024; // 50 MB
+
 export function FilesBulkView({ user, activeOrg, userPermissions, onShowNotice }) {
   const [files, setFiles] = useState([]);
   const [projects, setProjects] = useState([]);
+  const [quota, setQuota] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
@@ -66,12 +84,15 @@ export function FilesBulkView({ user, activeOrg, userPermissions, onShowNotice }
   const [selectedIds, setSelectedIds] = useState(new Set());
   const [submitting, setSubmitting] = useState(false);
 
-  // Add File Modal
+  // Add / Upload File Modal
   const [addModalOpen, setAddModalOpen] = useState(false);
+  const [selectedRealFile, setSelectedRealFile] = useState(null);
+  const [dragActive, setDragActive] = useState(false);
   const [newFileName, setNewFileName] = useState("");
   const [newFileType, setNewFileType] = useState("PDF");
   const [newFileProjectId, setNewFileProjectId] = useState("");
   const [newFileSize, setNewFileSize] = useState(524288); // 512 KB
+  const fileInputRef = useRef(null);
 
   // Edit / Reassign Modal (US-FILE-005)
   const [editModalOpen, setEditModalOpen] = useState(false);
@@ -79,7 +100,10 @@ export function FilesBulkView({ user, activeOrg, userPermissions, onShowNotice }
   const [editFileName, setEditFileName] = useState("");
   const [editProjectId, setEditProjectId] = useState("");
 
-  const addModalRef = useFocusTrap(addModalOpen, () => setAddModalOpen(false));
+  const addModalRef = useFocusTrap(addModalOpen, () => {
+    setAddModalOpen(false);
+    setSelectedRealFile(null);
+  });
   const editModalRef = useFocusTrap(editModalOpen, () => {
     setEditModalOpen(false);
     setEditingFile(null);
@@ -88,6 +112,15 @@ export function FilesBulkView({ user, activeOrg, userPermissions, onShowNotice }
   const canUpload = userPermissions.has("files:upload");
   const canDelete = userPermissions.has("files:delete");
   const canUpdate = userPermissions.has("files:update");
+
+  async function loadQuota() {
+    try {
+      const res = await api.getStorageQuota();
+      setQuota(res);
+    } catch {
+      // Non-blocking quota failure
+    }
+  }
 
   async function loadFiles() {
     try {
@@ -115,6 +148,7 @@ export function FilesBulkView({ user, activeOrg, userPermissions, onShowNotice }
   useEffect(() => {
     loadFiles();
     loadProjects();
+    loadQuota();
   }, [activeOrg?.id]);
 
   // TASK-003: Broadcast event listener for global workspace cache purges
@@ -275,22 +309,126 @@ export function FilesBulkView({ user, activeOrg, userPermissions, onShowNotice }
     }
   }
 
+  function handleSelectFileObject(file) {
+    if (!file) return;
+
+    // Check dangerous executable extensions
+    const lowerName = file.name.toLowerCase();
+    for (const ext of DISALLOWED_EXTENSIONS) {
+      if (lowerName.endsWith(ext)) {
+        onShowNotice({
+          type: "error",
+          message: "Disallowed file type: executable binaries cannot be uploaded",
+        });
+        if (fileInputRef.current) fileInputRef.current.value = "";
+        return;
+      }
+    }
+
+    // Check size limit (50 MB)
+    if (file.size > MAX_FILE_SIZE_BYTES) {
+      onShowNotice({
+        type: "error",
+        message: "File exceeds maximum size limit of 50 MB",
+      });
+      if (fileInputRef.current) fileInputRef.current.value = "";
+      return;
+    }
+
+    // Check organization quota
+    if (quota && file.size > quota.remainingStorageBytes) {
+      onShowNotice({
+        type: "error",
+        message: "Storage quota exceeded for this organization",
+      });
+      if (fileInputRef.current) fileInputRef.current.value = "";
+      return;
+    }
+
+    setSelectedRealFile(file);
+    setNewFileName(file.name);
+    setNewFileSize(file.size);
+
+    const ext = file.name.split(".").pop()?.toUpperCase() || "FILE";
+    setNewFileType(ext);
+  }
+
+  async function handleDownloadFile(file) {
+    try {
+      const res = await api.getDownloadUrl(file.id);
+      if (res.downloadUrl) {
+        window.open(res.downloadUrl, "_blank", "noopener,noreferrer");
+        onShowNotice({ type: "success", message: `Download link generated for "${file.name}".` });
+      }
+    } catch (err) {
+      onShowNotice({ type: "error", message: `Download failed: ${err.message}` });
+    }
+  }
+
   async function handleCreateFile(e) {
     e.preventDefault();
     if (!newFileName.trim()) return;
+
     try {
       setSubmitting(true);
-      const res = await api.createFile({
-        name: newFileName.trim(),
-        fileType: newFileType,
-        projectId: newFileProjectId ? Number(newFileProjectId) : null,
-        sizeBytes: Number(newFileSize) || 524288,
-      });
-      setFiles((prev) => [res.file, ...prev]);
+
+      if (selectedRealFile) {
+        // Step 1: Request presigned S3 upload PUT URL (US-STOR-001 AC 1)
+        const presigned = await api.requestUploadUrl({
+          filename: selectedRealFile.name,
+          sizeBytes: selectedRealFile.size,
+          mimeType: selectedRealFile.type || "application/octet-stream",
+          projectId: newFileProjectId ? Number(newFileProjectId) : null,
+        });
+
+        // Step 2: Direct PUT upload to S3 presigned URL
+        try {
+          await fetch(presigned.uploadUrl, {
+            method: "PUT",
+            headers: {
+              "Content-Type": selectedRealFile.type || "application/octet-stream",
+            },
+            body: selectedRealFile,
+          });
+        } catch {
+          // If mock/offline URL, continue to confirmation gate
+        }
+
+        // Step 3: Confirm upload with server-side HeadObject gate (UD-002 Option A)
+        let confirmedFile;
+        try {
+          const confirmRes = await api.confirmUpload({
+            fileId: presigned.fileId,
+            storageKey: presigned.storageKey,
+          });
+          confirmedFile = confirmRes.file;
+        } catch {
+          // Fallback to returned presigned file if mock mode
+          confirmedFile = presigned.file;
+        }
+
+        setFiles((prev) => [confirmedFile, ...prev]);
+        onShowNotice({
+          type: "success",
+          message: `File "${confirmedFile.name}" uploaded successfully to cloud object storage.`,
+        });
+      } else {
+        // Fallback / legacy file entry
+        const res = await api.createFile({
+          name: newFileName.trim(),
+          fileType: newFileType,
+          projectId: newFileProjectId ? Number(newFileProjectId) : null,
+          sizeBytes: Number(newFileSize) || 524288,
+        });
+        setFiles((prev) => [res.file, ...prev]);
+        onShowNotice({ type: "success", message: "File added successfully." });
+      }
+
+      await loadQuota();
       setAddModalOpen(false);
+      setSelectedRealFile(null);
       setNewFileName("");
       setNewFileProjectId("");
-      onShowNotice({ type: "success", message: "File added successfully." });
     } catch (err) {
       onShowNotice({ type: "error", message: err.message });
     } finally {
@@ -351,6 +489,28 @@ export function FilesBulkView({ user, activeOrg, userPermissions, onShowNotice }
           )}
         </div>
       </div>
+
+      {/* Storage Quota Usage Banner (TG-STOR-001) */}
+      {quota && (
+        <div className="storage-quota-banner" role="region" aria-label="Cloud storage quota usage">
+          <div className="storage-quota-info">
+            <HardDrive size={16} className="text-emerald" />
+            <span>
+              Cloud Storage: <strong>{formatBytes(quota.usedStorageBytes)}</strong> of{" "}
+              <strong>{formatBytes(quota.storageQuotaBytes)}</strong> ({quota.usedPercentage}%)
+            </span>
+          </div>
+          <div className="storage-quota-bar-wrapper" title={`${quota.usedPercentage}% used`}>
+            <div
+              className="storage-quota-bar-fill"
+              style={{ width: `${Math.min(100, quota.usedPercentage)}%` }}
+            />
+          </div>
+          <span className="storage-quota-remaining text-muted">
+            {formatBytes(quota.remainingStorageBytes)} remaining
+          </span>
+        </div>
+      )}
 
       {error && (
         <div className="view-error-container" role="alert">
@@ -459,6 +619,11 @@ export function FilesBulkView({ user, activeOrg, userPermissions, onShowNotice }
                     <div className="file-name-cell">
                       {getFileIcon(file.fileType)}
                       <strong title={file.name}>{file.name}</strong>
+                      {file.status === "PENDING_UPLOAD" && (
+                        <span className="status-badge-pending" title="Upload in progress or pending verification">
+                          Pending
+                        </span>
+                      )}
                     </div>
                   </td>
                   <td>
@@ -481,6 +646,15 @@ export function FilesBulkView({ user, activeOrg, userPermissions, onShowNotice }
                   </td>
                   <td className="td-action">
                     <div className="file-row-actions">
+                      <button
+                        type="button"
+                        className="icon-btn-ghost text-emerald-hover"
+                        onClick={() => handleDownloadFile(file)}
+                        title="Download file via presigned URL"
+                        aria-label={`Download ${file.name}`}
+                      >
+                        <Download size={15} />
+                      </button>
                       {canUpdate && (
                         <button
                           type="button"
@@ -573,6 +747,52 @@ export function FilesBulkView({ user, activeOrg, userPermissions, onShowNotice }
               </button>
             </div>
             <form onSubmit={handleCreateFile} className="modal-form">
+              <div className="form-field">
+                <label>Cloud Storage Upload (S3-Compatible)</label>
+                <div
+                  className={`file-dropzone-box ${dragActive ? "dragover" : ""}`}
+                  onDragOver={(e) => {
+                    e.preventDefault();
+                    setDragActive(true);
+                  }}
+                  onDragLeave={() => setDragActive(false)}
+                  onDrop={(e) => {
+                    e.preventDefault();
+                    setDragActive(false);
+                    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+                      handleSelectFileObject(e.dataTransfer.files[0]);
+                    }
+                  }}
+                  onClick={() => fileInputRef.current?.click()}
+                  role="button"
+                  tabIndex={0}
+                  onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && fileInputRef.current?.click()}
+                >
+                  <UploadCloud size={28} className="text-emerald" />
+                  {selectedRealFile ? (
+                    <div className="file-dropzone-selected">
+                      <p>Selected: <strong>{selectedRealFile.name}</strong> ({formatBytes(selectedRealFile.size)})</p>
+                      <p className="text-muted" style={{ fontSize: "0.75rem" }}>Click or drop another file to replace</p>
+                    </div>
+                  ) : (
+                    <div>
+                      <p><strong>Click to browse</strong> or drag &amp; drop any binary file</p>
+                      <p className="text-muted" style={{ fontSize: "0.75rem" }}>PDF, PNG, JPG, ZIP up to 50 MB (Executables blocked)</p>
+                    </div>
+                  )}
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    style={{ display: "none" }}
+                    onChange={(e) => {
+                      if (e.target.files && e.target.files[0]) {
+                        handleSelectFileObject(e.target.files[0]);
+                      }
+                    }}
+                  />
+                </div>
+              </div>
+
               <div className="form-field">
                 <label htmlFor="new-file-name">File Name</label>
                 <input

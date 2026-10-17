@@ -13,6 +13,8 @@ model Organization {
   isSuspended     Boolean      @default(false)
   suspendedAt     DateTime?
   suspensionReason String?
+  storageQuotaBytes BigInt       @default(10737418240)
+  usedStorageBytes  BigInt       @default(0)
   memberships Membership[]
   roles       Role[]
   projects    Project[]
@@ -221,6 +223,12 @@ model FileAsset {
   name           String
   sizeBytes      Int          @default(0)
   fileType       String       @default("FILE")
+  storageKey     String?
+  mimeType       String?
+  status         String       @default("READY")
+  etag           String?
+  checksumSha256 String?
+  confirmedAt    DateTime?
   url            String?
   uploadedById   Int
   createdAt      DateTime     @default(now())
@@ -231,6 +239,8 @@ model FileAsset {
 
   @@index([organizationId])
   @@index([projectId])
+  @@index([storageKey])
+  @@index([status])
 }
 
 model AuditLog {

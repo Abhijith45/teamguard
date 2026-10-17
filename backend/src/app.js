@@ -112,12 +112,18 @@ app.get(["/health", "/api/health"], async (_req, res) => {
 app.use("/api/auth", authRateLimiter, authRoutes);
 app.use("/api/v1/auth", authRateLimiter, authRoutes);
 
+// Handle BigInt JSON serialization cleanly across Express
+BigInt.prototype.toJSON = function () {
+  return Number(this);
+};
+
 app.use("/api/organizations", organizationsRoutes);
 app.use("/api/members", membersRoutes);
 app.use("/api/dashboard", dashboardRoutes);
 app.use("/api/projects", projectsRoutes);
 app.use("/api/tasks", tasksRoutes);
 app.use("/api/files", filesRoutes);
+app.use("/api/v1/files", filesRoutes);
 app.use("/api/permissions-matrix", permissionsMatrixRoutes);
 app.use("/api/roles", rolesRoutes);
 app.use("/api/admin", adminRoutes);

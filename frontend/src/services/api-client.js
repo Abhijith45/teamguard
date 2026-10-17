@@ -351,6 +351,10 @@ export const api = {
   bulkDeleteFiles: (fileIds) => request("/files/bulk-delete", { method: "POST", body: { fileIds } }),
   bulkDuplicateFiles: (fileIds) => request("/files/bulk-duplicate", { method: "POST", body: { fileIds } }),
   deleteFile: (id) => request(`/files/${id}`, { method: "DELETE" }),
+  requestUploadUrl: (body) => request("/files/upload-url", { method: "POST", body }),
+  confirmUpload: (body) => request("/files/confirm", { method: "POST", body }),
+  getDownloadUrl: (id) => request(`/files/${id}/download-url`),
+  getStorageQuota: () => request("/files/quota"),
 
   // Roles & Custom Templates (TASK-103)
   getRoles: () => request("/roles"),
