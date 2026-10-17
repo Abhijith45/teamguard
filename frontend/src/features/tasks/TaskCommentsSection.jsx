@@ -22,6 +22,7 @@ import {
   formatRelativeTime,
   getRemainingEditMinutes,
 } from "./commentUtils.js";
+import { RichTextViewer } from "../../components/RichTextViewer.jsx";
 
 /**
  * TaskCommentsSection Component
@@ -391,7 +392,7 @@ export function TaskCommentsSection({
                     </div>
                   ) : (
                     <div className="comment-text-content">
-                      <p className="comment-body-text">{comment.content}</p>
+                      <RichTextViewer content={comment.content} placeholder="Empty comment" />
                     </div>
                   )}
 

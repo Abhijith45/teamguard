@@ -87,7 +87,7 @@ app.use(
   })
 );
 
-app.use(express.json({ limit: "64kb" }));
+app.use(express.json({ limit: "1mb" }));
 app.use(cookieParser());
 
 // 3. Database Connectivity Health Check (TASK-004 / OPS-06)

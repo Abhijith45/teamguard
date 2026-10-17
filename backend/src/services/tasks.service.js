@@ -1,6 +1,7 @@
 import { prisma } from "../../config/prisma.js";
 import { logAuditEvent } from "./audit.service.js";
 import { dispatchWorkspaceEvent } from "./event-dispatcher.service.js";
+import { sanitizeRichTextContent, validateDescriptionSize } from "../utils/sanitize.js";
 
 /**
  * Tasks Service (TASK-203 — Task Core CRUD, Validation, Status Workflow & Priority Engine)
@@ -412,12 +413,22 @@ export async function createTaskService({ organizationId, actorId, input, permis
   const normalizedPriority = normalizeTaskPriority(input.priority);
   const completedAt = normalizedStatus === "DONE" ? new Date() : null;
 
+  let sanitizedDesc = "";
+  if (input.description !== undefined && input.description !== null) {
+    if (!validateDescriptionSize(input.description)) {
+      const err = new Error("Description exceeds maximum allowed size of 64KB");
+      err.statusCode = 400;
+      throw err;
+    }
+    sanitizedDesc = sanitizeRichTextContent(input.description);
+  }
+
   const task = await prisma.task.create({
     data: {
       organizationId,
       projectId: input.projectId,
       title: input.title,
-      description: input.description ?? "",
+      description: sanitizedDesc,
       status: normalizedStatus,
       priority: normalizedPriority,
       assigneeId: input.assigneeId ?? null,
@@ -545,7 +556,18 @@ export async function updateTaskService({
 
   const updateData = {};
   if (input.title !== undefined) updateData.title = input.title;
-  if (input.description !== undefined) updateData.description = input.description;
+  if (input.description !== undefined) {
+    if (input.description === null) {
+      updateData.description = "";
+    } else {
+      if (!validateDescriptionSize(input.description)) {
+        const err = new Error("Description exceeds maximum allowed size of 64KB");
+        err.statusCode = 400;
+        throw err;
+      }
+      updateData.description = sanitizeRichTextContent(input.description);
+    }
+  }
   if (input.priority !== undefined) updateData.priority = normalizeTaskPriority(input.priority);
   if (input.assigneeId !== undefined) updateData.assigneeId = input.assigneeId;
   if (input.projectId !== undefined) updateData.projectId = input.projectId;

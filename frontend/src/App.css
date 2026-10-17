@@ -9566,4 +9566,326 @@ input:checked + .slider:before {
   100% { transform: scale(0.95); opacity: 0.8; }
 }
 
+/* ==========================================================================
+   TASK-504: TipTap / ProseMirror Rich Text WYSIWYG Editor & Viewer
+   ========================================================================== */
+
+.rich-text-editor-container {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background-color: var(--color-surface);
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+  overflow: hidden;
+}
+
+.rich-text-editor-container:focus-within {
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px rgba(10, 92, 54, 0.12);
+}
+
+.rich-text-editor-container.disabled {
+  background-color: #f8fafc;
+  border-color: var(--color-border-subtle);
+  cursor: not-allowed;
+}
+
+.rich-text-editor-container.over-limit {
+  border-color: var(--color-urgent);
+  box-shadow: 0 0 0 3px rgba(185, 28, 28, 0.12);
+}
+
+/* RTE Toolbar */
+.rte-toolbar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding: 6px 10px;
+  background-color: #f8fafc;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.rte-btn-group {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.rte-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border-radius: 4px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  transition: all 0.12s ease;
+}
+
+.rte-btn:hover:not(:disabled) {
+  background: #e2e8f0;
+  color: var(--color-text-main);
+}
+
+.rte-btn.is-active {
+  background: var(--color-primary-light);
+  color: var(--color-primary);
+  border-color: var(--color-primary-border);
+  font-weight: 600;
+}
+
+.rte-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.rte-divider {
+  width: 1px;
+  height: 18px;
+  background-color: var(--color-border);
+  margin: 0 4px;
+}
+
+.rte-toolbar-spacer {
+  flex: 1;
+}
+
+.rte-byte-badge {
+  font-size: 0.72rem;
+  font-family: var(--font-mono);
+  font-weight: 500;
+  padding: 2px 8px;
+  border-radius: 12px;
+  background: #f1f5f9;
+  color: var(--color-text-subtle);
+  border: 1px solid var(--color-border);
+  white-space: nowrap;
+}
+
+.rte-byte-badge.warning {
+  background: #fffbeb;
+  color: #b45309;
+  border-color: #fde68a;
+}
+
+.rte-byte-badge.danger {
+  background: #fef2f2;
+  color: #dc2626;
+  border-color: #fecaca;
+  font-weight: 600;
+}
+
+/* Link Popover Dialog */
+.rte-link-popover {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  background: #ffffff;
+  border-bottom: 1px solid var(--color-border);
+  animation: slide-down 0.15s ease-out;
+}
+
+.rte-link-input {
+  flex: 1;
+  font-size: 0.85rem;
+  padding: 5px 10px;
+  border: 1px solid var(--color-border);
+  border-radius: 4px;
+  outline: none;
+}
+
+.rte-link-input:focus {
+  border-color: var(--color-primary);
+}
+
+.rte-link-apply-btn,
+.rte-link-cancel-btn {
+  font-size: 0.78rem;
+  padding: 5px 10px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-weight: 500;
+}
+
+.rte-link-apply-btn {
+  background: var(--color-primary);
+  color: #ffffff;
+  border: none;
+}
+
+.rte-link-cancel-btn {
+  background: #f1f5f9;
+  color: var(--color-text-muted);
+  border: 1px solid var(--color-border);
+}
+
+/* Content Area */
+.rte-content-wrapper {
+  padding: 10px 14px;
+  font-size: 0.9rem;
+  line-height: 1.6;
+  color: var(--color-text-main);
+  overflow-y: auto;
+}
+
+.rte-content-wrapper .tiptap {
+  outline: none;
+  min-height: inherit;
+}
+
+.rte-content-wrapper .tiptap p.is-editor-empty:first-child::before {
+  color: var(--color-text-subtle);
+  content: attr(data-placeholder);
+  float: left;
+  height: 0;
+  pointer-events: none;
+}
+
+/* Shared Typography for TipTap Editor Content & RichTextViewer */
+.rte-content-wrapper .tiptap,
+.rich-text-viewer {
+  font-family: var(--font-sans);
+  color: var(--color-text-main);
+  line-height: 1.65;
+  text-wrap: pretty;
+  word-break: break-word;
+}
+
+.rte-content-wrapper .tiptap h1,
+.rich-text-viewer h1 {
+  font-size: 1.35rem;
+  font-weight: 700;
+  margin-top: 1rem;
+  margin-bottom: 0.5rem;
+  color: #0f172a;
+}
+
+.rte-content-wrapper .tiptap h2,
+.rich-text-viewer h2 {
+  font-size: 1.15rem;
+  font-weight: 600;
+  margin-top: 0.85rem;
+  margin-bottom: 0.4rem;
+  color: #1e293b;
+}
+
+.rte-content-wrapper .tiptap h3,
+.rich-text-viewer h3 {
+  font-size: 1.02rem;
+  font-weight: 600;
+  margin-top: 0.7rem;
+  margin-bottom: 0.35rem;
+  color: #334155;
+}
+
+.rte-content-wrapper .tiptap p,
+.rich-text-viewer p {
+  margin-bottom: 0.6rem;
+}
+
+.rte-content-wrapper .tiptap p:last-child,
+.rich-text-viewer p:last-child {
+  margin-bottom: 0;
+}
+
+.rte-content-wrapper .tiptap ul,
+.rich-text-viewer ul {
+  list-style-type: disc;
+  margin-left: 1.4rem;
+  margin-bottom: 0.6rem;
+}
+
+.rte-content-wrapper .tiptap ol,
+.rich-text-viewer ol {
+  list-style-type: decimal;
+  margin-left: 1.4rem;
+  margin-bottom: 0.6rem;
+}
+
+.rte-content-wrapper .tiptap li,
+.rich-text-viewer li {
+  margin-bottom: 0.25rem;
+}
+
+.rte-content-wrapper .tiptap blockquote,
+.rich-text-viewer blockquote {
+  border-left: 3px solid var(--color-primary);
+  padding: 4px 12px;
+  margin: 0.6rem 0;
+  background: #f8fafc;
+  color: var(--color-text-muted);
+  border-radius: 0 4px 4px 0;
+  font-style: italic;
+}
+
+.rte-content-wrapper .tiptap code,
+.rich-text-viewer code {
+  font-family: var(--font-mono);
+  font-size: 0.82rem;
+  background: #f1f5f9;
+  color: #0f172a;
+  padding: 2px 6px;
+  border-radius: 4px;
+  border: 1px solid var(--color-border);
+}
+
+.rte-content-wrapper .tiptap pre,
+.rich-text-viewer pre {
+  background: #0f172a;
+  color: #f8fafc;
+  padding: 10px 14px;
+  border-radius: 6px;
+  margin: 0.6rem 0;
+  overflow-x: auto;
+}
+
+.rte-content-wrapper .tiptap pre code,
+.rich-text-viewer pre code {
+  background: transparent;
+  color: inherit;
+  border: none;
+  padding: 0;
+  font-size: 0.82rem;
+}
+
+.rte-content-wrapper .tiptap a,
+.rich-text-viewer a {
+  color: var(--color-primary);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  font-weight: 500;
+  transition: color 0.12s ease;
+}
+
+.rte-content-wrapper .tiptap a:hover,
+.rich-text-viewer a:hover {
+  color: var(--color-primary-hover);
+}
+
+.rich-text-viewer.empty {
+  color: var(--color-text-subtle);
+  font-style: italic;
+  font-size: 0.88rem;
+}
+
+/* Error Banner */
+.rte-error-banner {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  background: var(--color-urgent-bg);
+  border-top: 1px solid var(--color-urgent-border);
+  color: var(--color-urgent);
+  font-size: 0.78rem;
+  font-weight: 500;
+}
+
 
