@@ -174,6 +174,9 @@ export async function listTasksService({ organizationId, query = {} }) {
     order,
     page,
     limit,
+    dueFrom,
+    dueTo,
+    hasDueDate,
   } = query;
 
   const where = {
@@ -198,6 +201,24 @@ export async function listTasksService({ organizationId, query = {} }) {
     if (TASK_PRIORITIES.includes(normalizedPriority)) {
       where.priority = normalizedPriority;
     }
+  }
+
+  if (dueFrom || dueTo) {
+    where.dueDate = {};
+    if (dueFrom) {
+      const fromDate = new Date(dueFrom);
+      if (!isNaN(fromDate.getTime())) {
+        where.dueDate.gte = fromDate;
+      }
+    }
+    if (dueTo) {
+      const toDate = new Date(dueTo);
+      if (!isNaN(toDate.getTime())) {
+        where.dueDate.lte = toDate;
+      }
+    }
+  } else if (hasDueDate === "true" || hasDueDate === true) {
+    where.dueDate = { not: null };
   }
 
   if (assigneeId !== undefined && assigneeId !== null && assigneeId !== "") {

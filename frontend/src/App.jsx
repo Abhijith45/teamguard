@@ -9,6 +9,7 @@ import { MembersView } from "./features/members/MembersView.jsx";
 import { TeamPermissionsMatrixView } from "./features/permissions/TeamPermissionsMatrixView.jsx";
 import { ProjectSetupWizardModal } from "./features/projects/ProjectSetupWizardModal.jsx";
 import AuditReportsView from "./features/reports/AuditReportsView.jsx";
+import { CalendarView } from "./features/calendar/CalendarView.jsx";
 import { AppShell } from "./layout/AppShell.jsx";
 import {
   api,
@@ -299,16 +300,22 @@ export default function App() {
         />
       )}
 
-      {["calendar", "support"].includes(section) && (
+      {section === "calendar" && (
+        <CalendarView
+          key={`calendar-${activeOrg?.id}`}
+          user={user}
+          activeOrg={activeOrg}
+          userPermissions={userPermissions}
+          projects={projects}
+          onShowNotice={showNotice}
+          onNavigateTasks={() => setSection("tasks")}
+        />
+      )}
+
+      {section === "support" && (
         <div className="section-placeholder-card">
-          <h3>
-            {section === "calendar" && "Workspace Calendar"}
-            {section === "support" && "TeamGuard Documentation & Policies"}
-          </h3>
-          <p>
-            {section === "calendar" && "Release schedules and milestone sync dates for active projects."}
-            {section === "support" && "Help desk, role guides, and multi-tenant security architecture documentation."}
-          </p>
+          <h3>TeamGuard Documentation & Policies</h3>
+          <p>Help desk, role guides, and multi-tenant security architecture documentation.</p>
           <button type="button" className="btn-primary-emerald" onClick={() => setSection("dashboard")}>
             Return to Dashboard
           </button>

@@ -370,7 +370,15 @@ export function SubtaskChecklist({
 
       {/* Add New Item Form */}
       {canEdit && !isArchived ? (
-        <form onSubmit={handleAddSubtask} className="subtask-add-form">
+        <div
+          className="subtask-add-form"
+          onKeyDown={(e) => {
+            if (e.key === "Enter") {
+              e.preventDefault();
+              handleAddSubtask(e);
+            }
+          }}
+        >
           <div className="subtask-add-input-wrapper">
             <input
               type="text"
@@ -386,8 +394,9 @@ export function SubtaskChecklist({
             )}
           </div>
           <button
-            type="submit"
+            type="button"
             className="btn-subtask-add"
+            onClick={handleAddSubtask}
             disabled={adding || !newTitle.trim()}
           >
             {adding ? (
@@ -399,7 +408,7 @@ export function SubtaskChecklist({
               </>
             )}
           </button>
-        </form>
+        </div>
       ) : (
         <div className="subtask-locked-notice">
           <Lock size={12} />

@@ -683,8 +683,8 @@ Work is sequenced strictly by technical dependencies, security invariants, and r
 - **Linked User Stories**: `US-CAL-001`, `US-CAL-002`
 - **Linked PRD Features**: `TG-CAL-001`, `TG-CAL-002`
 - **Priority**: Medium (P2)
-- **Status**: Implementation Required
-- **Affected Files**: `frontend/src/views/CalendarView.jsx`
+- **Status**: Completed
+- **Affected Files**: `frontend/src/features/calendar/CalendarView.jsx`, `frontend/src/features/calendar/calendarUtils.js`, `frontend/src/features/calendar/calendarUtils.test.js`, `frontend/src/App.jsx`, `frontend/src/App.css`, `backend/src/services/tasks.service.js`, `backend/test/tasks.test.js`
 - **Implementation Steps**:
   1. Build month grid layout rendering 7 columns (Mon–Sun).
   2. Map tasks to calendar day cells based on `dueDate`.
@@ -1118,7 +1118,7 @@ Activated only after stakeholder decisions UD-001 through UD-005 are formally ra
 | **File Management** | 5 | 5 | 1 Verified, 3 Partial, 1 Planned | `TASK-405` |
 | **Storage Engine** | 1 | 1 | 1 Blocked (UD-002) | `TASK-502 (Blocked)` |
 | **Dashboard & Metrics** | 6 | 6 | 6 Verified | `TASK-403` |
-| **Calendar & Timeline** | 2 | 2 | 2 Planned | `TASK-402` |
+| **Calendar & Timeline** | 2 | 2 | 2 Verified | `TASK-402` |
 | **Notifications** | 3 | 3 | 3 Planned | `TASK-304`, `TASK-403` |
 | **Command Palette** | 2 | 2 | 2 Verified | `TASK-401` |
 | **Accessibility (WCAG AA)** | 3 | 3 | 1 Verified, 2 Partially Implemented | `TASK-404` |
@@ -1126,7 +1126,7 @@ Activated only after stakeholder decisions UD-001 through UD-005 are formally ra
 | **Reporting & Analytics** | 1 | 1 | 1 Blocked (Reporting Scope) | `TASK-507 (Blocked)` |
 | **Developer Tooling** | 1 | 1 | 1 Verified | `TASK-006` |
 | **State Synchronization** | 2 | 1 | 2 Blocked (UD-003) | `TASK-503 (Blocked)` |
-| **TOTALS RECONCILED** | **79 Stories** | **60 Features** | **37 Verified, 5 Partial, 26 Planned, 11 Blocked** | **35 Tasks across 7 Phases (32 Story-Linked + 3 Operational)** |
+| **TOTALS RECONCILED** | **79 Stories** | **60 Features** | **39 Verified, 5 Partial, 24 Planned, 11 Blocked** | **35 Tasks across 7 Phases (32 Story-Linked + 3 Operational)** |
 
 ---
 

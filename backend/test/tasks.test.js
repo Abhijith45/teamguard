@@ -936,3 +936,39 @@ test("TASK-206: Task Search, Filtering, Sorting & Pagination Engine", async (t) 
   });
 });
 
+test("TASK-402 [US-CAL-001]: Release Calendar Date Range Query Filters (dueFrom / dueTo / hasDueDate)", async (t) => {
+  const superAdmin = await getAuthSession("super-admin", "acme-corp");
+
+  await t.test("REQ 1 [US-CAL-001]: Filter tasks with hasDueDate=true excludes unscheduled tasks", async () => {
+    const res = await api("/api/tasks?hasDueDate=true", {
+      headers: {
+        Authorization: `Bearer ${superAdmin.token}`,
+        "x-organization-id": String(superAdmin.orgId),
+      },
+    });
+    assert.equal(res.status, 200);
+    assert.ok(Array.isArray(res.data.tasks));
+    for (const task of res.data.tasks) {
+      assert.ok(task.dueDate !== null && task.dueDate !== undefined, "Every returned task must have a non-null dueDate");
+    }
+  });
+
+  await t.test("REQ 2 [US-CAL-001]: Filter tasks within bounded date range (dueFrom & dueTo)", async () => {
+    const fromStr = "2026-01-01T00:00:00.000Z";
+    const toStr = "2027-12-31T23:59:59.999Z";
+    const res = await api(`/api/tasks?dueFrom=${encodeURIComponent(fromStr)}&dueTo=${encodeURIComponent(toStr)}`, {
+      headers: {
+        Authorization: `Bearer ${superAdmin.token}`,
+        "x-organization-id": String(superAdmin.orgId),
+      },
+    });
+    assert.equal(res.status, 200);
+    for (const task of res.data.tasks) {
+      const taskDue = new Date(task.dueDate).getTime();
+      assert.ok(taskDue >= new Date(fromStr).getTime(), "Task dueDate must be >= dueFrom");
+      assert.ok(taskDue <= new Date(toStr).getTime(), "Task dueDate must be <= dueTo");
+    }
+  });
+});
+
+
