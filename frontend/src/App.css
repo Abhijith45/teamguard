@@ -9504,3 +9504,66 @@ input:checked + .slider:before {
   font-weight: 500;
 }
 
+/* Real-Time SSE Stream State Badge (TASK-503 / UD-003) */
+.live-sync-indicator {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 11px;
+  border-radius: 9999px;
+  font-size: 0.73rem;
+  font-weight: 600;
+  border: 1px solid transparent;
+  transition: all 0.2s ease;
+  user-select: none;
+}
+
+.live-sync-indicator.connected {
+  background: #ecfdf5;
+  color: #065f46;
+  border-color: #a7f3d0;
+}
+
+.live-sync-indicator.connecting,
+.live-sync-indicator.reconnecting {
+  background: #fffbeb;
+  color: #92400e;
+  border-color: #fde68a;
+}
+
+.live-sync-indicator.disconnected {
+  background: #f1f5f9;
+  color: #64748b;
+  border-color: #e2e8f0;
+}
+
+.live-sync-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  display: inline-block;
+}
+
+.live-sync-indicator.connected .live-sync-dot {
+  background: #10b981;
+  box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.25);
+  animation: pulse-dot 2s infinite ease-in-out;
+}
+
+.live-sync-indicator.connecting .live-sync-dot,
+.live-sync-indicator.reconnecting .live-sync-dot {
+  background: #f59e0b;
+  animation: pulse-dot 1s infinite ease-in-out;
+}
+
+.live-sync-indicator.disconnected .live-sync-dot {
+  background: #94a3b8;
+}
+
+@keyframes pulse-dot {
+  0% { transform: scale(0.95); opacity: 0.8; }
+  50% { transform: scale(1.2); opacity: 1; }
+  100% { transform: scale(0.95); opacity: 0.8; }
+}
+
+

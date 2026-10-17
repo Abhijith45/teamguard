@@ -47,7 +47,7 @@ In strict adherence to TeamGuard document governance:
 | :--- | :--- | :---: | :--- | :--- | :--- | :--- | :--- | :--- |
 | **UD-001** | Platform Administration & Break-Glass Recovery | `ACCEPTED_RATIFIED` | Principal Architect | Product Steering & Security Lead | `US-PLAT-001`, `US-PLAT-002` | `TG-PLAT-001` | Option B: Unified App with Operator Context & MFA Step-Up | Internal admin flag; TOTP MFA step-up; ITSM ticket validation; 60m session limit. Ratified in TASK-501. |
 | **UD-002** | Cloud Binary Object Storage Provider | `ACCEPTED_RATIFIED` | Principal Architect | Product Steering & Security Lead | `US-STOR-001` | `TG-FILE-005`, `TG-STOR-001` | Option A: S3-Compatible Storage via Presigned URLs | S3-compatible cloud storage; 15m PUT / 5m GET presigned URLs; server-side `HeadObject` gate; tenant prefix isolation. Ratified in TASK-502. |
-| **UD-003** | Real-Time Transport & State Synchronization | `PROPOSED_RECOMMENDATION` | Principal Architect | Product Steering & Lead Frontend | `US-SYNC-001`, `US-SYNC-002` | `TG-SYNC-001` | Option B: SSE via Authenticated Fetch Streaming Client | `@microsoft/fetch-event-source` client with headers; `AbortController` cancellation; smart polling fallback. |
+| **UD-003** | Real-Time Transport & State Synchronization | `ACCEPTED_RATIFIED` | Principal Architect | Product Steering & Lead Frontend | `US-SYNC-001`, `US-SYNC-002` | `TG-SYNC-001` | Option B: SSE via Authenticated Fetch Streaming Client | SSE via authenticated fetch streaming client (`ReadableStream`); `Last-Event-ID` cursor replay buffer; heartbeat pings; zero cross-tenant leakage. Ratified in TASK-503. |
 | **UD-004** | Rich Text Description & Comment Editor | `PROPOSED_RECOMMENDATION` | Principal Architect | Product Steering & UX Lead | `US-COLLAB-004` | `TG-EDT-001` | Option A: TipTap / ProseMirror with DOMPurify | JSON ProseMirror document schema; server-side DOMPurify HTML sanitization; CSP compliance. |
 | **UD-005** | Member Invitation Delivery Mechanism | `PROPOSED_RECOMMENDATION` | Principal Architect | Product Steering & Security Lead | `US-INV-001`, `US-INV-002`, `US-INV-003` | `TG-INV-001` | Option B: Resend Transactional Email API + Token Fallback | Resend transactional email API; 7-day token expiration; strict recipient email matching. |
 | **DP-TASK-001** | Task Creator vs. Assignee Policy Bifurcation | `PROPOSED_RECOMMENDATION` | Principal Architect | Product Steering Committee | `US-ABAC-004` | `TG-ABAC-001` | Option B: Discrete Bifurcation (`task:update:own` vs. `assigned`) | Discrete permissions; ABAC ownership check evaluates creator vs assignee status. |
@@ -205,13 +205,14 @@ In multi-user collaborative environments, team members moving cards on Kanban bo
 #### 4. Architecture & Security Evaluation
 - **Security Impact**: Under Option B, the SSE connection requires standard JWT authentication and explicit `x-organization-id` header validation during handshake via the fetch streaming client. Channels are strictly isolated by organization and project.
 
-#### 5. Independent vs. Blocked Tasks
-- **Independent**: Optimistic local UI updates and automatic error rollback on HTTP 403/500 (`US-SYNC-001`) are handled locally in frontend React state.
-- **Blocked**: Multi-user real-time room subscriptions and cross-client event broadcasting (`US-SYNC-002` in `TASK-503`).
+#### 5. Independent vs. Completed Tasks
+- **Completed**: Optimistic local UI updates and automatic error rollback on HTTP 403/500 (`US-SYNC-001`).
+- **Completed**: Multi-user real-time SSE event streaming, authenticated fetch client, Last-Event-ID reconnection buffer replay, heartbeat pings, and cross-client event broadcasting (`US-SYNC-002`, `TG-SYNC-001` in `TASK-503`).
 
-#### 6. Required Stakeholder Action
-> [!IMPORTANT]
-> **Action Required**: Stakeholder approval of **Option B** (Server-Sent Events via authenticated fetch streaming client for server-to-client broadcast + optimistic REST mutations). If deferred, multi-client real-time synchronization remains disabled; client relies on standard manual refresh.
+#### 6. Ratification Status & Outcome
+> [!NOTE]
+> **Status: ACCEPTED & RATIFIED (Option B)**
+> Ratified by Principal Architect and Lead Frontend Engineer. Option B (Server-Sent Events via Authenticated Fetch Streaming Client + Last-Event-ID Replay Buffer + Smart Polling Fallback) has been implemented and verified in `TASK-503`. All 13 synchronization tests in `backend/test/sync.test.js` and frontend tests in `syncUtils.test.js` pass with zero regressions.
 
 ---
 

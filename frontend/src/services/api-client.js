@@ -5,6 +5,8 @@ let refreshRequest = null;
 
 export function setAccessToken(token) { accessToken = token; }
 export function clearAccessToken() { accessToken = null; }
+export function getAccessToken() { return accessToken; }
+export function getApiBase() { return apiBase; }
 
 export function setActiveOrgId(orgId) {
   const parsed = orgId ? Number(orgId) : null;
