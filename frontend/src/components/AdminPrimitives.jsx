@@ -1,5 +1,6 @@
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { Check, X } from "lucide-react";
+import { useFocusTrap } from "../hooks/useFocusTrap.js";
 
 export function PageHeading({ eyebrow, title, description, action }) {
   return <div className="page-heading">
@@ -17,17 +18,19 @@ export function Notice({ notice, dismiss }) {
 }
 
 export function Dialog({ title, eyebrow, onClose, children, footer }) {
-  useEffect(() => {
-    function closeOnEscape(event) { if (event.key === "Escape") onClose(); }
-    window.addEventListener("keydown", closeOnEscape);
-    return () => window.removeEventListener("keydown", closeOnEscape);
-  }, [onClose]);
+  const dialogRef = useRef(null);
 
-  return <div className="dialog-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}>
-    <section className="dialog" role="dialog" aria-modal="true" aria-labelledby="dialog-title">
+  useFocusTrap({
+    containerRef: dialogRef,
+    isOpen: true,
+    onEscape: onClose,
+  });
+
+  return <div className="dialog-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}>
+    <section ref={dialogRef} className="dialog" role="dialog" aria-modal="true" aria-labelledby="dialog-title">
       <header className="dialog-header">
         <div><span className="eyebrow">{eyebrow}</span><h2 id="dialog-title">{title}</h2></div>
-        <button className="icon-button" onClick={onClose} aria-label="Close"><X size={19} /></button>
+        <button className="icon-button" onClick={onClose} aria-label="Close dialog"><X size={19} /></button>
       </header>
       <div className="dialog-body">{children}</div>
       {footer && <footer className="dialog-footer">{footer}</footer>}

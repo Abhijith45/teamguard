@@ -1,6 +1,7 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { Check, Headphones, Mail, X } from "lucide-react";
 import { api } from "../../services/api-client.js";
+import { useFocusTrap } from "../../hooks/useFocusTrap.js";
 
 const STEPS = [
   { id: 1, label: "Project Info" },
@@ -11,6 +12,14 @@ const STEPS = [
 ];
 
 export function ProjectSetupWizardModal({ isOpen, onClose, onProjectCreated, onShowNotice }) {
+  const containerRef = useRef(null);
+
+  useFocusTrap({
+    containerRef,
+    isOpen,
+    onEscape: onClose,
+  });
+
   const [currentStep, setCurrentStep] = useState(2); // default to Step 2 as shown in mockup
   const [projectName, setProjectName] = useState("Alpha Redesign 2026");
   const [projectKey, setProjectKey] = useState("ALPHA");
@@ -89,12 +98,19 @@ export function ProjectSetupWizardModal({ isOpen, onClose, onProjectCreated, onS
   }
 
   return (
-    <div className="wizard-modal-backdrop">
-      <div className="wizard-modal-container">
+    <div className="wizard-modal-backdrop" onClick={onClose} role="presentation">
+      <div
+        ref={containerRef}
+        className="wizard-modal-container"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="wizard-modal-heading"
+        onClick={(e) => e.stopPropagation()}
+      >
         {/* Left Sidebar Stepper */}
         <div className="wizard-stepper-sidebar">
           <div className="wizard-stepper-header">
-            <h3>Project Setup Wizard</h3>
+            <h3 id="wizard-modal-heading">Project Setup Wizard</h3>
             <span className="wizard-progress-counter">{currentStep}/5 completed</span>
           </div>
 
@@ -149,7 +165,12 @@ export function ProjectSetupWizardModal({ isOpen, onClose, onProjectCreated, onS
                 {currentStep === 5 && "Review project configuration and launch into your workspace."}
               </p>
             </div>
-            <button type="button" className="icon-btn-ghost" onClick={onClose}>
+            <button
+              type="button"
+              className="icon-btn-ghost"
+              onClick={onClose}
+              aria-label="Close project setup wizard"
+            >
               <X size={18} />
             </button>
           </div>

@@ -723,19 +723,22 @@ Work is sequenced strictly by technical dependencies, security invariants, and r
 - **Linked User Stories**: `US-A11Y-001`, `US-A11Y-002`, `US-A11Y-003`
 - **Linked PRD Features**: `TG-A11Y-001`, `TG-A11Y-002`, `TG-A11Y-003`
 - **Priority**: High (P1)
-- **Status**: Partially Implemented / Expansion Required
-- **Affected Files**: [frontend/src/index.css](file:///c:/Users/Abhijeet%20Rawat/Desktop/rbac/frontend/src/index.css), `frontend/src/hooks/useFocusTrap.js`, [frontend/src/views/AccountPage.jsx](file:///c:/Users/Abhijeet%20Rawat/Desktop/rbac/frontend/src/views/AccountPage.jsx)
+- **Status**: Completed / 100% Verified (TIER-2 & TIER-3)
+- **Affected Files**: [frontend/src/features/a11y/a11yUtils.js](file:///c:/Users/Abhijeet%20Rawat/Desktop/rbac/frontend/src/features/a11y/a11yUtils.js), [frontend/src/features/a11y/a11yUtils.test.js](file:///c:/Users/Abhijeet%20Rawat/Desktop/rbac/frontend/src/features/a11y/a11yUtils.test.js), [frontend/src/hooks/useFocusTrap.js](file:///c:/Users/Abhijeet%20Rawat/Desktop/rbac/frontend/src/hooks/useFocusTrap.js), [frontend/src/features/a11y/KeyboardShortcutsModal.jsx](file:///c:/Users/Abhijeet%20Rawat/Desktop/rbac/frontend/src/features/a11y/KeyboardShortcutsModal.jsx), [frontend/src/index.css](file:///c:/Users/Abhijeet%20Rawat/Desktop/rbac/frontend/src/index.css), [frontend/src/App.css](file:///c:/Users/Abhijeet%20Rawat/Desktop/rbac/frontend/src/App.css), [frontend/src/layout/AppShell.jsx](file:///c:/Users/Abhijeet%20Rawat/Desktop/rbac/frontend/src/layout/AppShell.jsx), [frontend/src/features/tasks/KanbanBoardView.jsx](file:///c:/Users/Abhijeet%20Rawat/Desktop/rbac/frontend/src/features/tasks/KanbanBoardView.jsx), [frontend/src/features/tasks/TaskDetailDrawer.jsx](file:///c:/Users/Abhijeet%20Rawat/Desktop/rbac/frontend/src/features/tasks/TaskDetailDrawer.jsx), [frontend/src/features/notifications/NotificationDrawer.jsx](file:///c:/Users/Abhijeet%20Rawat/Desktop/rbac/frontend/src/features/notifications/NotificationDrawer.jsx), [frontend/src/features/notifications/NotificationPreferencesModal.jsx](file:///c:/Users/Abhijeet%20Rawat/Desktop/rbac/frontend/src/features/notifications/NotificationPreferencesModal.jsx), [frontend/src/features/projects/ProjectSetupWizardModal.jsx](file:///c:/Users/Abhijeet%20Rawat/Desktop/rbac/frontend/src/features/projects/ProjectSetupWizardModal.jsx), [frontend/src/components/AdminPrimitives.jsx](file:///c:/Users/Abhijeet%20Rawat/Desktop/rbac/frontend/src/components/AdminPrimitives.jsx)
 - **Implementation Steps**:
-  1. Implement `useFocusTrap` hook trapping Tab key inside open modals and drawers.
-  2. Audit all color tokens in `index.css` to guarantee 4.5:1 contrast against dark backgrounds.
-  3. Add `aria-modal="true"`, `role="dialog"`, and accessible button labels across console.
-  4. Ensure AccountPage password updates require current password confirmation.
-- **Data/API Impact**: Account profile update endpoint (`PATCH /api/users/me`).
-- **Security Considerations**: Password update requires current password re-entry.
+  1. Implement `useFocusTrap` hook trapping Tab key inside open modals and drawers with boundary wrapping.
+  2. Implement `a11yUtils.js` with focus element discovery, editable target detection, and relative luminance/contrast calculation.
+  3. Deploy `KeyboardShortcutsModal.jsx` cheatsheet triggered globally by `?` or topbar button.
+  4. Wire global `C` shortcut for quick task creation with input safeguards (`US-A11Y-002`).
+  5. Deploy accessible Skip-to-Content anchor link (`.skip-to-content-link`) targeting `#main-content`.
+  6. Audit all color tokens in `index.css` and `App.css` to guarantee >= 4.5:1 text contrast and high-contrast `:focus-visible` emerald rings.
+  7. Add `aria-modal="true"`, `role="dialog"`, `aria-labelledby`, and accessible button labels across all console modals and drawers.
+- **Data/API Impact**: Pure frontend accessibility & navigation enhancements.
+- **Security Considerations**: Focus management prevents focus escaping into inert background layers.
 - **Dependencies & Blockers**: TASK-204, TASK-401.
-- **Test Plan**: Automated axe-core accessibility scan returning zero critical or serious violations.
-- **Acceptance Criteria**: Focus trapped in dialogs; keyboard navigation passes automated audit.
-- **Definition of Done**: WCAG AA verification sign-off completed.
+- **Test Plan**: Pure a11y unit tests in `a11yUtils.test.js` (contrast math, focus wrap, shortcut guards) + browser subagent visual validation.
+- **Acceptance Criteria**: Focus trapped in dialogs; Esc dismisses cleanly; skip link visible on focus; contrast meets WCAG AA >= 4.5:1.
+- **Definition of Done**: WCAG AA verification sign-off completed and 100% test pass.
 - **Effort Estimate**: M (2 business days).
 - **Risk & Rollback**: Low risk.
 

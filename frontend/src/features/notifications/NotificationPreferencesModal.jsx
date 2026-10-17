@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   Bell,
   Mail,
@@ -23,6 +23,7 @@ import {
   isPreferencesDirty,
   getSubscriptionSummary,
 } from "./notificationPreferencesUtils.js";
+import { useFocusTrap } from "../../hooks/useFocusTrap.js";
 
 const ICON_MAP = {
   notifyTaskAssigned: ShieldAlert,
@@ -33,6 +34,16 @@ const ICON_MAP = {
 };
 
 export function NotificationPreferencesModal({ isOpen, onClose, activeOrg, onShowNotice }) {
+  const modalRef = useRef(null);
+
+  useFocusTrap({
+    containerRef: modalRef,
+    isOpen,
+    onEscape: () => {
+      if (!saving) onClose();
+    },
+  });
+
   const [preferences, setPreferences] = useState(DEFAULT_PREFERENCES);
   const [original, setOriginal] = useState(DEFAULT_PREFERENCES);
   const [loading, setLoading] = useState(false);
@@ -65,17 +76,6 @@ export function NotificationPreferencesModal({ isOpen, onClose, activeOrg, onSho
       mounted = false;
     };
   }, [isOpen]);
-
-  // Close on Escape
-  useEffect(() => {
-    const handleKeyDown = (e) => {
-      if (e.key === "Escape" && isOpen && !saving) {
-        onClose();
-      }
-    };
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [isOpen, saving, onClose]);
 
   if (!isOpen) return null;
 
@@ -136,8 +136,9 @@ export function NotificationPreferencesModal({ isOpen, onClose, activeOrg, onSho
   };
 
   return (
-    <div className="notif-pref-backdrop" onClick={onClose}>
+    <div className="notif-pref-backdrop" onClick={onClose} role="presentation">
       <div
+        ref={modalRef}
         className="notif-pref-modal"
         role="dialog"
         aria-modal="true"
