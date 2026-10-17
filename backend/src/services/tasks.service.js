@@ -128,19 +128,66 @@ export function validateProtectedFieldsMutation(rawKeys, permissions = new Set()
 }
 
 /**
- * Evaluates ABAC ownership policies on task update.
+ * Evaluates ABAC ownership policies on task update with Fine-Grained Creator vs Assignee Bifurcation (DP-TASK-001 / US-ABAC-004).
  */
-export function verifyTaskUpdateABAC(existingTask, actorId, permissions = new Set()) {
+export function verifyTaskUpdateABAC(existingTask, actorId, permissions = new Set(), input = {}) {
   const hasAnyUpdate = permissions.has("task:update:any") || permissions.has("task:manage");
-  const hasOwnUpdate = permissions.has("task:update:own");
-  const isOwnerOrAssignee =
-    existingTask.assigneeId === actorId || existingTask.creatorId === actorId;
+  if (hasAnyUpdate) {
+    return;
+  }
 
-  if (!hasAnyUpdate && (!hasOwnUpdate || !isOwnerOrAssignee)) {
+  const hasOwnUpdate = permissions.has("task:update:own");
+  const hasAssignedUpdate = permissions.has("task:update:assigned");
+  const isCreator = existingTask.creatorId === actorId;
+  const isAssignee = existingTask.assigneeId === actorId;
+
+  // Case 1: Neither creator nor assignee
+  if (!isCreator && !isAssignee) {
     const err = new Error("ABAC Policy Violation: You can only update tasks assigned to or created by you.");
     err.statusCode = 403;
     err.code = "CANNOT_UPDATE_OTHERS_TASK";
     throw err;
+  }
+
+  // Case 2: User is assignee on this task, but NOT the creator
+  if (isAssignee && !isCreator) {
+    if (!hasAssignedUpdate) {
+      const err = new Error("Access denied: task creator permission required");
+      err.statusCode = 403;
+      err.code = "CREATOR_PERMISSION_REQUIRED";
+      throw err;
+    }
+
+    // Assignee is attempting to alter task title without creator authority (US-ABAC-004 AC 4)
+    if (input.title !== undefined && input.title !== existingTask.title) {
+      const err = new Error("Access denied: task title cannot be modified by assignee");
+      err.statusCode = 403;
+      err.code = "ASSIGNEE_CANNOT_MUTATE_TITLE";
+      throw err;
+    }
+    return;
+  }
+
+  // Case 3: User is creator of this task
+  if (isCreator) {
+    if (!hasOwnUpdate) {
+      // If user is also assignee (self-assigned) and has task:update:assigned
+      if (isAssignee && hasAssignedUpdate) {
+        if (input.title !== undefined && input.title !== existingTask.title) {
+          const err = new Error("Access denied: task title cannot be modified by assignee");
+          err.statusCode = 403;
+          err.code = "ASSIGNEE_CANNOT_MUTATE_TITLE";
+          throw err;
+        }
+        return;
+      }
+
+      const err = new Error("Access denied: task creator permission required");
+      err.statusCode = 403;
+      err.code = "CREATOR_PERMISSION_REQUIRED";
+      throw err;
+    }
+    return;
   }
 }
 
@@ -521,8 +568,8 @@ export async function updateTaskService({
   // 4. Archival protection
   verifyProjectNotArchived(existing.project, "modify tasks");
 
-  // 5. ABAC resource policy check
-  verifyTaskUpdateABAC(existing, actorId, permissions);
+  // 5. ABAC resource policy check (DP-TASK-001 / US-ABAC-004)
+  verifyTaskUpdateABAC(existing, actorId, permissions, input);
 
   // 6. Project re-parenting verification if projectId is changing
   if (input.projectId !== undefined && input.projectId !== existing.projectId) {

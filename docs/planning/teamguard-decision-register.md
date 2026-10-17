@@ -48,9 +48,9 @@ In strict adherence to TeamGuard document governance:
 | **UD-001** | Platform Administration & Break-Glass Recovery | `ACCEPTED_RATIFIED` | Principal Architect | Product Steering & Security Lead | `US-PLAT-001`, `US-PLAT-002` | `TG-PLAT-001` | Option B: Unified App with Operator Context & MFA Step-Up | Internal admin flag; TOTP MFA step-up; ITSM ticket validation; 60m session limit. Ratified in TASK-501. |
 | **UD-002** | Cloud Binary Object Storage Provider | `ACCEPTED_RATIFIED` | Principal Architect | Product Steering & Security Lead | `US-STOR-001` | `TG-FILE-005`, `TG-STOR-001` | Option A: S3-Compatible Storage via Presigned URLs | S3-compatible cloud storage; 15m PUT / 5m GET presigned URLs; server-side `HeadObject` gate; tenant prefix isolation. Ratified in TASK-502. |
 | **UD-003** | Real-Time Transport & State Synchronization | `ACCEPTED_RATIFIED` | Principal Architect | Product Steering & Lead Frontend | `US-SYNC-001`, `US-SYNC-002` | `TG-SYNC-001` | Option B: SSE via Authenticated Fetch Streaming Client | SSE via authenticated fetch streaming client (`ReadableStream`); `Last-Event-ID` cursor replay buffer; heartbeat pings; zero cross-tenant leakage. Ratified in TASK-503. |
-| **UD-004** | Rich Text Description & Comment Editor | `PROPOSED_RECOMMENDATION` | Principal Architect | Product Steering & UX Lead | `US-COLLAB-004` | `TG-EDT-001` | Option A: TipTap / ProseMirror with DOMPurify | JSON ProseMirror document schema; server-side DOMPurify HTML sanitization; CSP compliance. |
+| **UD-004** | Rich Text Description & Comment Editor | `ACCEPTED_RATIFIED` | Principal Architect | Product Steering & UX Lead | `US-COLLAB-004` | `TG-EDT-001` | Option A: TipTap / ProseMirror with DOMPurify | JSON ProseMirror document schema; server-side DOMPurify HTML sanitization; CSP compliance. Ratified in TASK-504. |
 | **UD-005** | Member Invitation Delivery Mechanism | `ACCEPTED_RATIFIED` | Principal Architect | Product Steering & Security Lead | `US-INV-001`, `US-INV-002`, `US-INV-003` | `TG-INV-001` | Option B: Resend Transactional Email API + Token Fallback | Resend transactional email API; 7-day token expiration; strict recipient email matching; SHA-256 token hashing; Universal Delegation Barrier. Ratified in TASK-505. |
-| **DP-TASK-001** | Task Creator vs. Assignee Policy Bifurcation | `PROPOSED_RECOMMENDATION` | Principal Architect | Product Steering Committee | `US-ABAC-004` | `TG-ABAC-001` | Option B: Discrete Bifurcation (`task:update:own` vs. `assigned`) | Discrete permissions; ABAC ownership check evaluates creator vs assignee status. |
+| **DP-TASK-001** | Task Creator vs. Assignee Policy Bifurcation | `ACCEPTED_RATIFIED` | Principal Architect | Product Steering Committee | `US-ABAC-004` | `TG-ABAC-001` | Option B: Discrete Bifurcation (`task:update:own` vs. `assigned`) | Discrete permissions; ABAC evaluates creator strictly for `task:update:own` and assignee strictly for `task:update:assigned`; title mutation restricted to creator. Ratified in TASK-506. |
 | **DP-REP-001** | Reporting Scope, Metrics & Export Formats | `PROPOSED_RECOMMENDATION` | Principal Architect | Product Steering Committee | `US-REP-001` | `TG-REP-001` | Option A: Streaming CSV Export of Task Velocity & Audit History | Direct database streaming of CSV format (`text/csv`); zero heavy binary PDF dependencies. |
 
 ---
@@ -289,20 +289,21 @@ Inviting new team members into an organization requires generating cryptographic
 ### Decision DP-TASK-001: Task Creator vs. Assignee Policy Bifurcation
 
 #### 1. Context & Problem Statement
-Currently, `task:update:own` conflates the task creator and the task assignee. Organizations require fine-grained separation: allowing assignees to update status/priority while restricting title/scope edits to the creator.
+Previously, `task:update:own` conflated the task creator and the task assignee. Organizations require fine-grained separation: allowing assignees to update status/priority/checklist while restricting title/scope edits to the creator.
 
 #### 2. Affected User Stories & PRD Features
-- **User Stories**: [`US-ABAC-004`](file:///c:/Users/Abhijeet%20Rawat/Desktop/rbac/docs/product/teamguard-user-stories.md#L1506)
+- **User Stories**: [`US-ABAC-004`](file:///c:/Users/Abhijeet%20Rawat/Desktop/rbac/docs/product/teamguard-user-stories.md#L1525)
 - **PRD Feature**: `TG-ABAC-001` (Section 7.6, Section 16.2)
-- **Blocked Engineering Task**: `TASK-506 (Blocked)`
+- **Engineering Task**: `TASK-506 (Completed & Verified)`
 
-#### 3. Options Under Consideration
-- **Option A**: Coarse-Grained Task Ownership (Current single `task:update:own` covering both creator and assignee).
-- **Option B (Recommended)**: Fine-Grained Discrete Bifurcation (`task:update:own` strictly for creator; `task:update:assigned` strictly for assignee).
+#### 3. Ratified Architecture (Option B: Discrete Bifurcation)
+- **`task:update:own`**: Authorizes mutation if and only if `task.creatorId === actor.id`. Permits full title, description, status, priority, and subtask modifications.
+- **`task:update:assigned`**: Authorizes mutation if and only if `task.assigneeId === actor.id`. Permits updating status, description, priority, and checklist/subtasks, but strictly forbids altering author-defined `title` (rejected with `403 Forbidden` / `ASSIGNEE_CANNOT_MUTATE_TITLE`).
+- **Protected Fields Guard**: Neither permission permits mutating `projectId`, `creatorId`, or `assigneeId` (requires `task:assign` or `project:manage`).
+- **Default Role Assignment**: Built-in `Team Member` role holds both `task:update:own` and `task:update:assigned`. Custom roles can be tailored with either or both.
+- **Frontend Affordances**: Title input in `TaskDetailDrawer.jsx` is visually locked with an author requirement hint when user is assignee without creator authority.
 
-#### 4. Required Stakeholder Action
-> [!IMPORTANT]
-> **Action Required**: Stakeholder approval of **Option B** (Permission Bifurcation) and confirmation of default role matrix assignments.
+> Ratified by Product Steering Committee and Principal Architect. Implemented in `TASK-506`. Verified via 9 automated tests in `backend/test/bifurcation.test.js`, 4 unit tests in `frontend/src/features/tasks/task-drawer-dnd.test.js`, and title lock in `TaskDetailDrawer.jsx`.
 
 ---
 

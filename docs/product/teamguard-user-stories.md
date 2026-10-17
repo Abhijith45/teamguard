@@ -1529,12 +1529,13 @@ As a Team Member, if I drag a locked task to another Kanban column, I want the c
 - **Module**: ABAC and Resource-Level Authorization
 - **Primary actor**: Product Stakeholder / Organization Admin
 - **Supporting actors**: Team Member (Creator / Assignee)
-- **Requirement approval status**: Proposed — Pending Approval
-- **Implementation status**: Absent from repository (Option B architectural recommendation)
-- **Decision blocker status**: Blocked by Product Decision (Task Update Policy)
-- **Priority**: Low
-- **Dependencies**: Unresolved Task Update Policy Decision, `US-ABAC-001`
-- **Security impact**: Decouples creator permissions from assignee permissions; prevents assignees from altering creator-protected fields
+- **Requirement approval status**: Approved Requirement
+- **Implementation status**: Verified in Repository
+- **Decision blocker status**: Unblocked (DP-TASK-001 Ratified)
+- **Implementation evidence**: `backend/src/services/tasks.service.js`, `backend/test/bifurcation.test.js`, and `TaskDetailDrawer.jsx`
+- **Priority**: High
+- **Dependencies**: `US-ABAC-001`, `DP-TASK-001`
+- **Security impact**: Decouples creator permissions from assignee permissions; prevents assignees from altering author-defined task titles or creator-protected fields
 
 **User Story**
 As an Organization Administrator, I want the system to provide discrete permissions for `task:update:own` (creator strictly) and `task:update:assigned` (assignee strictly), so that our organization role governance can grant assignees execution rights (e.g. status transitions, checklist updates) without permitting them to alter author-defined task scopes or titles.
@@ -1556,7 +1557,7 @@ In the current baseline repository, `task:update:own` conflates author and assig
 5. **Given** current pre-ratification code baseline (Option A), **When** a user holding `task:update:own` updates a task they either created or are assigned to, **Then** request succeeds, while attempting to alter `projectId` or `creatorId` fails closed with HTTP 403.
 
 **Dependencies and Open Decisions**
-- **Blocked by Task Update Policy Decision**: Stakeholder ratification required before updating `tasks.controller.js` and automated Test #4 in `rbac.test.js`.
+- **Ratified Architecture**: Ratified via Decision DP-TASK-001 (Option B: Discrete Bifurcation) and verified via 9 automated tests in `backend/test/bifurcation.test.js` and 4 unit tests in `frontend/src/features/tasks/task-drawer-dnd.test.js`.
 
 ---
 
@@ -2919,7 +2920,7 @@ The following table provides requirement-level verification for all 60 PRD Featu
 | `TG-RBAC-005` | Custom Organization Role Creation | `US-RBAC-004` | PRD §7.4: Tenant custom role definition, template cloning, name uniqueness within tenant. Verified in `US-RBAC-004` AC 1-2. | Unverified / Planned | Unblocked | Fully Covered (Planned) |
 | `TG-RBAC-006` | Module-Level Bulk Permission Assignment | `US-RBAC-005` | PRD §7.4: "Select All" / "Clear All" module buttons with atomic bulk persistence. Verified in `US-RBAC-005` AC 1-2. | Unverified / Planned | Unblocked | Fully Covered (Planned) |
 | `TG-RBAC-007` | Custom Role Deletion & Safeguards | `US-RBAC-006` | PRD §7.4: Safe deletion of custom roles with assigned-member safeguard; system roles protected. Verified in `US-RBAC-006` AC 1-2. | Unverified / Planned | Unblocked | Fully Covered (Planned) |
-| `TG-ABAC-001` | Resource-Level Task Ownership Verification | `US-ABAC-001`, `US-ABAC-003`, `US-ABAC-004` | PRD §7.7, §8.3: Server verification of creator/assignee for `task:update:own`, protected fields guard. Verified in `US-ABAC-001` AC 1-4 & `US-ABAC-003` AC 1-3; `US-ABAC-004` AC 1-5 covers Option B target. | Verified in Repository | `US-ABAC-004` blocked by Policy Decision | Fully Covered (Verified Baseline, Split Blocked) |
+| `TG-ABAC-001` | Resource-Level Task Ownership Verification | `US-ABAC-001`, `US-ABAC-003`, `US-ABAC-004` | PRD §7.7, §8.3: Server verification of creator/assignee for `task:update:own` and `task:update:assigned`, protected fields guard, assignee title lock. Verified in `US-ABAC-001` AC 1-4, `US-ABAC-003` AC 1-3, and `US-ABAC-004` AC 1-5 in `backend/test/bifurcation.test.js`. | Verified in Repository | Unblocked (DP-TASK-001 Ratified) | Fully Covered (Verified) |
 | `TG-ABAC-002` | Card-Level ABAC Lock Indicator Display | `US-ABAC-002` | PRD §7.7: Visual lock icon hint on cards where user lacks update authority. Verified in `US-ABAC-002` AC 1-3. | Verified in Repository | Unblocked | Fully Covered (Verified) |
 | `TG-PROJ-001` | Organization-Scoped Project CRUD | `US-PROJ-001` | PRD §7.6: Project listing, creation, editing, deletion within active tenant. Verified in `US-PROJ-001` AC 1-3. | Verified in Repository | Unblocked | Fully Covered (Verified) |
 | `TG-PROJ-002` | 5-Step Guided Project Setup Wizard Modal | `US-PROJ-002` | PRD §7.6: Stepwise guided wizard modal with input validation. Verified in `US-PROJ-002` AC 1-3. | Verified in Repository | Unblocked | Fully Covered (Verified) |

@@ -93,7 +93,10 @@ export function CalendarView({
   );
 
   const canCreateTask = hasPerm("task:create");
-  const canEditTask = hasPerm("task:update:any") || hasPerm("task:update:own");
+  const canEditTask =
+    hasPerm("task:update:any") ||
+    hasPerm("task:update:own") ||
+    hasPerm("task:update:assigned");
   const canDeleteTask = hasPerm("task:delete");
 
   // Fetch tasks and members for active organization

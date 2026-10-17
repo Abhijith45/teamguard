@@ -8,8 +8,20 @@ function canEditTask(task, user, userPermissions) {
   if (task.project?.isArchived) return false;
   const canUpdateAny = userPermissions.has("task:update:any") || userPermissions.has("task:manage");
   const canUpdateOwn = userPermissions.has("task:update:own");
+  const canUpdateAssigned = userPermissions.has("task:update:assigned");
   if (canUpdateAny) return true;
-  if (canUpdateOwn && (task.assigneeId === user.id || task.creatorId === user.id)) return true;
+  if (canUpdateOwn && task.creatorId === user.id) return true;
+  if (canUpdateAssigned && task.assigneeId === user.id) return true;
+  return false;
+}
+
+function canEditTitle(task, user, userPermissions) {
+  if (!task) return false;
+  if (task.project?.isArchived) return false;
+  const canUpdateAny = userPermissions.has("task:update:any") || userPermissions.has("task:manage");
+  const canUpdateOwn = userPermissions.has("task:update:own");
+  if (canUpdateAny) return true;
+  if (canUpdateOwn && task.creatorId === user.id) return true;
   return false;
 }
 
@@ -33,6 +45,7 @@ function computeOptimisticStatusChange(tasks, taskId, targetStatus) {
 
 function constructDrawerSavePayload({
   task,
+  user,
   title,
   description,
   status,
@@ -42,22 +55,29 @@ function constructDrawerSavePayload({
   assigneeId,
   userPermissions,
 }) {
+  const canUpdateAny =
+    userPermissions.has("task:update:any") ||
+    userPermissions.has("task:manage");
   const canManageProjects =
     userPermissions.has("project:manage") ||
-    userPermissions.has("task:manage") ||
-    userPermissions.has("task:update:any");
+    canUpdateAny;
   const canAssign =
     userPermissions.has("task:assign") ||
-    userPermissions.has("task:manage") ||
-    userPermissions.has("task:update:any");
+    canUpdateAny;
+
+  const isCreator = user ? task?.creatorId === user.id : true;
+  const canEditTitlePerm = canUpdateAny || (userPermissions.has("task:update:own") && isCreator);
 
   const payload = {
-    title: title.trim(),
     description: description.trim(),
     status,
     priority,
     dueDate: dueDate ? new Date(dueDate).toISOString() : null,
   };
+
+  if (canEditTitlePerm && title !== undefined) {
+    payload.title = title.trim();
+  }
 
   if (canManageProjects && projectId && Number(projectId) !== task.projectId) {
     payload.projectId = Number(projectId);
@@ -168,4 +188,51 @@ test("TASK-204 [REQ 4 / TG-TASK-005]: Drawer payload enforces governance barrier
 
   assert.equal(adminPayload.projectId, 99, "projectId must be included for managers/admins");
   assert.equal(adminPayload.assigneeId, 88, "assigneeId must be included for users with task:assign");
+});
+
+test("TASK-506 [REQ 1 / US-ABAC-004 AC 1]: canEditTask & canEditTitle allow creator holding task:update:own", () => {
+  const creatorUser = { id: 10, name: "Alice Creator" };
+  const creatorPerms = new Set(["task:read", "task:update:own"]);
+  const task = { id: 501, title: "Feature Spec", creatorId: 10, assigneeId: 99, project: { isArchived: false } };
+
+  assert.equal(canEditTask(task, creatorUser, creatorPerms), true, "Creator with task:update:own can edit task");
+  assert.equal(canEditTitle(task, creatorUser, creatorPerms), true, "Creator with task:update:own can modify title");
+});
+
+test("TASK-506 [REQ 2 / US-ABAC-004 AC 2]: canEditTask denies non-creator assignee holding strictly task:update:own", () => {
+  const assigneeUser = { id: 20, name: "Bob Assignee" };
+  const perms = new Set(["task:read", "task:update:own"]);
+  const task = { id: 502, title: "Backend API", creatorId: 10, assigneeId: 20, project: { isArchived: false } };
+
+  assert.equal(canEditTask(task, assigneeUser, perms), false, "Assignee lacking task:update:assigned cannot edit task");
+  assert.equal(canEditTitle(task, assigneeUser, perms), false, "Assignee lacking task:update:assigned cannot modify title");
+});
+
+test("TASK-506 [REQ 3 / US-ABAC-004 AC 3 & 4]: canEditTask allows assignee holding task:update:assigned, but canEditTitle denies title edits", () => {
+  const assigneeUser = { id: 20, name: "Bob Assignee" };
+  const perms = new Set(["task:read", "task:update:assigned"]);
+  const task = { id: 503, title: "Refactor CSS", creatorId: 10, assigneeId: 20, project: { isArchived: false } };
+
+  assert.equal(canEditTask(task, assigneeUser, perms), true, "Assignee with task:update:assigned can edit task execution fields");
+  assert.equal(canEditTitle(task, assigneeUser, perms), false, "Assignee with task:update:assigned CANNOT modify task title");
+});
+
+test("TASK-506 [REQ 4 / US-ABAC-004 AC 4]: constructDrawerSavePayload strips title for assignee holding strictly task:update:assigned", () => {
+  const assigneeUser = { id: 20, name: "Bob Assignee" };
+  const perms = new Set(["task:update:assigned"]);
+  const task = { id: 504, title: "Initial Title", creatorId: 10, assigneeId: 20 };
+
+  const payload = constructDrawerSavePayload({
+    task,
+    user: assigneeUser,
+    title: "Attempted Subversive Title Change",
+    description: "Valid progress description",
+    status: "IN_PROGRESS",
+    priority: "HIGH",
+    userPermissions: perms,
+  });
+
+  assert.equal(payload.title, undefined, "Title must be excluded from save payload for non-creator assignee");
+  assert.equal(payload.status, "IN_PROGRESS", "Status transition must be preserved");
+  assert.equal(payload.description, "Valid progress description", "Description must be preserved");
 });

@@ -870,17 +870,30 @@ Work is sequenced strictly by technical dependencies, security invariants, and r
   - Frontend UI: Members directory tab switching ("Members Directory" vs "Pending Invitations"), "Invite Member" modal with shareable link copy fallback, and URL search parameter token listener launching `AcceptInvitationModal`.
 - **Verification**: 13 automated tests in `backend/test/invitations.test.js`, 5 frontend unit tests in `frontend/test/invitations.test.js`, and comprehensive UI in `MembersView.jsx` and `AcceptInvitationModal.jsx`.
 
-#### Task ID: TASK-506 (Blocked) — Task Creator vs. Assignee Permission Bifurcation
+#### Task ID: TASK-506 (Completed & Verified) — Task Creator vs. Assignee Permission Bifurcation
 - **Objective**: Bifurcate task update permissions into discrete `task:update:own` (creator) and `task:update:assigned` (assignee).
 - **Linked User Stories**: `US-ABAC-004`
 - **Linked PRD Features**: `TG-ABAC-001`
 - **Priority**: High (P1)
-- **Status**: Blocked by Product Decision (Task Update Policy DP-TASK-001)
-- **Affected Files**: [backend/src/controllers/tasks.controller.js](file:///c:/Users/Abhijeet%20Rawat/Desktop/rbac/backend/src/controllers/tasks.controller.js)
-- **Provisional Specification**:
-  - Introduce discrete permission codename and evaluate in ABAC policy engine.
-- **Dependencies & Blockers**: **DP-TASK-001 Ratification Required**.
-- **Effort Estimate Range**: S–M (1–2 business days).
+- **Status**: Completed & Verified (DP-TASK-001 Ratified)
+- **Affected Files**:
+  - `backend/config/seed.js`
+  - `backend/src/controllers/organizations.controller.js`
+  - `backend/src/routes/tasks.routes.js`
+  - `backend/src/services/tasks.service.js`
+  - `backend/src/services/subtasks.service.js`
+  - `backend/test/bifurcation.test.js`
+  - `frontend/src/features/tasks/TaskDetailDrawer.jsx`
+  - `frontend/src/features/tasks/KanbanBoardView.jsx`
+  - `frontend/src/features/calendar/CalendarView.jsx`
+  - `frontend/src/features/tasks/task-drawer-dnd.test.js`
+- **Architectural & Security Invariants**:
+  - Discrete permission codenames: `task:update:own` strictly evaluates author ownership (`task.creatorId === actor.id`), granting full modification of author-defined scope and title.
+  - `task:update:assigned` strictly evaluates assignee execution (`task.assigneeId === actor.id`), granting task execution status transitions, priority updates, progress description notes, and subtask checklist modifications, while strictly prohibiting author title alterations (rejected with `HTTP 403 Forbidden` / `ASSIGNEE_CANNOT_MUTATE_TITLE`).
+  - Strict protected fields barrier: Neither permission permits mutating `projectId`, `creatorId`, or `assigneeId` without elevated permissions (`task:assign`, `project:manage`, or `task:manage`).
+  - Default role assignment: Built-in `Team Member` role holds both `task:update:own` and `task:update:assigned`. Custom roles can be tailored with either or both.
+  - Frontend UI: Title input in `TaskDetailDrawer.jsx` is visually locked with an author requirement hint when user is assignee without creator authority.
+- **Verification**: 9 automated tests in `backend/test/bifurcation.test.js`, 4 unit tests in `frontend/src/features/tasks/task-drawer-dnd.test.js`, and title lock in `TaskDetailDrawer.jsx`.
 
 #### Task ID: TASK-507 (Blocked) — Compliance & Velocity Reporting CSV Export
 - **Objective**: Stream organization task velocity and security audit history as CSV downloads.
@@ -1140,7 +1153,7 @@ Activated only after stakeholder decisions UD-001 through UD-005 are formally ra
 | **Platform Administration** | 2 | 1 | 2 Verified | `TASK-501` |
 | **Invitations & Onboarding** | 5 | 1 | 5 Verified | `TASK-101`, `TASK-505` |
 | **RBAC Administration** | 7 | 8 | 7 Verified, 0 Planned | `TASK-102`, `TASK-103`, `TASK-104` |
-| **ABAC & Policy Engine** | 4 | 3 | 3 Verified, 0 Planned, 1 Blocked | `TASK-002`, `TASK-203`, `TASK-506 (Blocked)` |
+| **ABAC & Policy Engine** | 4 | 3 | 4 Verified, 0 Planned | `TASK-002`, `TASK-203`, `TASK-506` |
 | **Project Management** | 5 | 5 | 5 Verified, 0 Planned | `TASK-201`, `TASK-202` |
 | **Task Management** | 10 | 10 | 10 Verified, 0 Planned | `TASK-203`, `TASK-204`, `TASK-205`, `TASK-206` |
 | **Subtask Hierarchy** | 2 | 2 | 2 Verified, 0 Planned | `TASK-301` |
@@ -1158,7 +1171,7 @@ Activated only after stakeholder decisions UD-001 through UD-005 are formally ra
 | **Reporting & Analytics** | 1 | 1 | 1 Blocked (Reporting Scope) | `TASK-507 (Blocked)` |
 | **Developer Tooling** | 1 | 1 | 1 Verified | `TASK-006` |
 | **State Synchronization** | 2 | 1 | 2 Verified | `TASK-503` |
-| **TOTALS RECONCILED** | **79 Stories** | **60 Features** | **45 Verified, 5 Partial, 23 Planned, 6 Blocked** | **35 Tasks across 7 Phases (32 Story-Linked + 3 Operational)** |
+| **TOTALS RECONCILED** | **79 Stories** | **60 Features** | **46 Verified, 5 Partial, 23 Planned, 5 Blocked** | **35 Tasks across 7 Phases (32 Story-Linked + 3 Operational)** |
 
 ---
 
@@ -1170,7 +1183,7 @@ Prior to expanding into Phase 5, stakeholder sign-off is required on the 7 archi
 3. **UD-003**: Approve Server-Sent Events via authenticated fetch streaming client for real-time broadcasts.
 4. **UD-004**: Ratified (Option A: TipTap / ProseMirror rich text editor with strict DOMPurify sanitization — `TASK-504` Completed).
 5. **UD-005**: Ratified (Option B: Resend Transactional Email API with 7-Day Token Link Fallback — `TASK-505` Completed & Verified).
-6. **DP-TASK-001**: Approve discrete permission bifurcation (`task:update:own` vs. `task:update:assigned`).
+6. **DP-TASK-001**: Ratified (Option B: Discrete Permission Bifurcation `task:update:own` vs. `task:update:assigned` — `TASK-506` Completed & Verified).
 7. **DP-REP-001**: Confirm Phase 1 CSV export scope for task velocity and audit logs.
 
 ---

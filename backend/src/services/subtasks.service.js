@@ -59,16 +59,19 @@ async function verifyParentTaskAccess({
     throw error;
   }
 
-  // ABAC Ownership Boundary (BR-005)
+  // ABAC Ownership Boundary (BR-005 / DP-TASK-001)
   // Check if caller can update this specific task
   const canUpdateAny =
     permissions.has("task:update:any") || permissions.has("task:manage");
   const canUpdateOwn = permissions.has("task:update:own");
+  const canUpdateAssigned = permissions.has("task:update:assigned");
   const isAssignee = task.assigneeId === userId;
   const isCreator = task.creatorId === userId;
 
   if (!canUpdateAny) {
-    if (!canUpdateOwn || (!isAssignee && !isCreator)) {
+    const isAuthorizedCreator = canUpdateOwn && isCreator;
+    const isAuthorizedAssignee = canUpdateAssigned && isAssignee;
+    if (!isAuthorizedCreator && !isAuthorizedAssignee) {
       const error = new Error(
         "Forbidden: You cannot modify subtasks for tasks assigned to other members"
       );

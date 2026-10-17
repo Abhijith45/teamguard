@@ -113,7 +113,7 @@ export async function createOrganization(req, res, next) {
             });
           }
         }
-        if (["dashboard:view", "project:view", "task:view", "task:create", "task:update:own", "files:view"].includes(`${p.resource}:${p.action}`)) {
+        if (["dashboard:view", "project:view", "task:view", "task:create", "task:update:own", "task:update:assigned", "files:view"].includes(`${p.resource}:${p.action}`)) {
           await tx.rolePermission.create({
             data: { roleId: memberRole.id, permissionId: p.id },
           });

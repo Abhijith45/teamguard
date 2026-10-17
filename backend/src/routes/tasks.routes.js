@@ -32,11 +32,20 @@ router.get("/", requirePermission("task", "view"), listTasks);
 router.get("/:taskId", requirePermission("task", "view"), getTask);
 router.post("/", requirePermission("task", "create"), createTask);
 
-// Middleware allowing update if user has task:update:any or task:update:own (ABAC verified in service)
+// Middleware allowing update if user has task:update:any, task:update:own, or task:update:assigned (ABAC verified in service)
 const requireTaskUpdatePermission = (req, res, next) => {
   const p = req.userPermissions;
-  if (!p || (!p.has("task:update:any") && !p.has("task:update:own") && !p.has("task:manage"))) {
-    return res.status(403).json({ error: "Permission denied", requiredPermission: "task:update:own or task:update:any" });
+  if (
+    !p ||
+    (!p.has("task:update:any") &&
+      !p.has("task:update:own") &&
+      !p.has("task:update:assigned") &&
+      !p.has("task:manage"))
+  ) {
+    return res.status(403).json({
+      error: "Permission denied",
+      requiredPermission: "task:update:own, task:update:assigned, or task:update:any",
+    });
   }
   next();
 };

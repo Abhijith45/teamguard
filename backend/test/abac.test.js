@@ -77,6 +77,7 @@ async function getTestTaskForMember(orgId, memberId) {
     where: {
       organizationId: orgId,
       assigneeId: memberId,
+      creatorId: memberId,
     },
   });
 

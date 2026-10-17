@@ -81,6 +81,7 @@ export function KanbanBoardView({ user, activeOrg, userPermissions, onShowNotice
   const canCreateTask = userPermissions.has("task:create");
   const canUpdateAny = userPermissions.has("task:update:any") || userPermissions.has("task:manage");
   const canUpdateOwn = userPermissions.has("task:update:own");
+  const canUpdateAssigned = userPermissions.has("task:update:assigned");
   const canAssign = userPermissions.has("task:assign") || userPermissions.has("task:manage") || canUpdateAny;
   const canManageProjects = userPermissions.has("project:manage") || userPermissions.has("task:manage") || canUpdateAny;
   const canDeleteTask = userPermissions.has("task:delete") || canUpdateAny;
@@ -216,7 +217,8 @@ export function KanbanBoardView({ user, activeOrg, userPermissions, onShowNotice
     if (!task) return false;
     if (task.project?.isArchived) return false;
     if (canUpdateAny) return true;
-    if (canUpdateOwn && (task.assigneeId === user.id || task.creatorId === user.id)) return true;
+    if (canUpdateOwn && task.creatorId === user.id) return true;
+    if (canUpdateAssigned && task.assigneeId === user.id) return true;
     return false;
   }
 

@@ -14,7 +14,8 @@ const permissionsData = [
   // Tasks
   { resource: "task", action: "view", description: "View tasks" },
   { resource: "task", action: "create", description: "Create tasks" },
-  { resource: "task", action: "update:own", description: "Update own assigned tasks" },
+  { resource: "task", action: "update:own", description: "Update tasks created by you" },
+  { resource: "task", action: "update:assigned", description: "Update tasks assigned to you" },
   { resource: "task", action: "update:any", description: "Update any task" },
   { resource: "task", action: "assign", description: "Assign tasks to members" },
   { resource: "task", action: "delete", description: "Delete tasks" },
@@ -141,7 +142,7 @@ async function main() {
     const memberKeys = [
       "dashboard:view",
       "project:view",
-      "task:view", "task:create", "task:update:own",
+      "task:view", "task:create", "task:update:own", "task:update:assigned",
       "files:view", "files:download",
       "profile:read"
     ];

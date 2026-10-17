@@ -62,6 +62,10 @@ export function TaskDetailDrawer({
   if (!task) return null;
 
   const isArchived = Boolean(task.project?.isArchived);
+  const userPermsSet = useMemo(() => new Set(userPermissions), [userPermissions]);
+  const canUpdateAny = userPermsSet.has("task:update:any") || userPermsSet.has("task:manage");
+  const isCreator = Boolean(currentUser?.id && task?.creatorId === currentUser.id);
+  const canEditTitle = canEdit && (canUpdateAny || (userPermsSet.has("task:update:own") && isCreator));
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -71,12 +75,15 @@ export function TaskDetailDrawer({
     setDrawerError(null);
 
     const payload = {
-      title: title.trim(),
       description: description.trim(),
       status,
       priority,
       dueDate: dueDate ? new Date(dueDate).toISOString() : null,
     };
+
+    if (canEditTitle) {
+      payload.title = title.trim();
+    }
 
     if (canManageProjects && projectId && Number(projectId) !== task.projectId) {
       payload.projectId = Number(projectId);
@@ -260,13 +267,20 @@ export function TaskDetailDrawer({
 
           {/* Title Field */}
           <div className="form-field">
-            <label htmlFor="drawer-task-title">Title</label>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <label htmlFor="drawer-task-title">Title</label>
+              {!canEditTitle && canEdit && (
+                <span className="field-hint" style={{ fontSize: "0.75rem", color: "var(--color-text-muted)" }}>
+                  Locked by author (requires creator permission)
+                </span>
+              )}
+            </div>
             <input
               id="drawer-task-title"
               type="text"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
-              disabled={!canEdit || isArchived}
+              disabled={!canEditTitle || isArchived}
               placeholder="Task summary / deliverable..."
               required
             />
