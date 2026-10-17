@@ -15,6 +15,7 @@ import {
   CheckSquare,
   X,
   ExternalLink,
+  Sliders,
 } from "lucide-react";
 import { api } from "../../services/api-client.js";
 import {
@@ -22,12 +23,15 @@ import {
   getNotificationMeta,
   filterNotifications,
 } from "./notificationUtils.js";
+import { NotificationPreferencesModal } from "./NotificationPreferencesModal.jsx";
 
 export function NotificationDrawer({
   isOpen,
   onClose,
   onNavigateTask,
   onNotificationChange,
+  activeOrg,
+  onShowNotice,
 }) {
   const [notifications, setNotifications] = useState([]);
   const [unreadCount, setUnreadCount] = useState(0);
@@ -36,6 +40,7 @@ export function NotificationDrawer({
   const [error, setError] = useState(null);
   const [activeTab, setActiveTab] = useState("all"); // "all" | "unread"
   const [actionInProgress, setActionInProgress] = useState(null);
+  const [showPreferences, setShowPreferences] = useState(false);
 
   const fetchNotifications = useCallback(async () => {
     try {
@@ -188,14 +193,25 @@ export function NotificationDrawer({
                 </span>
               </div>
             </div>
-            <button
-              type="button"
-              className="notification-drawer-close-btn"
-              onClick={onClose}
-              aria-label="Close notifications panel"
-            >
-              <X size={18} />
-            </button>
+            <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+              <button
+                type="button"
+                className="notification-drawer-settings-btn"
+                onClick={() => setShowPreferences(true)}
+                title="Alert & Notification Preferences"
+                aria-label="Notification Preferences"
+              >
+                <Sliders size={16} />
+              </button>
+              <button
+                type="button"
+                className="notification-drawer-close-btn"
+                onClick={onClose}
+                aria-label="Close notifications panel"
+              >
+                <X size={18} />
+              </button>
+            </div>
           </div>
 
           {/* Quick Action Controls */}
@@ -395,6 +411,14 @@ export function NotificationDrawer({
           </button>
         </div>
       </aside>
+
+      {/* Preferences Modal (TASK-403 / US-NOTIF-003) */}
+      <NotificationPreferencesModal
+        isOpen={showPreferences}
+        onClose={() => setShowPreferences(false)}
+        activeOrg={activeOrg}
+        onShowNotice={onShowNotice}
+      />
     </>
   );
 }

@@ -381,6 +381,8 @@ export function AppShell({
 
             {/* Notification Bell & Pipeline Drawer (TASK-304) */}
             <NotificationBell
+              activeOrg={activeOrg}
+              onShowNotice={onShowNotice}
               onNavigateTask={(taskId) => {
                 setSection("tasks");
                 window.dispatchEvent(

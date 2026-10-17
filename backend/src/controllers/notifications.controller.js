@@ -5,6 +5,8 @@ import {
   markAllNotificationsAsReadService,
   deleteNotificationService,
   clearReadNotificationsService,
+  getNotificationPreferencesService,
+  updateNotificationPreferencesService,
 } from "../services/notifications.service.js";
 
 /**
@@ -139,6 +141,48 @@ export async function clearReadNotifications(req, res, next) {
     return res.status(200).json({
       message: "Read notifications cleared",
       ...result,
+    });
+  } catch (err) {
+    next(err);
+  }
+}
+
+/**
+ * Retrieves the notification preferences for caller in active organization.
+ */
+export async function getPreferences(req, res, next) {
+  try {
+    const organizationId = req.organizationId;
+    const userId = req.auth.userId;
+
+    const preferences = await getNotificationPreferencesService({
+      organizationId,
+      userId,
+    });
+
+    return res.status(200).json({ preferences });
+  } catch (err) {
+    next(err);
+  }
+}
+
+/**
+ * Updates notification preferences for caller in active organization.
+ */
+export async function updatePreferences(req, res, next) {
+  try {
+    const organizationId = req.organizationId;
+    const userId = req.auth.userId;
+
+    const preferences = await updateNotificationPreferencesService({
+      organizationId,
+      userId,
+      data: req.body,
+    });
+
+    return res.status(200).json({
+      message: "Notification preferences updated successfully",
+      preferences,
     });
   } catch (err) {
     next(err);

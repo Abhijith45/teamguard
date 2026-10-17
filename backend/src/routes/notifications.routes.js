@@ -6,6 +6,8 @@ import {
   markAllAsRead,
   deleteNotification,
   clearReadNotifications,
+  getPreferences,
+  updatePreferences,
 } from "../controllers/notifications.controller.js";
 import { authenticate } from "../middleware/authenticate.js";
 import { resolveTenant } from "../middleware/tenant.middleware.js";
@@ -14,6 +16,10 @@ const router = Router();
 
 // Strict Authentication and Tenant Isolation
 router.use(authenticate, resolveTenant);
+
+// Preferences (TASK-403 / US-NOTIF-003 & TG-NOTIF-003)
+router.get("/preferences", getPreferences);
+router.patch("/preferences", updatePreferences);
 
 // Queries
 router.get("/unread-count", getUnreadCount);

@@ -1,4 +1,5 @@
 import { prisma } from "../../config/prisma.js";
+import { z } from "zod";
 
 /**
  * Creates a notification record for a specific recipient user within an organization.
@@ -284,4 +285,90 @@ export async function clearReadNotificationsService({
   });
 
   return { deletedCount: result.count };
+}
+
+const preferencesSchema = z.object({
+  emailDigest: z.enum(["INSTANT", "DAILY", "WEEKLY", "OFF"]).optional(),
+  notifyTaskAssigned: z.boolean().optional(),
+  notifyTaskStatusChanged: z.boolean().optional(),
+  notifyCommentAdded: z.boolean().optional(),
+  notifyProjectArchived: z.boolean().optional(),
+  notifyDueSoon: z.boolean().optional(),
+});
+
+/**
+ * Retrieves the notification preferences for the calling user in the active tenant.
+ * Falls back to default preferences if not yet customized.
+ */
+export async function getNotificationPreferencesService({ organizationId, userId }) {
+  const orgId = Number(organizationId);
+  const targetUserId = Number(userId);
+
+  const existing = await prisma.notificationPreference.findUnique({
+    where: {
+      userId_organizationId: {
+        userId: targetUserId,
+        organizationId: orgId,
+      },
+    },
+  });
+
+  if (existing) {
+    return existing;
+  }
+
+  // Default notification preferences
+  return {
+    userId: targetUserId,
+    organizationId: orgId,
+    emailDigest: "DAILY",
+    notifyTaskAssigned: true,
+    notifyTaskStatusChanged: true,
+    notifyCommentAdded: true,
+    notifyProjectArchived: true,
+    notifyDueSoon: true,
+    isDefault: true,
+  };
+}
+
+/**
+ * Updates or creates notification preferences for the calling user in the active tenant.
+ */
+export async function updateNotificationPreferencesService({
+  organizationId,
+  userId,
+  data,
+}) {
+  const orgId = Number(organizationId);
+  const targetUserId = Number(userId);
+
+  const parsed = preferencesSchema.safeParse(data);
+  if (!parsed.success) {
+    const error = new Error("Invalid notification preferences payload");
+    error.statusCode = 400;
+    error.details = parsed.error.issues;
+    throw error;
+  }
+
+  const validData = parsed.data;
+
+  const preference = await prisma.notificationPreference.upsert({
+    where: {
+      userId_organizationId: {
+        userId: targetUserId,
+        organizationId: orgId,
+      },
+    },
+    create: {
+      userId: targetUserId,
+      organizationId: orgId,
+      ...validData,
+    },
+    update: {
+      ...validData,
+      updatedAt: new Date(),
+    },
+  });
+
+  return preference;
 }

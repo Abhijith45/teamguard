@@ -371,6 +371,8 @@ export const api = {
   markAllNotificationsAsRead: () => request("/notifications/mark-all-read", { method: "PATCH" }),
   deleteNotification: (id) => request(`/notifications/${id}`, { method: "DELETE" }),
   clearReadNotifications: () => request("/notifications/clear-read", { method: "DELETE" }),
+  getNotificationPreferences: () => request("/notifications/preferences"),
+  updateNotificationPreferences: (body) => request("/notifications/preferences", { method: "PATCH", body }),
 
   // Global Multi-Entity Search (TASK-401 / US-CMD-001)
   globalSearch: (q, limit = 6) => {

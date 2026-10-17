@@ -703,8 +703,8 @@ Work is sequenced strictly by technical dependencies, security invariants, and r
 - **Linked User Stories**: `US-DASH-001`–`US-DASH-006`, `US-NOTIF-003`
 - **Linked PRD Features**: `TG-DASH-001`–`TG-DASH-006`, `TG-NOTIF-003`
 - **Priority**: High (P1)
-- **Status**: Verified in Baseline / Expansion Required
-- **Affected Files**: [frontend/src/views/DashboardView.jsx](file:///c:/Users/Abhijeet%20Rawat/Desktop/rbac/frontend/src/views/DashboardView.jsx), [backend/src/controllers/dashboard.controller.js](file:///c:/Users/Abhijeet%20Rawat/Desktop/rbac/backend/src/controllers/dashboard.controller.js)
+- **Status**: Completed
+- **Affected Files**: `backend/src/controllers/dashboard.controller.js`, `backend/src/services/dashboard.service.js`, `backend/src/controllers/notifications.controller.js`, `backend/src/services/notifications.service.js`, `backend/src/routes/notifications.routes.js`, `backend/test/dashboard.test.js`, `frontend/src/features/dashboard/DashboardView.jsx`, `frontend/src/features/dashboard/dashboardUtils.js`, `frontend/src/features/dashboard/dashboardUtils.test.js`, `frontend/src/features/notifications/NotificationPreferencesModal.jsx`, `frontend/src/features/notifications/notificationPreferencesUtils.js`, `frontend/src/features/notifications/notificationPreferencesUtils.test.js`, `frontend/src/features/notifications/NotificationDrawer.jsx`, `frontend/src/features/notifications/NotificationBell.jsx`, `frontend/src/services/api-client.js`, `frontend/src/App.jsx`, `frontend/src/App.css`
 - **Implementation Steps**:
   1. Optimize KPI aggregation queries (Projects, Tasks, Members, Storage).
   2. Ensure 48h urgent tasks query uses indexed `dueDate` comparisons.
@@ -1119,14 +1119,14 @@ Activated only after stakeholder decisions UD-001 through UD-005 are formally ra
 | **Storage Engine** | 1 | 1 | 1 Blocked (UD-002) | `TASK-502 (Blocked)` |
 | **Dashboard & Metrics** | 6 | 6 | 6 Verified | `TASK-403` |
 | **Calendar & Timeline** | 2 | 2 | 2 Verified | `TASK-402` |
-| **Notifications** | 3 | 3 | 3 Planned | `TASK-304`, `TASK-403` |
+| **Notifications** | 3 | 3 | 3 Verified | `TASK-304`, `TASK-403` |
 | **Command Palette** | 2 | 2 | 2 Verified | `TASK-401` |
 | **Accessibility (WCAG AA)** | 3 | 3 | 1 Verified, 2 Partially Implemented | `TASK-404` |
 | **Account Management** | 1 | 1 | 1 Verified | `TASK-005` |
 | **Reporting & Analytics** | 1 | 1 | 1 Blocked (Reporting Scope) | `TASK-507 (Blocked)` |
 | **Developer Tooling** | 1 | 1 | 1 Verified | `TASK-006` |
 | **State Synchronization** | 2 | 1 | 2 Blocked (UD-003) | `TASK-503 (Blocked)` |
-| **TOTALS RECONCILED** | **79 Stories** | **60 Features** | **39 Verified, 5 Partial, 24 Planned, 11 Blocked** | **35 Tasks across 7 Phases (32 Story-Linked + 3 Operational)** |
+| **TOTALS RECONCILED** | **79 Stories** | **60 Features** | **40 Verified, 5 Partial, 23 Planned, 11 Blocked** | **35 Tasks across 7 Phases (32 Story-Linked + 3 Operational)** |
 
 ---
 
