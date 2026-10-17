@@ -328,8 +328,25 @@ export const api = {
   getAuditStats: () => request("/audit/stats"),
 
   // Files
-  getFiles: (params = "") => request(`/files${params ? `?${params}` : ""}`),
+  getFiles: (params = "") => {
+    let queryStr = "";
+    if (typeof params === "string") {
+      queryStr = params ? (params.startsWith("?") ? params : `?${params}`) : "";
+    } else if (params && typeof params === "object") {
+      const q = new URLSearchParams();
+      for (const [k, v] of Object.entries(params)) {
+        if (v !== undefined && v !== null && v !== "") {
+          q.set(k, String(v));
+        }
+      }
+      const s = q.toString();
+      queryStr = s ? `?${s}` : "";
+    }
+    return request(`/files${queryStr}`);
+  },
+  getFile: (id) => request(`/files/${id}`),
   createFile: (body) => request("/files", { method: "POST", body }),
+  updateFile: (id, body) => request(`/files/${id}`, { method: "PATCH", body }),
   bulkDeleteFiles: (fileIds) => request("/files/bulk-delete", { method: "POST", body: { fileIds } }),
   bulkDuplicateFiles: (fileIds) => request("/files/bulk-duplicate", { method: "POST", body: { fileIds } }),
   deleteFile: (id) => request(`/files/${id}`, { method: "DELETE" }),

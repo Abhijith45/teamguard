@@ -1460,6 +1460,72 @@ body {
   text-align: center;
 }
 
+.th-sortable {
+  cursor: pointer;
+  user-select: none;
+  transition: background-color 0.15s ease;
+}
+
+.th-sortable:hover {
+  background-color: #EDF2F7 !important;
+}
+
+.th-content {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.sort-icon-inactive {
+  color: #94A3B8;
+  opacity: 0.6;
+}
+
+.sort-icon-active {
+  color: var(--color-emerald);
+}
+
+.filter-select-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.filter-select-wrapper .filter-icon {
+  position: absolute;
+  left: 10px;
+  pointer-events: none;
+  color: var(--color-text-muted);
+}
+
+.files-project-select {
+  padding: 8px 12px 8px 32px;
+  font-size: 0.82rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  color: var(--color-text-main);
+  cursor: pointer;
+  outline: none;
+  transition: border-color 0.15s ease;
+}
+
+.files-project-select:focus-visible {
+  border-color: var(--color-emerald);
+  outline: 2px solid var(--color-emerald);
+  outline-offset: 2px;
+}
+
+.file-row-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.text-destructive-hover:hover {
+  color: var(--color-high) !important;
+}
+
 .file-name-cell {
   display: flex;
   align-items: center;
