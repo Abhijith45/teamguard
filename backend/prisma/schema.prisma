@@ -19,6 +19,7 @@ model Organization {
   files           FileAsset[]
   auditLogs       AuditLog[]
   notifications   Notification[]
+  notificationPreferences NotificationPreference[]
   createdAt       DateTime     @default(now())
   updatedAt       DateTime     @updatedAt
 }
@@ -40,6 +41,7 @@ model User {
   auditLogs       AuditLog[]
   notifications   Notification[]   @relation("UserNotifications")
   actorNotifications Notification[] @relation("ActorNotifications")
+  notificationPreferences NotificationPreference[]
   createdAt       DateTime         @default(now())
   updatedAt       DateTime         @updatedAt
 }
@@ -279,5 +281,25 @@ model Notification {
   @@index([userId])
   @@index([organizationId, userId, isRead])
   @@index([userId, createdAt])
+}
+
+model NotificationPreference {
+  id                      Int          @id @default(autoincrement())
+  userId                  Int
+  organizationId          Int?
+  emailDigest             String       @default("DAILY")
+  notifyTaskAssigned      Boolean      @default(true)
+  notifyTaskStatusChanged Boolean      @default(true)
+  notifyCommentAdded      Boolean      @default(true)
+  notifyProjectArchived   Boolean      @default(true)
+  notifyDueSoon           Boolean      @default(true)
+  createdAt               DateTime     @default(now())
+  updatedAt               DateTime     @updatedAt
+  user                    User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  organization            Organization? @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, organizationId])
+  @@index([userId])
+  @@index([organizationId])
 }
 

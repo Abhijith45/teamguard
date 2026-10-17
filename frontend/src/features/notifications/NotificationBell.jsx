@@ -3,7 +3,7 @@ import { Bell } from "lucide-react";
 import { api } from "../../services/api-client.js";
 import { NotificationDrawer } from "./NotificationDrawer.jsx";
 
-export function NotificationBell({ onNavigateTask }) {
+export function NotificationBell({ onNavigateTask, activeOrg, onShowNotice }) {
   const [isOpen, setIsOpen] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
 
@@ -59,6 +59,8 @@ export function NotificationBell({ onNavigateTask }) {
         onClose={() => setIsOpen(false)}
         onNavigateTask={onNavigateTask}
         onNotificationChange={(count) => setUnreadCount(count)}
+        activeOrg={activeOrg}
+        onShowNotice={onShowNotice}
       />
     </>
   );

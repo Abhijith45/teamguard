@@ -230,8 +230,18 @@ export default function App() {
           user={user}
           activeOrg={activeOrg}
           userPermissions={userPermissions}
-          onNavigateToTasks={() => setSection("tasks")}
+          onNavigateToTasks={(filter) => {
+            setSection("tasks");
+            if (filter) {
+              window.dispatchEvent(
+                new CustomEvent("teamguard:filter-tasks", { detail: filter })
+              );
+            }
+          }}
           onNavigateToProjects={() => setSection("tasks")}
+          onNavigateToCalendar={() => setSection("calendar")}
+          onOpenWizard={() => setWizardOpen(true)}
+          onShowNotice={showNotice}
         />
       )}
 
