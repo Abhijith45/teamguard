@@ -10,6 +10,9 @@ model Organization {
   id          Int          @id @default(autoincrement())
   name        String
   slug        String       @unique
+  isSuspended     Boolean      @default(false)
+  suspendedAt     DateTime?
+  suspensionReason String?
   memberships Membership[]
   roles       Role[]
   projects    Project[]
@@ -20,6 +23,8 @@ model Organization {
   auditLogs       AuditLog[]
   notifications   Notification[]
   notificationPreferences NotificationPreference[]
+  platformAuditLogs PlatformAuditLog[]
+  breakGlassAlerts BreakGlassAlertOutbox[]
   createdAt       DateTime     @default(now())
   updatedAt       DateTime     @updatedAt
 }
@@ -32,6 +37,7 @@ model User {
   passwordHash    String
   avatarUrl       String?
   isActive        Boolean          @default(true)
+  isPlatformAdmin Boolean          @default(false)
   memberships     Membership[]
   refreshSessions RefreshSession[]
   createdTasks    Task[]           @relation("TaskCreator")
@@ -42,6 +48,9 @@ model User {
   notifications   Notification[]   @relation("UserNotifications")
   actorNotifications Notification[] @relation("ActorNotifications")
   notificationPreferences NotificationPreference[]
+  platformAuditLogs PlatformAuditLog[] @relation("PlatformOperator")
+  breakGlassOutboxes BreakGlassAlertOutbox[] @relation("BreakGlassOperator")
+  designatedBreakGlasses BreakGlassAlertOutbox[] @relation("BreakGlassDesignee")
   createdAt       DateTime         @default(now())
   updatedAt       DateTime         @updatedAt
 }
@@ -301,5 +310,63 @@ model NotificationPreference {
   @@unique([userId, organizationId])
   @@index([userId])
   @@index([organizationId])
+}
+
+model PlatformAuditLog {
+  id                   Int           @id @default(autoincrement())
+  operatorId           Int
+  targetOrganizationId Int?
+  ticketId             String
+  action               String
+  justification        String
+  prevLogHash          String
+  currentHash          String
+  ipAddress            String?
+  metadata             Json?
+  createdAt            DateTime      @default(now())
+  operator             User          @relation("PlatformOperator", fields: [operatorId], references: [id], onDelete: Cascade)
+  targetOrganization   Organization? @relation(fields: [targetOrganizationId], references: [id], onDelete: SetNull)
+
+  @@index([operatorId])
+  @@index([targetOrganizationId])
+  @@index([createdAt])
+}
+
+model BreakGlassAlertOutbox {
+  id                   Int          @id @default(autoincrement())
+  targetOrganizationId Int
+  designatedMemberId   Int
+  operatorId           Int
+  ticketId             String
+  justification        String
+  recipients           Json
+  payload              Json
+  status               String       @default("PENDING")
+  attempts             Int          @default(0)
+  lastError            String?
+  dispatchedAt         DateTime?
+  createdAt            DateTime     @default(now())
+  updatedAt            DateTime     @updatedAt
+  targetOrganization   Organization @relation(fields: [targetOrganizationId], references: [id], onDelete: Cascade)
+  operator             User         @relation("BreakGlassOperator", fields: [operatorId], references: [id], onDelete: Cascade)
+  designatedMember     User         @relation("BreakGlassDesignee", fields: [designatedMemberId], references: [id], onDelete: Cascade)
+
+  @@index([status])
+  @@index([targetOrganizationId])
+  @@index([createdAt])
+}
+
+model PlatformMfaNonce {
+  id                   Int       @id @default(autoincrement())
+  nonce                String    @unique
+  operatorId           Int
+  targetOrganizationId Int?
+  purpose              String    @default("break-glass")
+  expiresAt            DateTime
+  usedAt               DateTime?
+  createdAt            DateTime  @default(now())
+
+  @@index([nonce])
+  @@index([expiresAt])
 }
 

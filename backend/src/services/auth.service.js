@@ -19,6 +19,7 @@ export async function getPublicUser(userId, requestedOrgId = null) {
       email: true,
       avatarUrl: true,
       isActive: true,
+      isPlatformAdmin: true,
       memberships: {
         where: { status: "ACTIVE" },
         include: {
@@ -106,6 +107,7 @@ export async function getPublicUser(userId, requestedOrgId = null) {
       : null,
     roles: activeRoles,
     permissions: uniquePermissions,
+    isPlatformAdmin: Boolean(user.isPlatformAdmin),
   };
 }
 

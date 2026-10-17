@@ -55,6 +55,10 @@ export async function resolveTenant(req, res, next) {
       return res.status(403).json({ error: "Access denied: you are not an active member of this organization" });
     }
 
+    if (membership.organization.isSuspended) {
+      return res.status(403).json({ error: "Organization account is suspended. Contact platform administrator." });
+    }
+
     // Extract all effective permissions from membership roles
     const permissionsSet = new Set();
     for (const mr of membership.roles) {

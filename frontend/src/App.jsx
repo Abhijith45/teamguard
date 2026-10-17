@@ -10,6 +10,7 @@ import { TeamPermissionsMatrixView } from "./features/permissions/TeamPermission
 import { ProjectSetupWizardModal } from "./features/projects/ProjectSetupWizardModal.jsx";
 import AuditReportsView from "./features/reports/AuditReportsView.jsx";
 import { CalendarView } from "./features/calendar/CalendarView.jsx";
+import { PlatformAdminView } from "./features/platform/PlatformAdminView.jsx";
 import { AppShell } from "./layout/AppShell.jsx";
 import {
   api,
@@ -330,6 +331,13 @@ export default function App() {
             Return to Dashboard
           </button>
         </div>
+      )}
+
+      {section === "platform-admin" && (
+        <PlatformAdminView
+          currentUser={user}
+          onShowNotice={showNotice}
+        />
       )}
 
       {/* Project Setup Wizard Modal */}
