@@ -743,24 +743,26 @@ Work is sequenced strictly by technical dependencies, security invariants, and r
 - **Risk & Rollback**: Low risk.
 
 #### Task ID: TASK-405 — File Asset Directory, Project Association & Bulk Metadata Operations
-- **Objective**: Provide comprehensive file asset directory listing, project filtering, multi-row selection, floating bulk action dock (duplicate, delete), and task attachment linking.
+- **Objective**: Provide comprehensive file asset directory listing, project filtering, multi-row selection, floating bulk action dock (duplicate, delete), and project/task association operations.
 - **Linked User Stories**: `US-FILE-001`, `US-FILE-002`, `US-FILE-003`, `US-FILE-004`, `US-FILE-005`
 - **Linked PRD Features**: `TG-FILE-001`, `TG-FILE-002`, `TG-FILE-003`, `TG-FILE-004`, `TG-FILE-005`
 - **Priority**: Medium (P2)
-- **Status**: Verified in Baseline / Expansion Required
-- **Affected Files**: [backend/src/controllers/files.controller.js](file:///c:/Users/Abhijeet%20Rawat/Desktop/rbac/backend/src/controllers/files.controller.js), [frontend/src/views/FilesView.jsx](file:///c:/Users/Abhijeet%20Rawat/Desktop/rbac/frontend/src/views/FilesView.jsx), `frontend/src/components/FloatingBulkDock.jsx`
+- **Status**: Completed / 100% Verified (TIER-2 & TIER-3)
+- **Affected Files**: [backend/src/controllers/files.controller.js](file:///c:/Users/Abhijeet%20Rawat/Desktop/rbac/backend/src/controllers/files.controller.js), [backend/src/routes/files.routes.js](file:///c:/Users/Abhijeet%20Rawat/Desktop/rbac/backend/src/routes/files.routes.js), [backend/test/files.test.js](file:///c:/Users/Abhijeet%20Rawat/Desktop/rbac/backend/test/files.test.js), [frontend/src/features/files/FilesBulkView.jsx](file:///c:/Users/Abhijeet%20Rawat/Desktop/rbac/frontend/src/features/files/FilesBulkView.jsx), [frontend/src/features/files/filesUtils.js](file:///c:/Users/Abhijeet%20Rawat/Desktop/rbac/frontend/src/features/files/filesUtils.js), [frontend/src/features/files/filesUtils.test.js](file:///c:/Users/Abhijeet%20Rawat/Desktop/rbac/frontend/src/features/files/filesUtils.test.js), [frontend/src/components/FloatingBulkDock.jsx](file:///c:/Users/Abhijeet%20Rawat/Desktop/rbac/frontend/src/components/FloatingBulkDock.jsx), [frontend/src/services/api-client.js](file:///c:/Users/Abhijeet%20Rawat/Desktop/rbac/frontend/src/services/api-client.js), [frontend/src/App.css](file:///c:/Users/Abhijeet%20Rawat/Desktop/rbac/frontend/src/App.css)
 - **Implementation Steps**:
-  1. Optimize `GET /api/v1/files` with project filtering and pagination.
-  2. Connect multi-select checkboxes to floating bottom action dock.
-  3. Implement bulk duplicate endpoint appending "(Copy)" suffix to names.
-  4. Implement bulk delete endpoint guarded by `files:delete` permission.
-  5. Connect task attachment association foreign key.
-- **Data/API Impact**: Manages `FileAsset` database rows and `Task` associations.
-- **Security Considerations**: Strict tenant isolation; cross-tenant file access blocked.
+  1. Optimize `GET /api/files` with project filtering, case-insensitive search (`q`), sorting (`sortBy`, `sortOrder`), and pagination.
+  2. Implement `FloatingBulkDock.jsx` with accessible selection counter, duplicate, and delete actions.
+  3. Implement bulk duplicate endpoint appending ` (Copy)` suffix to copied file names.
+  4. Implement bulk delete endpoint guarded by `files:delete` permission with transactional batch deletion.
+  5. Implement `PATCH /api/files/:fileId` for file renaming and project reassignment (`US-FILE-005`) with tenant ownership validation.
+  6. Connect project association selector in Add File and Edit File modals with `useFocusTrap` dialog focus trapping.
+  7. Deploy frontend utilities `filesUtils.js` with pure sorting, filtering, formatting, and duplicate naming algorithms.
+- **Data/API Impact**: Manages `FileAsset` database rows and `Project` associations.
+- **Security Considerations**: Strict tenant isolation; cross-tenant file mutations and project associations return HTTP 404; RBAC permissions (`files:upload`, `files:update`, `files:delete`) strictly enforced.
 - **Dependencies & Blockers**: TASK-201, TASK-203.
-- **Test Plan**: Automated integration tests covering file listing, project filter, bulk duplicate, and bulk delete transactions.
-- **Acceptance Criteria**: Files directory displays correctly; floating bulk dock executes batch operations atomically.
-- **Definition of Done**: File management endpoints and UI verified.
+- **Test Plan**: Automated integration tests in `backend/test/files.test.js` (16 test vectors) + frontend unit tests in `filesUtils.test.js` (5 unit tests).
+- **Acceptance Criteria**: Files directory displays correctly; column headers sort asc/desc; floating bulk dock executes batch operations atomically; duplicates receive ` (Copy)` suffix.
+- **Definition of Done**: File management endpoints, floating dock UI, and tests 100% verified.
 - **Effort Estimate**: M (2 business days).
 - **Risk & Rollback**: Low risk.
 
