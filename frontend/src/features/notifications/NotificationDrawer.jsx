@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import {
   Bell,
   BellOff,
@@ -24,6 +24,7 @@ import {
   filterNotifications,
 } from "./notificationUtils.js";
 import { NotificationPreferencesModal } from "./NotificationPreferencesModal.jsx";
+import { useFocusTrap } from "../../hooks/useFocusTrap.js";
 
 export function NotificationDrawer({
   isOpen,
@@ -33,6 +34,13 @@ export function NotificationDrawer({
   activeOrg,
   onShowNotice,
 }) {
+  const drawerRef = useRef(null);
+
+  useFocusTrap({
+    containerRef: drawerRef,
+    isOpen,
+    onEscape: onClose,
+  });
   const [notifications, setNotifications] = useState([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [total, setTotal] = useState(0);
@@ -65,17 +73,6 @@ export function NotificationDrawer({
       fetchNotifications();
     }
   }, [isOpen, fetchNotifications]);
-
-  // Close on Escape key
-  useEffect(() => {
-    const handleKeyDown = (e) => {
-      if (e.key === "Escape" && isOpen) {
-        onClose();
-      }
-    };
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [isOpen, onClose]);
 
   const handleMarkAsRead = async (e, id) => {
     e.stopPropagation();
@@ -177,8 +174,14 @@ export function NotificationDrawer({
 
   return (
     <>
-      <div className="notification-drawer-backdrop" onClick={onClose} />
-      <aside className="notification-drawer" role="dialog" aria-label="Notifications Panel">
+      <div className="notification-drawer-backdrop" onClick={onClose} role="presentation" />
+      <aside
+        ref={drawerRef}
+        className="notification-drawer"
+        role="dialog"
+        aria-modal="true"
+        aria-label="Notifications Panel"
+      >
         {/* Header */}
         <div className="notification-drawer-header">
           <div className="notification-header-title-row">

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import {
   AlertCircle,
   Calendar,
@@ -16,6 +16,7 @@ import {
 import { SubtaskChecklist } from "./SubtaskChecklist.jsx";
 import { TaskCommentsSection } from "./TaskCommentsSection.jsx";
 import TaskActivityStream from "./TaskActivityStream.jsx";
+import { useFocusTrap } from "../../hooks/useFocusTrap.js";
 
 export function TaskDetailDrawer({
   task,
@@ -34,6 +35,14 @@ export function TaskDetailDrawer({
   onSubtasksChange,
   onCommentsCountChange,
 }) {
+  const drawerRef = useRef(null);
+
+  useFocusTrap({
+    containerRef: drawerRef,
+    isOpen: Boolean(task),
+    onEscape: onClose,
+  });
+
   const [title, setTitle] = useState(task?.title || "");
   const [description, setDescription] = useState(task?.description || "");
   const [status, setStatus] = useState(task?.status || "TODO");
@@ -48,17 +57,6 @@ export function TaskDetailDrawer({
   const [drawerError, setDrawerError] = useState(null);
   const [activeDrawerTab, setActiveDrawerTab] = useState("overview");
   const [activityCount, setActivityCount] = useState(null);
-
-  // Esc key dismissal (US-TASK-004)
-  useEffect(() => {
-    const handleKeyDown = (e) => {
-      if (e.key === "Escape") {
-        onClose();
-      }
-    };
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [onClose]);
 
   if (!task) return null;
 
@@ -134,11 +132,12 @@ export function TaskDetailDrawer({
       data-testid="task-drawer-backdrop"
     >
       <div
+        ref={drawerRef}
         className="task-detail-drawer"
         onClick={(e) => e.stopPropagation()}
         role="dialog"
         aria-modal="true"
-        aria-labelledby="task-drawer-heading"
+        aria-label={`Task Details: ${task.title}`}
         data-testid="task-detail-drawer"
       >
         {/* Drawer Header */}

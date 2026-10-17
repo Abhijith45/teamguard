@@ -20,6 +20,7 @@ import {
   ExternalLink,
 } from "lucide-react";
 import { api } from "../../services/api-client.js";
+import { useFocusTrap } from "../../hooks/useFocusTrap.js";
 import {
   getQuickActions,
   filterQuickActions,
@@ -48,9 +49,17 @@ export function CommandPaletteModal({
   });
   const [selectedIndex, setSelectedIndex] = useState(0);
 
+  const containerRef = useRef(null);
   const inputRef = useRef(null);
   const listRef = useRef(null);
   const debounceTimerRef = useRef(null);
+
+  useFocusTrap({
+    containerRef,
+    isOpen,
+    initialFocusRef: inputRef,
+    onEscape: onClose,
+  });
 
   // Compute available quick actions based on permissions
   const allQuickActions = getQuickActions({ currentSection, permissions });
@@ -252,6 +261,7 @@ export function CommandPaletteModal({
       aria-label="Global Search and Command Palette"
     >
       <div
+        ref={containerRef}
         className="cmd-palette-modal"
         onClick={(e) => e.stopPropagation()}
         onKeyDown={handleKeyDown}

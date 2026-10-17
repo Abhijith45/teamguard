@@ -44,7 +44,7 @@ A candidate build cannot be promoted to production without 100% verification acr
 ### 2.2 Two-Track Release Scope & Gate Applicability
 To eliminate logical contradictions between unresolved architectural decisions and production readiness:
 - **Track A (Core v1.0 Production Release)**:
-  - Scope: Exactly **68 Core Stories** (34 Verified in Repository + 2 Partially Implemented + 32 Planned Implementation) across Phases 0–4 and Phase 6.
+  - Scope: Exactly **68 Core Stories** (39 Verified in Repository + 3 Partially Implemented + 26 Planned Implementation) across Phases 0–4 and Phase 6.
   - Applicable Security Gates: **SEC-01 through SEC-10** are **MANDATORY**. All must pass with `TIER-2` (Test Verified) or higher.
   - **Excluded / Deferred Gates**: `SEC-11` (Invitation Identity Matching) and `SEC-12` (Break-Glass Safeguards) belong strictly to Track B. Because invitation and platform administration endpoints are physically unmounted and disabled in Track A, they are **classified as planned deferrals pending a formal stakeholder release waiver** (`[STATUS: PENDING]`). The waiver must record: approver name, approval date, excluded story/feature scope, and evidence reference. Zero unverified code paths exist in Track A.
 - **Track B (Enterprise Expansion Release Post-v1.0)**:
@@ -105,7 +105,7 @@ To prevent ungrounded claims of production readiness, every checklist status mus
 | **FUNC-16** | Workspace Release Calendar | Monthly/weekly calendar grid mapping tasks by due date; month navigation & "Today" reset; filter controls. | `CalendarView.jsx`, `calendarUtils.js`, `calendarUtils.test.js`, and `backend/test/tasks.test.js` (`TASK-402`). | **VERIFIED (`TIER-3`)** | QA Lead |
 | **FUNC-17** | In-App Notification Center & Alert Preferences | Bell icon with unread badge counter; popover notification drawer; mark-as-read and deep linking; alert subscription preferences modal. | `NotificationBell.jsx`, `NotificationDrawer.jsx`, `NotificationPreferencesModal.jsx`, `notifications.service.js`, `dashboard.service.js`, `dashboard.test.js`, and `notificationPreferencesUtils.test.js` (`TASK-403`). | **VERIFIED (`TIER-2`, `TIER-3`)** | QA Lead |
 | **FUNC-18** | Global Command Palette | `Cmd/Ctrl+K` launches multi-entity search across projects, tasks, and members with keyboard selection. | Command palette planned in Phase 4 (`TASK-401`). | **PLANNED (Phase 4)** | QA Lead |
-| **FUNC-19** | Accessibility & Focus Trapping | Visible `:focus-visible` rings, semantic landmarks, WCAG AA 4.5:1 contrast, modal `Esc` dismissal. | `index.css` focus rings & Esc verified; focus trap planned in `TASK-404`. | **PARTIAL (`TIER-3`: Focus styles verified; Focus trap planned)** | QA Lead |
+| **FUNC-19** | Accessibility & Focus Trapping | Visible `:focus-visible` rings, semantic landmarks, WCAG AA 4.5:1 contrast, modal `Esc` dismissal, dialog focus trapping, and global shortcuts. | `useFocusTrap.js`, `a11yUtils.js`, `KeyboardShortcutsModal.jsx`, `a11yUtils.test.js`, `index.css`, and `App.css` (`TASK-404`). | **VERIFIED (`TIER-2`, `TIER-3`)** | QA Lead |
 | **FUNC-20** | Demo Persona Switcher Guard | 1-click persona switching enabled only in development; completely disabled when `NODE_ENV=production`. | Test #1 in `backend/test/rbac.test.js` & `demo.controller.js`. | **VERIFIED (`TIER-2`)** | Security Lead |
 
 ---
@@ -155,7 +155,7 @@ To prevent ungrounded claims of production readiness, every checklist status mus
 
 ### 4.1 Track A (Core v1.0 Release) Sign-off Criteria
 Prior to promoting a Track A release candidate to production:
-1. **Core Story Completion**: All **68 Core Stories** (34 Verified in Repository + 2 Partially Implemented + 32 Planned Implementation) must be verified completed with evidence at `TIER-2` (Automated Test Pass) or higher.
+1. **Core Story Completion**: All **68 Core Stories** (39 Verified in Repository + 3 Partially Implemented + 26 Planned Implementation) must be verified completed with evidence at `TIER-2` (Automated Test Pass) or higher.
 2. **Mandatory Security Gates**: Checks `SEC-01` through `SEC-10` must be marked **PASS** with verified execution evidence.
 3. **Formal Decision Exclusion Waiver** `[STATUS: PENDING]`: The **11 Blocked Stories** (Phase 5) and associated checks (`SEC-11`, `SEC-12`) are classified as **Post-v1.0 Deferred / Feature-Flagged Exclusions**. A formal stakeholder release waiver must be signed and recorded with: approver name, approval date, excluded story ID list, and evidence path. Until signed, these are treated as planned deferrals only.
 4. The sign-off table below must be formally executed:

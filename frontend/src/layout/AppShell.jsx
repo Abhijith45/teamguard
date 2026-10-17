@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import {
   BarChart2,
   Bell,
@@ -10,6 +10,7 @@ import {
   FileText,
   FolderGit2,
   Headphones,
+  Keyboard,
   LayoutDashboard,
   Loader2,
   LogOut,
@@ -24,6 +25,9 @@ import { Brand } from "../components/Brand.jsx";
 import { PersonaSwitcher } from "../components/PersonaSwitcher.jsx";
 import { NotificationBell } from "../features/notifications/NotificationBell.jsx";
 import { CommandPaletteModal } from "../features/search/CommandPaletteModal.jsx";
+import { KeyboardShortcutsModal } from "../features/a11y/KeyboardShortcutsModal.jsx";
+import { shouldTriggerGlobalShortcut } from "../features/a11y/a11yUtils.js";
+import { useFocusTrap } from "../hooks/useFocusTrap.js";
 import { api } from "../services/api-client.js";
 
 export function AppShell({
@@ -48,25 +52,66 @@ export function AppShell({
   const [newOrgName, setNewOrgName] = useState("");
   const [creatingOrg, setCreatingOrg] = useState(false);
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
+  const [shortcutsModalOpen, setShortcutsModalOpen] = useState(false);
 
-  // Global keyboard shortcut (Cmd+K / Ctrl+K) & event listener
+  const createOrgRef = useRef(null);
+
+  useFocusTrap({
+    containerRef: createOrgRef,
+    isOpen: showCreateOrgModal,
+    onEscape: () => !creatingOrg && setShowCreateOrgModal(false),
+  });
+
+  // Global keyboard shortcuts (Cmd+K, ?, C) & custom event listeners
   useEffect(() => {
     function handleKeyDown(e) {
+      // 1. Cmd/Ctrl + K: Command Palette
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
         e.preventDefault();
         setCommandPaletteOpen((prev) => !prev);
+        return;
+      }
+
+      // 2. ?: Keyboard Shortcuts Cheatsheet
+      if (shouldTriggerGlobalShortcut(e, "?")) {
+        e.preventDefault();
+        setShortcutsModalOpen((prev) => !prev);
+        return;
+      }
+
+      // 3. C: Quick Create Task (US-A11Y-002)
+      if (shouldTriggerGlobalShortcut(e, "c")) {
+        const canCreateTask =
+          user?.permissions?.includes("task:create") ||
+          user?.roles?.some((r) => r.name === "Super Admin" || r.name === "Project Manager" || r.name === "Team Member");
+
+        if (canCreateTask) {
+          e.preventDefault();
+          window.dispatchEvent(new CustomEvent("teamguard:quick-create-task"));
+          if (section !== "tasks" && section !== "dashboard" && onOpenWizard) {
+            onOpenWizard();
+          }
+        }
       }
     }
+
     function handleOpenPalette() {
       setCommandPaletteOpen(true);
     }
+    function handleOpenShortcuts() {
+      setShortcutsModalOpen(true);
+    }
+
     window.addEventListener("keydown", handleKeyDown);
     window.addEventListener("teamguard:open-command-palette", handleOpenPalette);
+    window.addEventListener("teamguard:open-shortcuts-modal", handleOpenShortcuts);
+
     return () => {
       window.removeEventListener("keydown", handleKeyDown);
       window.removeEventListener("teamguard:open-command-palette", handleOpenPalette);
+      window.removeEventListener("teamguard:open-shortcuts-modal", handleOpenShortcuts);
     };
-  }, []);
+  }, [user, section, onOpenWizard]);
 
   const activeRoleName = user?.roles?.[0]?.name || "Member";
 
@@ -96,8 +141,13 @@ export function AppShell({
 
   return (
     <div className="taskora-app-layout">
+      {/* Skip to Main Content Link (WCAG AA Requirement) */}
+      <a href="#main-content" className="skip-to-content-link">
+        Skip to main content
+      </a>
+
       {/* Left Sidebar */}
-      <aside className="taskora-sidebar">
+      <aside className="taskora-sidebar" aria-label="Workspace navigation">
         {/* Brand & Organization Switcher */}
         <div className="sidebar-brand-container">
           <div
@@ -372,6 +422,19 @@ export function AppShell({
               </kbd>
             </button>
 
+            {/* Keyboard Shortcuts Trigger Button (TASK-404 / US-A11Y-001) */}
+            <button
+              type="button"
+              className="topbar-search-trigger topbar-shortcuts-trigger"
+              style={{ width: "auto", padding: "0 10px", gap: "6px" }}
+              onClick={() => setShortcutsModalOpen(true)}
+              title="View keyboard shortcuts (?)"
+              aria-label="View keyboard shortcuts"
+            >
+              <Keyboard size={15} />
+              <kbd className="topbar-search-kbd">?</kbd>
+            </button>
+
             {/* Live Demo Persona Switcher */}
             <PersonaSwitcher
               currentRole={activeRoleName}
@@ -443,7 +506,13 @@ export function AppShell({
         </header>
 
         {/* Page Content Body with TASK-003 Workspace State Isolation */}
-        <main className="taskora-page-body" aria-busy={switchingWorkspace}>
+        <main
+          id="main-content"
+          className="taskora-page-body"
+          tabIndex="-1"
+          role="main"
+          aria-busy={switchingWorkspace}
+        >
           {switchingWorkspace && (
             <div
               className="workspace-switching-overlay"
@@ -466,17 +535,30 @@ export function AppShell({
 
       {/* Create Workspace Modal */}
       {showCreateOrgModal && (
-        <div className="member-modal-backdrop" onClick={() => !creatingOrg && setShowCreateOrgModal(false)}>
-          <div className="member-dialog create-org-dialog" onClick={(e) => e.stopPropagation()}>
+        <div
+          className="member-modal-backdrop"
+          onClick={() => !creatingOrg && setShowCreateOrgModal(false)}
+          role="presentation"
+        >
+          <div
+            ref={createOrgRef}
+            className="member-dialog create-org-dialog"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="create-org-heading"
+            onClick={(e) => e.stopPropagation()}
+          >
             <div className="member-dialog-header">
               <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
                 <Building2 size={20} style={{ color: "#10B981" }} />
-                <h3>Provision New Workspace</h3>
+                <h3 id="create-org-heading">Provision New Workspace</h3>
               </div>
               <button
+                type="button"
                 className="member-modal-close"
                 onClick={() => setShowCreateOrgModal(false)}
                 disabled={creatingOrg}
+                aria-label="Close provision workspace dialog"
               >
                 <X size={16} />
               </button>
@@ -550,6 +632,12 @@ export function AppShell({
           );
         }}
         onOpenProjectWizard={onOpenWizard}
+      />
+
+      {/* Keyboard Shortcuts Cheatsheet Modal (TASK-404 / US-A11Y-001) */}
+      <KeyboardShortcutsModal
+        isOpen={shortcutsModalOpen}
+        onClose={() => setShortcutsModalOpen(false)}
       />
     </div>
   );

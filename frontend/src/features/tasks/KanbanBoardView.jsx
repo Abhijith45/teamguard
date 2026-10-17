@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import {
   AlertCircle,
   CheckSquare,
@@ -20,6 +20,7 @@ import { TaskDetailDrawer } from "./TaskDetailDrawer.jsx";
 import { TaskListView } from "./TaskListView.jsx";
 import { TaskTableView } from "./TaskTableView.jsx";
 import { DueDateBadge } from "./DueDateBadge.jsx";
+import { useFocusTrap } from "../../hooks/useFocusTrap.js";
 
 const COLUMNS = [
   { id: "TODO", label: "To do", dotColor: "#A855F7" },
@@ -54,6 +55,13 @@ export function KanbanBoardView({ user, activeOrg, userPermissions, onShowNotice
   const [newPriority, setNewPriority] = useState("MEDIUM");
   const [newProjectId, setNewProjectId] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const createTaskModalRef = useRef(null);
+
+  useFocusTrap({
+    containerRef: createTaskModalRef,
+    isOpen: createModalOpen,
+    onEscape: () => setCreateModalOpen(false),
+  });
 
   // Detail Drawer state (TASK-204)
   const [editingTask, setEditingTask] = useState(null);
@@ -136,6 +144,17 @@ export function KanbanBoardView({ user, activeOrg, userPermissions, onShowNotice
   useEffect(() => {
     setCurrentPage(1);
   }, [searchTerm, filterProject, filterAssignee, filterStatus, filterPriority, pageSize]);
+
+  // US-A11Y-002: Listen for global 'C' key quick create task trigger
+  useEffect(() => {
+    function handleQuickCreate() {
+      if (canCreateTask) {
+        setCreateModalOpen(true);
+      }
+    }
+    window.addEventListener("teamguard:quick-create-task", handleQuickCreate);
+    return () => window.removeEventListener("teamguard:quick-create-task", handleQuickCreate);
+  }, [canCreateTask]);
 
   function canEditTask(task) {
     if (!task) return false;
@@ -883,14 +902,22 @@ export function KanbanBoardView({ user, activeOrg, userPermissions, onShowNotice
 
       {/* Quick Add Task Modal */}
       {createModalOpen && (
-        <div className="modal-backdrop" onClick={() => setCreateModalOpen(false)}>
-          <div className="modal-dialog" onClick={(e) => e.stopPropagation()}>
+        <div className="modal-backdrop" onClick={() => setCreateModalOpen(false)} role="presentation">
+          <div
+            ref={createTaskModalRef}
+            className="modal-dialog"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="create-task-heading"
+            onClick={(e) => e.stopPropagation()}
+          >
             <div className="modal-header">
-              <h3>Create New Task</h3>
+              <h3 id="create-task-heading">Create New Task</h3>
               <button
                 type="button"
                 className="icon-btn-ghost"
                 onClick={() => setCreateModalOpen(false)}
+                aria-label="Close task creation dialog"
               >
                 ✕
               </button>
