@@ -48,6 +48,17 @@ export function getQuickActions({ currentSection = "", permissions = [] } = {}) 
       keywords: ["projects", "repos", "workspace", "initiatives"],
     },
     {
+      id: "nav-calendar",
+      type: "action",
+      category: "Quick Actions",
+      title: "Go to Workspace Calendar",
+      subtitle: "Monthly release grid & scheduled milestones",
+      iconName: "Calendar",
+      actionType: "navigate",
+      targetSection: "calendar",
+      keywords: ["calendar", "schedule", "releases", "milestones", "due dates", "grid"],
+    },
+    {
       id: "nav-members",
       type: "action",
       category: "Quick Actions",

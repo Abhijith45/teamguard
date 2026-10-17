@@ -5,6 +5,7 @@ import {
   CornerDownLeft,
   ArrowUp,
   ArrowDown,
+  Calendar,
   LayoutDashboard,
   CheckSquare,
   FolderGit2,
@@ -212,6 +213,8 @@ export function CommandPaletteModal({
           return <ScrollText size={16} className="cmd-icon-action" />;
         case "FileText":
           return <FileText size={16} className="cmd-icon-action" />;
+        case "Calendar":
+          return <Calendar size={16} className="cmd-icon-action" />;
         case "User":
           return <User size={16} className="cmd-icon-action" />;
         default:
