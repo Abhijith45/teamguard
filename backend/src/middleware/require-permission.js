@@ -26,3 +26,24 @@ export function requirePermission(resource, action) {
     });
   };
 }
+
+/**
+ * Middleware that allows request if caller holds ANY of the specified permission grants.
+ */
+export function requireAnyPermission(...permissions) {
+  return (req, res, next) => {
+    if (!req.userPermissions) {
+      return res.status(403).json({ error: "Access denied: organization membership context missing" });
+    }
+
+    const hasAny = permissions.some((perm) => req.userPermissions.has(perm));
+    if (hasAny) {
+      return next();
+    }
+
+    return res.status(403).json({
+      error: "Permission denied",
+      requiredPermissions: permissions,
+    });
+  };
+}

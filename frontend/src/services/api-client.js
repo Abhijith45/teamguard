@@ -114,15 +114,38 @@ function isTenantScoped(path) {
 
 async function readResponse(response) {
   if (response.status === 204) return null;
-  const payload = await response.json().catch(() => ({}));
+  const contentType = response.headers.get("content-type") || "";
+  let payload;
+  if (contentType.includes("application/json")) {
+    payload = await response.json().catch(() => ({}));
+  } else if (contentType.includes("text/csv") || contentType.includes("text/plain")) {
+    payload = await response.text();
+  } else {
+    payload = await response.json().catch(() => response.text());
+  }
+
   if (!response.ok) {
-    const error = new Error(payload.error ?? `Request failed (${response.status})`);
+    const errorMsg = typeof payload === "object" ? payload?.error : payload;
+    const error = new Error(errorMsg ?? `Request failed (${response.status})`);
     error.status = response.status;
-    error.code = payload.code;
+    if (typeof payload === "object") error.code = payload?.code;
     throw error;
   }
   return payload;
 }
+
+export function triggerCsvDownload(csvString, filename) {
+  const blob = new Blob([csvString], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.setAttribute("href", url);
+  link.setAttribute("download", filename);
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
+}
+
 
 export function refreshSession() {
   if (!refreshRequest) {
@@ -433,6 +456,26 @@ export const api = {
       body: { targetOrganizationId, designatedMemberId, ticketId, justification, mfaToken },
     }),
   getPlatformAuditLogs: () => request("/platform/audit-logs", { skipCache: true }),
+
+  // Compliance & Velocity Reporting (TASK-507 / DP-REP-001 / US-REP-001)
+  getReportsSummary: () => request("/reports/summary"),
+  downloadTasksVelocityCsv: async (params = {}) => {
+    const q = new URLSearchParams();
+    if (params.projectId) q.set("projectId", params.projectId);
+    if (params.from) q.set("from", params.from);
+    if (params.to) q.set("to", params.to);
+    const queryStr = q.toString() ? `?${q.toString()}` : "";
+    return request(`/reports/tasks/csv${queryStr}`, { skipCache: true });
+  },
+  downloadAuditComplianceCsv: async (params = {}) => {
+    const q = new URLSearchParams();
+    if (params.action) q.set("action", params.action);
+    if (params.resourceType) q.set("resourceType", params.resourceType);
+    if (params.from) q.set("from", params.from);
+    if (params.to) q.set("to", params.to);
+    const queryStr = q.toString() ? `?${q.toString()}` : "";
+    return request(`/reports/audit/csv${queryStr}`, { skipCache: true });
+  },
 };
 
 export const apiClient = api;

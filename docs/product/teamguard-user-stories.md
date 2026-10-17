@@ -2745,10 +2745,11 @@ As an authenticated user, I want an Account Settings page showing my personal de
 - **Module**: Account Settings, Reports & Development Features
 - **Primary actor**: Organization Admin / Project Manager
 - **Supporting actors**: None
-- **Requirement approval status**: Proposed — Pending Approval
-- **Implementation status**: Absent from repository (Navigation item placeholder)
-- **Decision blocker status**: Blocked by Product Decision (Reporting Scope)
-- **Priority**: Low
+- **Requirement approval status**: Approved Requirement
+- **Implementation status**: Verified in Repository
+- **Decision blocker status**: Unblocked (DP-REP-001 Ratified)
+- **Implementation evidence**: Verified in [reports.controller.js](file:///c:/Users/Abhijeet%20Rawat/Desktop/rbac/backend/src/controllers/reports.controller.js), [reports.test.js](file:///c:/Users/Abhijeet%20Rawat/Desktop/rbac/backend/test/reports.test.js), and [AuditReportsView.jsx](file:///c:/Users/Abhijeet%20Rawat/Desktop/rbac/frontend/src/features/reports/AuditReportsView.jsx)
+- **Priority**: Medium
 - **Dependencies**: Unresolved Reporting Scope Decision, `US-TENANT-001`, `US-DASH-001`
 - **Security impact**: Strict tenant data scoping for report exports; non-repudiable audit logging for sensitive metric exports
 
@@ -2960,7 +2961,7 @@ The following table provides requirement-level verification for all 60 PRD Featu
 | `TG-AUDIT-002`| Administrative Slide-Over Audit Trail Inspection | `US-AUDIT-002` | PRD §7.16: Slide-over drawer displaying chronological audit entries with actor details. Verified in `US-AUDIT-002` AC 1-3. | Unverified / Planned | Unblocked | Fully Covered (Planned) |
 | `TG-DEV-001`  | Live Demo Persona Switcher | `US-DEV-001` | PRD §7.21: 1-click test persona switching in development; disabled in production. Verified in `US-DEV-001` AC 1-2 (Test #1 in rbac.test.js). | Verified in Repository | Unblocked | Fully Covered (Verified Dev-Only) |
 | `TG-ACC-001`  | Account Settings & Permissions Display | `US-ACC-001` | PRD §7.19: User profile view, active organization membership roles, effective permissions list. Verified in `US-ACC-001` AC 1-2. | Verified in Repository | Unblocked | Fully Covered (Verified) |
-| `TG-REP-001`  | Reports & Export | `US-REP-001` | PRD §7.18: Navigation placeholder only in UI; compliance export scope pending definition. Covered in `US-REP-001` AC 1-4 (tenant isolation & audit). | Absent from repository | Blocked by Reporting Scope | Covered (Blocked by Decision) |
+| `TG-REP-001`  | Reports & Export | `US-REP-001` | PRD §7.18: Streaming CSV export of workspace task velocity and security audit history. Verified in `US-REP-001` AC 1-4. | Verified in Repository | Unblocked (DP-REP-001 Ratified) | Fully Covered (Verified) |
 | `TG-A11Y-001` | Keyboard Interactions & Accessibility | `US-A11Y-001`, `US-A11Y-002`, `US-A11Y-003` | PRD §7.20: Visible focus rings (`:focus-visible`) and WCAG AA contrast verified in CSS. Global keyboard shortcuts (`Esc`, `C`) planned in `US-A11Y-001` AC 1, `US-A11Y-002` AC 1-2, `US-A11Y-003` AC 1-3. | Partially Implemented (Baseline CSS verified; shortcuts planned) | Unblocked | Partially Covered (Baseline Verified, Gaps Identified) |
 
 ---

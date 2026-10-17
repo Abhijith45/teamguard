@@ -51,7 +51,7 @@ In strict adherence to TeamGuard document governance:
 | **UD-004** | Rich Text Description & Comment Editor | `ACCEPTED_RATIFIED` | Principal Architect | Product Steering & UX Lead | `US-COLLAB-004` | `TG-EDT-001` | Option A: TipTap / ProseMirror with DOMPurify | JSON ProseMirror document schema; server-side DOMPurify HTML sanitization; CSP compliance. Ratified in TASK-504. |
 | **UD-005** | Member Invitation Delivery Mechanism | `ACCEPTED_RATIFIED` | Principal Architect | Product Steering & Security Lead | `US-INV-001`, `US-INV-002`, `US-INV-003` | `TG-INV-001` | Option B: Resend Transactional Email API + Token Fallback | Resend transactional email API; 7-day token expiration; strict recipient email matching; SHA-256 token hashing; Universal Delegation Barrier. Ratified in TASK-505. |
 | **DP-TASK-001** | Task Creator vs. Assignee Policy Bifurcation | `ACCEPTED_RATIFIED` | Principal Architect | Product Steering Committee | `US-ABAC-004` | `TG-ABAC-001` | Option B: Discrete Bifurcation (`task:update:own` vs. `assigned`) | Discrete permissions; ABAC evaluates creator strictly for `task:update:own` and assignee strictly for `task:update:assigned`; title mutation restricted to creator. Ratified in TASK-506. |
-| **DP-REP-001** | Reporting Scope, Metrics & Export Formats | `PROPOSED_RECOMMENDATION` | Principal Architect | Product Steering Committee | `US-REP-001` | `TG-REP-001` | Option A: Streaming CSV Export of Task Velocity & Audit History | Direct database streaming of CSV format (`text/csv`); zero heavy binary PDF dependencies. |
+| **DP-REP-001** | Reporting Scope, Metrics & Export Formats | `ACCEPTED_RATIFIED` | Principal Architect | Product Steering Committee | `US-REP-001` | `TG-REP-001` | Option A: Streaming CSV Export of Task Velocity & Audit History | Direct database streaming of CSV format (`text/csv`); zero heavy binary PDF dependencies. Ratified in TASK-507. |
 
 ---
 
@@ -321,9 +321,11 @@ Stakeholders require visibility into workspace velocity, completion rates, and a
 - **Option A (Recommended)**: Streaming CSV Export of Task Velocity & Audit History (`text/csv`). Zero binary rendering dependencies; lightweight; instant export downloads.
 - **Option B**: Full Graphical Multi-Page PDF Generation via Headless Chromium.
 
-#### 4. Required Stakeholder Action
-> [!IMPORTANT]
-> **Action Required**: Stakeholder approval of **Option A** (Phase 1 CSV task & audit report exports).
+#### 4. Stakeholder Decision & Ratification
+- **Status**: `ACCEPTED_RATIFIED (Option A: Streaming CSV Export of Task Velocity & Audit History)`
+- **Ratified By**: Product Steering Committee & Lead Security Architect
+- **Ratification Date**: 2026-10-17
+- **Implementation Evidence**: Delivered in `backend/src/controllers/reports.controller.js`, `backend/src/services/reports.service.js`, `backend/test/reports.test.js`, and `frontend/src/features/reports/AuditReportsView.jsx`. `TASK-507` Completed & Verified.
 
 ---
 

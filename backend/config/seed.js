@@ -31,6 +31,8 @@ const permissionsData = [
   { resource: "roles", action: "manage", description: "Manage roles and permissions" },
   { resource: "audit", action: "read", description: "Read security audit logs" },
   { resource: "profile", action: "read", description: "Read user profile" },
+  // Reports & Analytics (DP-REP-001 / US-REP-001 / TASK-507)
+  { resource: "report", action: "export", description: "Export workspace compliance and velocity reports" },
 ];
 
 async function main() {
@@ -125,6 +127,7 @@ async function main() {
       "project:view", "project:create", "project:update",
       "task:view", "task:create", "task:update:any", "task:assign", "task:export",
       "files:view", "files:upload", "files:update", "files:download",
+      "report:export",
       "profile:read"
     ];
     for (const key of managerKeys) {

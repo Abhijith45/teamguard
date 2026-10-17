@@ -895,17 +895,18 @@ Work is sequenced strictly by technical dependencies, security invariants, and r
   - Frontend UI: Title input in `TaskDetailDrawer.jsx` is visually locked with an author requirement hint when user is assignee without creator authority.
 - **Verification**: 9 automated tests in `backend/test/bifurcation.test.js`, 4 unit tests in `frontend/src/features/tasks/task-drawer-dnd.test.js`, and title lock in `TaskDetailDrawer.jsx`.
 
-#### Task ID: TASK-507 (Blocked) — Compliance & Velocity Reporting CSV Export
+#### Task ID: TASK-507 — Compliance & Velocity Reporting CSV Export
 - **Objective**: Stream organization task velocity and security audit history as CSV downloads.
 - **Linked User Stories**: `US-REP-001`
 - **Linked PRD Features**: `TG-REP-001`
-- **Priority**: Low (P3)
-- **Status**: Blocked by Product Decision (Reporting Scope DP-REP-001)
-- **Affected Files**: `backend/src/controllers/reports.controller.js`
-- **Provisional Specification**:
-  - Server streams database records as CSV with `Content-Type: text/csv`.
-- **Dependencies & Blockers**: **DP-REP-001 Ratification Required**.
-- **Effort Estimate Range**: S–M (2 business days).
+- **Priority**: Medium (P2)
+- **Status**: Completed & Verified (DP-REP-001 Ratified)
+- **Affected Files**: `backend/src/controllers/reports.controller.js`, `backend/src/services/reports.service.js`, `backend/src/routes/reports.routes.js`, `frontend/src/features/reports/AuditReportsView.jsx`, `frontend/src/features/reports/reportsUtils.js`
+- **Specification**:
+  - Server streams database records as CSV with `Content-Type: text/csv; charset=utf-8` and RFC 4180 escaping with formula injection defense.
+  - Multi-tab UI for Compliance & Audit Trail and Velocity & Completion Rates.
+  - Generates immutable `AuditLog` entry with `action: "report:export"`.
+- **Verification**: 13 automated tests in `backend/test/reports.test.js`, 5 unit tests in `frontend/src/features/reports/reportsUtils.test.js`.
 
 ---
 
@@ -1168,10 +1169,10 @@ Activated only after stakeholder decisions UD-001 through UD-005 are formally ra
 | **Command Palette** | 2 | 2 | 2 Verified | `TASK-401` |
 | **Accessibility (WCAG AA)** | 3 | 3 | 1 Verified, 2 Partially Implemented | `TASK-404` |
 | **Account Management** | 1 | 1 | 1 Verified | `TASK-005` |
-| **Reporting & Analytics** | 1 | 1 | 1 Blocked (Reporting Scope) | `TASK-507 (Blocked)` |
+| **Reporting & Analytics** | 1 | 1 | 1 Verified | `TASK-507` |
 | **Developer Tooling** | 1 | 1 | 1 Verified | `TASK-006` |
 | **State Synchronization** | 2 | 1 | 2 Verified | `TASK-503` |
-| **TOTALS RECONCILED** | **79 Stories** | **60 Features** | **46 Verified, 5 Partial, 23 Planned, 5 Blocked** | **35 Tasks across 7 Phases (32 Story-Linked + 3 Operational)** |
+| **TOTALS RECONCILED** | **79 Stories** | **60 Features** | **47 Verified, 5 Partial, 23 Planned, 4 Blocked** | **35 Tasks across 7 Phases (32 Story-Linked + 3 Operational)** |
 
 ---
 
@@ -1184,7 +1185,7 @@ Prior to expanding into Phase 5, stakeholder sign-off is required on the 7 archi
 4. **UD-004**: Ratified (Option A: TipTap / ProseMirror rich text editor with strict DOMPurify sanitization — `TASK-504` Completed).
 5. **UD-005**: Ratified (Option B: Resend Transactional Email API with 7-Day Token Link Fallback — `TASK-505` Completed & Verified).
 6. **DP-TASK-001**: Ratified (Option B: Discrete Permission Bifurcation `task:update:own` vs. `task:update:assigned` — `TASK-506` Completed & Verified).
-7. **DP-REP-001**: Confirm Phase 1 CSV export scope for task velocity and audit logs.
+7. **DP-REP-001**: Ratified (Option A: Streaming CSV Export of Task Velocity & Audit History — `TASK-507` Completed & Verified).
 
 ---
 

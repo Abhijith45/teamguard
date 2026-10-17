@@ -22,6 +22,7 @@ import searchRoutes from "./routes/search.routes.js";
 import demoRoutes from "./routes/demo.routes.js";
 import platformRoutes from "./routes/platform.routes.js";
 import syncRoutes from "./routes/sync.routes.js";
+import reportsRoutes from "./routes/reports.routes.js";
 import { errorHandler } from "./middleware/error-handler.js";
 
 const app = express();
@@ -140,6 +141,8 @@ app.use("/api/search", searchRoutes);
 app.use("/api/demo", demoRoutes);
 app.use("/api/platform", platformRoutes);
 app.use("/api/v1/platform", platformRoutes);
+app.use("/api/reports", reportsRoutes);
+app.use("/api/v1/reports", reportsRoutes);
 
 app.use((_req, res) => {
   res.status(404).json({ error: "Route not found" });

@@ -106,7 +106,7 @@ export async function createOrganization(req, res, next) {
 
       // Assign partial permissions to Manager, Member, Stakeholder
       for (const p of allPerms) {
-        if (["dashboard", "project", "task", "files"].includes(p.resource)) {
+        if (["dashboard", "project", "task", "files", "report"].includes(p.resource)) {
           if (!p.action.includes("delete") && !p.action.includes("manage")) {
             await tx.rolePermission.create({
               data: { roleId: managerRole.id, permissionId: p.id },
