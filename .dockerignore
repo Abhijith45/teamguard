@@ -1,0 +1,17 @@
+node_modules
+dist
+.env
+.env.*
+!.env.example
+*.log
+coverage
+.git
+.agents
+.vscode
+.idea
+backups/*.sql
+backups/*.meta.json
+backups/test-run
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
