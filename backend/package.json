@@ -11,6 +11,9 @@
     "db:migrate": "prisma migrate dev",
     "db:deploy": "prisma migrate deploy",
     "db:seed": "prisma db seed",
+    "db:baseline": "node scripts/baseline-migrations.js",
+    "db:backup": "node scripts/backup-db.js",
+    "db:restore": "node scripts/restore-backup.js",
     "test": "node --test --test-concurrency=1"
   },
   "keywords": [
