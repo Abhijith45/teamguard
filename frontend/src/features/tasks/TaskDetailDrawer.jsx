@@ -62,7 +62,7 @@ export function TaskDetailDrawer({
   if (!task) return null;
 
   const isArchived = Boolean(task.project?.isArchived);
-  const userPermsSet = useMemo(() => new Set(userPermissions), [userPermissions]);
+  const userPermsSet = new Set(userPermissions || []);
   const canUpdateAny = userPermsSet.has("task:update:any") || userPermsSet.has("task:manage");
   const isCreator = Boolean(currentUser?.id && task?.creatorId === currentUser.id);
   const canEditTitle = canEdit && (canUpdateAny || (userPermsSet.has("task:update:own") && isCreator));

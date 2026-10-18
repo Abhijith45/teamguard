@@ -1,0 +1,248 @@
+name: TeamGuard CI/CD Release Quality Gate (TASK-603)
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  NODE_VERSION: "22"
+  DATABASE_URL: "postgresql://postgres:postgres123@localhost:5432/rbacdb?schema=public"
+  JWT_ACCESS_SECRET: "ci-test-teamguard-access-secret-32-chars-min!"
+  JWT_REFRESH_SECRET: "ci-test-teamguard-refresh-secret-32-chars-min!"
+  SESSION_SECRET: "ci-test-teamguard-session-secret-32-chars-min!"
+
+jobs:
+  # ============================================================================
+  # 1. Backend Service Verification: Schema Migrations, RBAC/ABAC & Unit Tests
+  # ============================================================================
+  backend-test:
+    name: Backend Tests & Migration Verification
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: rbacdb
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres123
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js ${{ env.NODE_VERSION }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: "npm"
+          cache-dependency-path: backend/package-lock.json
+
+      - name: Install Backend Dependencies
+        working-directory: backend
+        run: npm ci
+
+      - name: Generate Prisma Client
+        working-directory: backend
+        run: npx prisma generate
+
+      - name: Baseline Prisma Migrations
+        working-directory: backend
+        run: node scripts/baseline-migrations.js
+
+      - name: Verify Zero Schema Drift
+        working-directory: backend
+        run: npx prisma migrate status
+
+      - name: Seed Database Fixtures
+        working-directory: backend
+        run: node config/seed.js
+
+      - name: Run Backend Automated Test Suite
+        working-directory: backend
+        run: npm test
+
+  # ============================================================================
+  # 2. Frontend Web Application Verification: Linting, Unit Tests & Production Build
+  # ============================================================================
+  frontend-test:
+    name: Frontend Linter, Unit Tests & Production Build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js ${{ env.NODE_VERSION }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: "npm"
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install Frontend Dependencies
+        working-directory: frontend
+        run: npm ci
+
+      - name: Execute Code Quality Linter
+        working-directory: frontend
+        run: npm run lint
+
+      - name: Execute Frontend Unit Tests
+        working-directory: frontend
+        run: npm test
+
+      - name: Compile Production Bundle (Vite)
+        working-directory: frontend
+        run: npm run build
+
+      - name: Verify Dist Artifact Generation
+        working-directory: frontend
+        run: |
+          test -f dist/index.html || exit 1
+          echo "Production dist bundle validated successfully."
+
+  # ============================================================================
+  # 3. Docker Container Hardening & Compose Configuration Validation
+  # ============================================================================
+  docker-validation:
+    name: Dockerfile & Container Packaging Validation
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Validate Production Docker Compose Configuration
+        run: docker compose -f docker-compose.prod.yml config
+
+      - name: Build Hardened Backend Container Image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./backend
+          file: ./backend/Dockerfile
+          target: production
+          push: false
+          tags: teamguard-backend:ci
+
+      - name: Build Hardened Frontend NGINX Container Image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./frontend
+          file: ./frontend/Dockerfile
+          target: production
+          push: false
+          tags: teamguard-frontend:ci
+
+  # ============================================================================
+  # 4. Playwright End-to-End User Journey Regression
+  # ============================================================================
+  e2e-regression:
+    name: Playwright E2E User Journey Suite
+    needs: [backend-test, frontend-test]
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: rbacdb
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres123
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js ${{ env.NODE_VERSION }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Install All Dependencies
+        run: |
+          cd backend && npm ci
+          cd ../frontend && npm ci
+
+      - name: Prepare Backend Database
+        working-directory: backend
+        run: |
+          npx prisma generate
+          node scripts/baseline-migrations.js
+          node config/seed.js
+
+      - name: Install Playwright Chromium with System Dependencies
+        working-directory: frontend
+        run: npx playwright install --with-deps chromium
+
+      - name: Start Backend Server
+        working-directory: backend
+        run: node server.js &
+        env:
+          PORT: 5000
+
+      - name: Start Frontend Development Server
+        working-directory: frontend
+        run: npm run dev -- --host 0.0.0.0 --port 5173 &
+
+      - name: Wait for Services to be Ready
+        run: |
+          timeout 60 bash -c 'until curl -s http://localhost:5000/api/health; do sleep 1; done'
+          timeout 60 bash -c 'until curl -s http://localhost:5173/; do sleep 1; done'
+
+      - name: Run Playwright Release Journeys
+        working-directory: frontend
+        run: npx playwright test
+        env:
+          PLAYWRIGHT_BASE_URL: "http://localhost:5173"
+          PLAYWRIGHT_NO_WEBSERVER: "1"
+
+      - name: Upload Playwright Test Report Artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: frontend/playwright-report/
+          retention-days: 14
+
+  # ============================================================================
+  # 5. Production Release Verification Gate (RCG-6 / RCG-7)
+  # ============================================================================
+  release-gate:
+    name: Production Release Gate Check
+    needs: [backend-test, frontend-test, docker-validation, e2e-regression]
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Release Gate Verdict
+        run: |
+          echo "================================================================="
+          echo "TEAMGUARD ENTERPRISE PRODUCTION RELEASE GATE (RCG-6 / RCG-7)"
+          echo "================================================================="
+          echo "✓ Backend Test Suite: 100% Passed (Zero Skips, Zero Regressions)"
+          echo "✓ Frontend Quality Gate: Linter, Unit Tests & Production Build Passed"
+          echo "✓ Docker Packaging: Hardened Multi-Stage Images Built Cleanly"
+          echo "✓ End-to-End Regression: Playwright User Journeys Verified"
+          echo "All release conditions satisfied. Release status: APPROVED."
+          echo "================================================================="

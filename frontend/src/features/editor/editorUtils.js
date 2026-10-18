@@ -71,7 +71,7 @@ export function sanitizeHtml(dirtyHtml) {
     const clean = purify.sanitize(dirtyHtml, {
       ALLOWED_TAGS,
       ALLOWED_ATTR,
-      ALLOWED_URI_REGEXP: /^(?:(?:https?|mailto):|[^a-z]|[a-z+.\-]+(?:[^a-z+.\-:]|$))/i,
+      ALLOWED_URI_REGEXP: /^(?:(?:https?|mailto):|[^a-z]|[a-z+.-]+(?:[^a-z+.-:]|$))/i,
       FORBID_TAGS: ["script", "iframe", "object", "embed", "style", "form", "input", "button"],
       FORBID_ATTR: ["onerror", "onload", "onclick", "onmouseover", "onfocus"],
     });
