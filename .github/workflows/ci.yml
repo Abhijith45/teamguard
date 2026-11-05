@@ -13,6 +13,7 @@ concurrency:
 env:
   NODE_VERSION: "22"
   DATABASE_URL: "postgresql://postgres:postgres123@localhost:5432/rbacdb?schema=public"
+  DIRECT_URL: "postgresql://postgres:postgres123@localhost:5432/rbacdb?schema=public"
   JWT_ACCESS_SECRET: "ci-test-teamguard-access-secret-32-chars-min!"
   JWT_REFRESH_SECRET: "ci-test-teamguard-refresh-secret-32-chars-min!"
   SESSION_SECRET: "ci-test-teamguard-session-secret-32-chars-min!"
