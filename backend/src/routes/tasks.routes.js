@@ -23,13 +23,29 @@ import { getTaskActivity } from "../controllers/audit.controller.js";
 import { authenticate } from "../middleware/authenticate.js";
 import { resolveTenant } from "../middleware/tenant.middleware.js";
 import { requirePermission } from "../middleware/require-permission.js";
+import { requireTaskDeletePermission } from "../middleware/rbac.middleware.js";
 
 const router = Router();
 
 router.use(authenticate, resolveTenant);
 
-router.get("/", requirePermission("task", "view"), listTasks);
-router.get("/:taskId", requirePermission("task", "view"), getTask);
+const requireTaskViewPermission = (req, res, next) => {
+  const isGuest = req.membership?.accountType === "GUEST" || req.user?.accountType === "GUEST";
+  if (isGuest) {
+    return next();
+  }
+  const p = req.userPermissions;
+  if (!p || (!p.has("task:view") && !p.has("task:read") && !p.has("task:manage"))) {
+    return res.status(403).json({
+      error: "Permission denied",
+      requiredPermission: "task:view",
+    });
+  }
+  next();
+};
+
+router.get("/", requireTaskViewPermission, listTasks);
+router.get("/:taskId", requireTaskViewPermission, getTask);
 router.post("/", requirePermission("task", "create"), createTask);
 
 // Middleware allowing update if user has task:update:any, task:update:own, or task:update:assigned (ABAC verified in service)
@@ -51,7 +67,7 @@ const requireTaskUpdatePermission = (req, res, next) => {
 };
 
 router.patch("/:taskId", requireTaskUpdatePermission, updateTask);
-router.delete("/:taskId", requirePermission("task", "delete"), deleteTask);
+router.delete("/:taskId", requireTaskDeletePermission, deleteTask);
 
 // Nested Subtask Routes (TASK-301 / TG-SUB-001 & TG-SUB-002)
 router.get("/:taskId/subtasks", requirePermission("task", "view"), listSubtasks);

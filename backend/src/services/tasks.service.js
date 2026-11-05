@@ -2,6 +2,7 @@ import { prisma } from "../../config/prisma.js";
 import { logAuditEvent } from "./audit.service.js";
 import { dispatchWorkspaceEvent } from "./event-dispatcher.service.js";
 import { sanitizeRichTextContent, validateDescriptionSize } from "../utils/sanitize.js";
+import { evaluateTwoKeyAction } from "../middleware/rbac.middleware.js";
 
 /**
  * Tasks Service (TASK-203 — Task Core CRUD, Validation, Status Workflow & Priority Engine)
@@ -361,6 +362,11 @@ export async function listTasksService({ organizationId, query = {} }) {
         select: { id: true, title: true, isCompleted: true, order: true },
         orderBy: { order: "asc" },
       },
+      customFieldValues: {
+        include: {
+          customField: true,
+        },
+      },
     },
   };
 
@@ -409,6 +415,11 @@ export async function getTaskService({ organizationId, taskId }) {
           },
         },
         orderBy: { createdAt: "asc" },
+      },
+      customFieldValues: {
+        include: {
+          customField: true,
+        },
       },
     },
   });
@@ -691,7 +702,13 @@ export async function updateTaskService({
 /**
  * Deletes a task scoped to active organization.
  */
-export async function deleteTaskService({ organizationId, actorId, taskId, permissions = new Set() }) {
+export async function deleteTaskService({
+  organizationId,
+  actorId,
+  taskId,
+  permissions = new Set(),
+  membership = null,
+}) {
   const existing = await prisma.task.findFirst({
     where: {
       id: taskId,
@@ -699,7 +716,20 @@ export async function deleteTaskService({ organizationId, actorId, taskId, permi
       project: { deletedAt: null },
     },
     include: {
-      project: { select: { id: true, isArchived: true, status: true } },
+      project: {
+        select: {
+          id: true,
+          isArchived: true,
+          status: true,
+          spaceId: true,
+          space: {
+            select: {
+              id: true,
+              isPrivate: true,
+            },
+          },
+        },
+      },
     },
   });
 
@@ -710,7 +740,82 @@ export async function deleteTaskService({ organizationId, actorId, taskId, permi
   }
 
   // Archival protection
-  verifyProjectNotArchived(existing.project, "delete tasks");
+  if (existing.project?.isArchived || existing.project?.status === "ARCHIVED") {
+    const hasAdminManage = permissions.has("task:manage") || permissions.has("roles:manage");
+    const err = new Error("Cannot delete tasks in an archived project");
+    err.statusCode = hasAdminManage ? 400 : 403;
+    err.code = "PROJECT_ARCHIVED";
+    throw err;
+  }
+
+  // Resolve Spatial Tier if task project is bound to a Space
+  let objectAccessLevel = undefined;
+  if (existing.project?.spaceId) {
+    const isSuperAdminOrOwner =
+      permissions.has("roles:manage") ||
+      permissions.has("space:manage") ||
+      (membership?.roles &&
+        membership.roles.some((mr) => {
+          const name = mr.role?.name || "";
+          const slug = mr.role?.slug || "";
+          return (
+            ["Super Admin", "Admin", "Owner"].includes(name) ||
+            ["super-admin", "admin", "owner"].includes(slug)
+          );
+        }));
+
+    if (isSuperAdminOrOwner) {
+      objectAccessLevel = "FULL";
+    } else {
+      const membershipId =
+        membership?.id ??
+        (
+          await prisma.membership.findUnique({
+            where: { userId_organizationId: { userId: actorId, organizationId } },
+            select: { id: true },
+          })
+        )?.id;
+
+      if (membershipId) {
+        const spaceMember = await prisma.spaceMember.findUnique({
+          where: {
+            spaceId_membershipId: {
+              spaceId: existing.project.spaceId,
+              membershipId,
+            },
+          },
+          select: { accessLevel: true },
+        });
+
+        if (spaceMember) {
+          objectAccessLevel = spaceMember.accessLevel;
+        } else if (existing.project.space && existing.project.space.isPrivate === false) {
+          objectAccessLevel = "EDIT"; // default tier for public space members
+        } else if (existing.project.space && existing.project.space.isPrivate === true) {
+          // Non-member attempting action on task in private space
+          const err = new Error("Forbidden: You cannot access or modify tasks in a private space you are not a member of");
+          err.statusCode = 403;
+          err.code = "PRIVATE_SPACE_ACCESS_DENIED";
+          throw err;
+        }
+      }
+    }
+  }
+
+  // Two-Key Action Authorization Gate
+  const twoKeyResult = evaluateTwoKeyAction({
+    userPermissions: permissions,
+    action: "task:delete",
+    isCreator: existing.creatorId === actorId,
+    objectAccessLevel,
+  });
+
+  if (!twoKeyResult.allowed) {
+    const err = new Error(twoKeyResult.reason || "Forbidden: You cannot delete this task");
+    err.statusCode = 403;
+    err.code = twoKeyResult.layer === "ABAC" ? "CANNOT_DELETE_OTHERS_TASK" : "TIER_RESTRICTION";
+    throw err;
+  }
 
   await prisma.task.delete({
     where: { id: taskId },

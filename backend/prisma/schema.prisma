@@ -28,6 +28,9 @@ model Organization {
   platformAuditLogs PlatformAuditLog[]
   breakGlassAlerts BreakGlassAlertOutbox[]
   invitations     MembershipInvitation[]
+  spaces          Space[]
+  customFields    CustomField[]
+  accessRequests  AccessRequest[]
   createdAt       DateTime     @default(now())
   updatedAt       DateTime     @updatedAt
 }
@@ -66,16 +69,22 @@ model Membership {
   organizationId Int
   department     String?
   status         String           @default("ACTIVE")
+  accountType    AccountType      @default(MEMBER)
   joinedAt       DateTime         @default(now())
   createdAt      DateTime         @default(now())
   updatedAt      DateTime         @updatedAt
   user           User             @relation(fields: [userId], references: [id], onDelete: Cascade)
   organization   Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   roles          MembershipRole[]
+  spaceMemberships SpaceMember[]
+  createdSpaces    Space[]          @relation("SpaceCreator")
+  accessRequests   AccessRequest[]  @relation("AccessRequester")
+  reviewedRequests AccessRequest[]  @relation("AccessReviewer")
 
   @@unique([userId, organizationId])
   @@index([organizationId])
   @@index([userId])
+  @@index([organizationId, accountType])
 }
 
 model Role {
@@ -144,11 +153,15 @@ model Project {
   createdAt      DateTime     @default(now())
   updatedAt      DateTime     @updatedAt
   organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  spaceId        Int?
+  space          Space?       @relation(fields: [spaceId], references: [id], onDelete: SetNull)
   tasks          Task[]
   files          FileAsset[]
 
   @@unique([organizationId, key])
   @@index([organizationId])
+  @@index([spaceId])
+  @@index([organizationId, spaceId])
   @@index([deletedAt])
   @@index([organizationId, deletedAt])
   @@index([organizationId, isArchived])
@@ -177,6 +190,7 @@ model Task {
   creator          User         @relation("TaskCreator", fields: [creatorId], references: [id], onDelete: Cascade)
   subtasks         Subtask[]
   comments         Comment[]
+  customFieldValues CustomFieldValue[]
 
   @@index([organizationId])
   @@index([projectId])
@@ -410,4 +424,149 @@ model MembershipInvitation {
   @@index([tokenHash])
   @@index([expiresAt])
 }
+
+// ==========================================
+// 1. ACCOUNT CLASSIFICATION & ACCESS TIERS
+// ==========================================
+
+enum AccountType {
+  MEMBER
+  LIMITED_MEMBER
+  GUEST
+}
+
+enum SpaceAccessLevel {
+  FULL
+  EDIT
+  COMMENT
+  VIEW
+}
+
+enum CustomFieldType {
+  TEXT
+  NUMBER
+  CURRENCY
+  DROPDOWN
+  DATE
+  CHECKBOX
+}
+
+// ==========================================
+// 2. SPATIAL CONTAINER HIERARCHY (ReBAC)
+// ==========================================
+
+model Space {
+  id             Int           @id @default(autoincrement())
+  organizationId Int
+  creatorId      Int?
+  name           String
+  slug           String
+  description    String?
+  icon           String?       @default("Folder")
+  color          String?       @default("#6366f1")
+  isPrivate      Boolean       @default(false)
+  isArchived     Boolean       @default(false)
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  organization   Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  creator        Membership?   @relation("SpaceCreator", fields: [creatorId], references: [id], onDelete: SetNull)
+  projects       Project[]
+  members        SpaceMember[]
+  customFields   CustomField[]
+
+  @@unique([organizationId, slug])
+  @@index([organizationId])
+  @@index([creatorId])
+  @@index([organizationId, isPrivate])
+  @@index([organizationId, isArchived])
+}
+
+model SpaceMember {
+  id           Int              @id @default(autoincrement())
+  spaceId      Int
+  membershipId Int
+  accessLevel  SpaceAccessLevel @default(VIEW)
+  createdAt    DateTime         @default(now())
+
+  space        Space            @relation(fields: [spaceId], references: [id], onDelete: Cascade)
+  membership   Membership       @relation(fields: [membershipId], references: [id], onDelete: Cascade)
+
+  @@unique([spaceId, membershipId])
+  @@index([spaceId])
+  @@index([membershipId])
+}
+
+// ==========================================
+// 3. FIELD-LEVEL ABAC & CUSTOM FIELDS
+// ==========================================
+
+model CustomField {
+  id             Int                @id @default(autoincrement())
+  organizationId Int
+  spaceId        Int?
+  name           String
+  fieldKey       String
+  fieldType      CustomFieldType    @default(TEXT)
+  options        Json?
+  hideFromGuests Boolean            @default(false)
+  adminOnly      Boolean            @default(false)
+  createdAt      DateTime           @default(now())
+  updatedAt      DateTime           @updatedAt
+
+  organization   Organization       @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  space          Space?             @relation(fields: [spaceId], references: [id], onDelete: Cascade)
+  values         CustomFieldValue[]
+
+  @@unique([organizationId, fieldKey])
+  @@index([organizationId])
+  @@index([spaceId])
+}
+
+model CustomFieldValue {
+  id            Int         @id @default(autoincrement())
+  customFieldId Int
+  taskId        Int
+  valueText     String?
+  valueNumber   Float?
+  valueJson     Json?
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+
+  customField   CustomField @relation(fields: [customFieldId], references: [id], onDelete: Cascade)
+  task          Task        @relation(fields: [taskId], references: [id], onDelete: Cascade)
+
+  @@unique([customFieldId, taskId])
+  @@index([taskId])
+  @@index([customFieldId])
+}
+
+// ==========================================
+// 4. ACCESS REQUEST WORKFLOW (Self-Service)
+// ==========================================
+
+model AccessRequest {
+  id                     Int          @id @default(autoincrement())
+  organizationId         Int
+  requesterMembershipId  Int
+  resourceType           String
+  resourceId             Int
+  requestedLevel         String       @default("VIEW")
+  justification          String
+  status                 String       @default("PENDING")
+  reviewedByMembershipId Int?
+  rejectionReason        String?
+  createdAt              DateTime     @default(now())
+  updatedAt              DateTime     @updatedAt
+
+  organization           Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  requester              Membership   @relation("AccessRequester", fields: [requesterMembershipId], references: [id], onDelete: Cascade)
+  reviewer               Membership?  @relation("AccessReviewer", fields: [reviewedByMembershipId], references: [id], onDelete: SetNull)
+
+  @@index([organizationId, status])
+  @@index([requesterMembershipId])
+  @@index([reviewedByMembershipId])
+  @@index([organizationId, resourceType, resourceId])
+}
+
 

@@ -137,7 +137,7 @@ export async function getDashboardDataService({ organizationId, userId }) {
       { dueDate: "asc" },
       { priority: "asc" },
     ],
-    take: 6,
+    take: 50,
     include: {
       project: { select: { id: true, name: true, key: true } },
       assignee: { select: { id: true, name: true, avatarUrl: true } },

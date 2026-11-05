@@ -23,13 +23,18 @@ import demoRoutes from "./routes/demo.routes.js";
 import platformRoutes from "./routes/platform.routes.js";
 import syncRoutes from "./routes/sync.routes.js";
 import reportsRoutes from "./routes/reports.routes.js";
+import spacesRoutes from "./routes/spaces.routes.js";
+import accessRequestsRoutes from "./routes/access-requests.routes.js";
 import { errorHandler } from "./middleware/error-handler.js";
+import { conditionalETagMiddleware } from "./middleware/etag.middleware.js";
+import { cache } from "./lib/cache.js";
 
 const app = express();
 
-const allowedOrigins = (process.env.FRONTEND_ORIGIN ?? "http://localhost:5173")
+const rawOrigins = process.env.FRONTEND_ORIGIN || process.env.CLIENT_URL || "http://localhost:5173";
+const allowedOrigins = rawOrigins
   .split(",")
-  .map((o) => o.trim())
+  .map((o) => o.trim().replace(/\/+$/, ""))
   .filter(Boolean);
 
 // 1. Baseline Helmet Security Headers (TASK-004 / OPS-04)
@@ -91,6 +96,7 @@ app.use(
 
 app.use(express.json({ limit: "1mb" }));
 app.use(cookieParser());
+app.use(conditionalETagMiddleware);
 
 // 3. Database Connectivity Health Check (TASK-004 / OPS-06)
 app.get(["/health", "/api/health"], async (_req, res) => {
@@ -139,10 +145,25 @@ app.use("/api/audit", auditRoutes);
 app.use("/api/notifications", notificationsRoutes);
 app.use("/api/search", searchRoutes);
 app.use("/api/demo", demoRoutes);
+// Cache Telemetry & Diagnostics (TASK-CACHE)
+app.get(["/api/platform/cache-stats", "/api/v1/platform/cache-stats"], (_req, res) => {
+  res.json({
+    status: "healthy",
+    cache: cache.getStats(),
+    timestamp: new Date().toISOString(),
+  });
+});
+
 app.use("/api/platform", platformRoutes);
 app.use("/api/v1/platform", platformRoutes);
+
+
 app.use("/api/reports", reportsRoutes);
 app.use("/api/v1/reports", reportsRoutes);
+app.use("/api/spaces", spacesRoutes);
+app.use("/api/v1/spaces", spacesRoutes);
+app.use("/api/access-requests", accessRequestsRoutes);
+app.use("/api/v1/access-requests", accessRequestsRoutes);
 
 app.use((_req, res) => {
   res.status(404).json({ error: "Route not found" });

@@ -18,6 +18,7 @@ import {
   X,
 } from "lucide-react";
 import { api } from "../../services/api-client.js";
+import { LoadingView } from "../../components/LoadingView.jsx";
 
 export function TeamPermissionsMatrixView({
   activeOrg,
@@ -314,12 +315,7 @@ export function TeamPermissionsMatrixView({
   }, [categories, searchQuery, selectedCategory]);
 
   if (loading) {
-    return (
-      <div className="view-loading-container">
-        <div className="loading-spinner" />
-        <span>Loading role & permission matrix…</span>
-      </div>
-    );
+    return <LoadingView message="Loading role & permission matrix…" />;
   }
 
   if (error) {

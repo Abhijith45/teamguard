@@ -10,7 +10,14 @@ import {
 import { getPublicUser } from "../services/auth.service.js";
 
 const switchSchema = z.object({
-  persona: z.enum(["super-admin", "project-manager", "team-member", "stakeholder", "platform-operator"]),
+  persona: z.enum([
+    "super-admin",
+    "project-manager",
+    "team-member",
+    "stakeholder",
+    "platform-operator",
+    "guest-collaborator",
+  ]),
   organizationSlug: z.string().optional().default("acme-corp"),
 });
 
@@ -20,6 +27,7 @@ const personaEmailMap = {
   "team-member": "member@teamguard.io",
   "stakeholder": "viewer@teamguard.io",
   "platform-operator": "platform-operator@teamguard.internal",
+  "guest-collaborator": "guest@teamguard.io",
 };
 
 export async function switchPersona(req, res, next) {
@@ -43,6 +51,38 @@ export async function switchPersona(req, res, next) {
           isActive: true,
         },
       });
+    }
+
+    if (persona === "guest-collaborator") {
+      const guestUser = await prisma.user.upsert({
+        where: { email: targetEmail },
+        update: { isActive: true },
+        create: {
+          name: "Guest Collaborator",
+          username: "guest_collaborator",
+          email: targetEmail,
+          passwordHash: "demo-hash",
+          isActive: true,
+        },
+      });
+
+      const targetOrg = await prisma.organization.findUnique({
+        where: { slug: organizationSlug },
+      });
+
+      if (targetOrg) {
+        await prisma.membership.upsert({
+          where: { userId_organizationId: { userId: guestUser.id, organizationId: targetOrg.id } },
+          update: { status: "ACTIVE", accountType: "GUEST" },
+          create: {
+            userId: guestUser.id,
+            organizationId: targetOrg.id,
+            status: "ACTIVE",
+            department: "External Contractor",
+            accountType: "GUEST",
+          },
+        });
+      }
     }
 
     const user = await prisma.user.findUnique({

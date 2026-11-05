@@ -225,6 +225,7 @@ export const KEYBOARD_SHORTCUTS = [
     shortcuts: [
       { keys: ["⌘ / Ctrl", "K"], description: "Open Command Palette / Universal Search" },
       { keys: ["?"], description: "Open this Keyboard Shortcuts cheat sheet" },
+      { keys: ["T"], description: "Toggle Light / Dark theme mode" },
       { keys: ["Esc"], description: "Dismiss active modal, drawer, or open menu" },
       { keys: ["Tab"], description: "Move focus to next interactive element" },
       { keys: ["Shift", "Tab"], description: "Move focus to previous interactive element" },

@@ -119,3 +119,63 @@ export function formatRelativeTime(dateInput, now = new Date()) {
   const diffMonths = Math.floor(diffDays / 30);
   return `${diffMonths}mo ago`;
 }
+
+/**
+ * Groups tasks into time horizon buckets (Overdue, Today, Upcoming 7d, In Review, Later).
+ */
+export function groupTasksByHorizon(tasks = [], now = new Date()) {
+  const overdue = [];
+  const today = [];
+  const upcoming = [];
+  const inReview = [];
+  const later = [];
+
+  const nowDateStr = now.toISOString().slice(0, 10);
+  const next7Days = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+
+  for (const t of tasks) {
+    if (t.status === "DONE") continue;
+
+    if (t.status === "REVISION") {
+      inReview.push(t);
+    }
+
+    if (!t.dueDate) {
+      later.push(t);
+      continue;
+    }
+
+    const dueDateObj = new Date(t.dueDate);
+    const dueDateStr = dueDateObj.toISOString().slice(0, 10);
+
+    if (dueDateStr < nowDateStr) {
+      overdue.push(t);
+    } else if (dueDateStr === nowDateStr) {
+      today.push(t);
+    } else if (dueDateObj <= next7Days) {
+      upcoming.push(t);
+    } else {
+      later.push(t);
+    }
+  }
+
+  return {
+    overdue,
+    today,
+    upcoming,
+    inReview,
+    later,
+    totalActionable: overdue.length + today.length + inReview.length,
+  };
+}
+
+/**
+ * Calculates a project's operational health status indicator.
+ */
+export function calculateProjectHealth(project = {}) {
+  if (project.isArchived) return { label: "Archived", tone: "archived", color: "#64748B" };
+  const progress = Number(project.progress) || 0;
+  if (progress >= 80) return { label: "On Track", tone: "healthy", color: "#10B981" };
+  if (progress >= 40) return { label: "In Progress", tone: "active", color: "#2563EB" };
+  return { label: "At Risk", tone: "warning", color: "#F59E0B" };
+}

@@ -14,7 +14,8 @@
     "db:baseline": "node scripts/baseline-migrations.js",
     "db:backup": "node scripts/backup-db.js",
     "db:restore": "node scripts/restore-backup.js",
-    "test": "node --test --test-concurrency=1"
+    "test": "node --test --test-concurrency=1",
+    "build": "prisma generate"
   },
   "keywords": [
     "node",
@@ -35,7 +36,7 @@
     "bcryptjs": "^3.0.2",
     "cookie-parser": "^1.4.7",
     "cors": "^2.8.6",
-    "dotenv": "^18.0.7",
+    "dotenv": "^18.0.9",
     "express": "^5.3.0",
     "express-rate-limit": "^8.7.1",
     "helmet": "^8.3.0",

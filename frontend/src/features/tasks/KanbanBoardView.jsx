@@ -1,14 +1,19 @@
 import { useEffect, useState, useRef } from "react";
 import {
   AlertCircle,
+  ArrowUpDown,
+  Check,
   CheckSquare,
   Edit3,
+  Eye,
   Filter,
+  Inbox,
   Kanban,
   Layers,
   List,
   Lock,
   MessageSquare,
+  MoreHorizontal,
   Plus,
   Search,
   Table,
@@ -16,6 +21,7 @@ import {
   X,
 } from "lucide-react";
 import { api } from "../../services/api-client.js";
+import { LoadingView } from "../../components/LoadingView.jsx";
 import { getWorkspaceEventStream } from "../../services/eventStream.js";
 import {
   applyRealtimeTaskCreate,
@@ -26,6 +32,10 @@ import { TaskDetailDrawer } from "./TaskDetailDrawer.jsx";
 import { TaskListView } from "./TaskListView.jsx";
 import { TaskTableView } from "./TaskTableView.jsx";
 import { DueDateBadge } from "./DueDateBadge.jsx";
+import { ColumnQuickAdd } from "./ColumnQuickAdd.jsx";
+import { CalendarView } from "../calendar/CalendarView.jsx";
+import { ProjectChatView } from "./ProjectChatView.jsx";
+import { Calendar as CalendarIcon, Flag } from "lucide-react";
 import { useFocusTrap } from "../../hooks/useFocusTrap.js";
 
 const COLUMNS = [
@@ -35,21 +45,126 @@ const COLUMNS = [
   { id: "DONE", label: "Done", dotColor: "#10B981" },
 ];
 
-export function KanbanBoardView({ user, activeOrg, userPermissions, onShowNotice }) {
+const AVATAR_COLORS = ["#6366f1", "#0ea5e9", "#10b981", "#f59e0b", "#8b5cf6", "#ec4899"];
+function getAvatarColor(name = "") {
+  let hash = 0;
+  for (let i = 0; i < name.length; i++) hash = name.charCodeAt(i) + ((hash << 5) - hash);
+  return AVATAR_COLORS[Math.abs(hash) % AVATAR_COLORS.length];
+}
+
+function getAvatarInitial(name) {
+  if (!name) return "U";
+  const parts = name.trim().split(" ");
+  if (parts.length >= 2) {
+    return `${parts[0][0]}${parts[1][0]}`.toUpperCase();
+  }
+  return name.slice(0, 2).toUpperCase();
+}
+
+function getPriorityFlag(priority) {
+  switch (priority) {
+    case "URGENT":
+      return <Flag size={13} className="text-red-500 fill-red-500" style={{ color: "#ef4444", fill: "#ef4444" }} />;
+    case "HIGH":
+      return <Flag size={13} className="text-orange-500 fill-orange-500" style={{ color: "#f97316", fill: "#f97316" }} />;
+    case "MEDIUM":
+      return <Flag size={13} className="text-blue-500 fill-blue-500" style={{ color: "#3b82f6", fill: "#3b82f6" }} />;
+    case "LOW":
+      return <Flag size={13} className="text-slate-400 fill-slate-400" style={{ color: "#94a3b8", fill: "#94a3b8" }} />;
+    default:
+      return null;
+  }
+}
+
+
+export function KanbanBoardView({
+  user,
+  activeOrg,
+  userPermissions,
+  onShowNotice,
+  initialProjectId = null,
+  initialViewType = null,
+  onViewTypeChange = null,
+  onProjectChange = null,
+}) {
+  const resolveInitialViewMode = (type) => {
+    if (type === "l" || type === "list") return "list";
+    if (type === "gr" || type === "table") return "table";
+    if (type === "c" || type === "calendar") return "calendar";
+    if (type === "chat") return "chat";
+    try {
+      const saved = localStorage.getItem("teamguard_pref_view");
+      if (saved && ["board", "list", "table", "calendar", "chat"].includes(saved)) {
+        return saved;
+      }
+    } catch {}
+    return "board";
+  };
+
   const [tasks, setTasks] = useState([]);
   const [projects, setProjects] = useState([]);
   const [members, setMembers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [viewMode, setViewMode] = useState("board"); // "board" | "list" | "table"
+  const [viewMode, setViewModeState] = useState(() => resolveInitialViewMode(initialViewType)); // "board" | "list" | "table"
   const [syncStatus, setSyncStatus] = useState("disconnected"); // TASK-503 / UD-003
 
   // Search & Multi-Parameter Filter state (TASK-206)
   const [searchTerm, setSearchTerm] = useState("");
-  const [filterProject, setFilterProject] = useState("ALL");
+  const [filterProject, setFilterProjectState] = useState(() => (initialProjectId ? String(initialProjectId) : "ALL"));
   const [filterAssignee, setFilterAssignee] = useState("ALL");
   const [filterStatus, setFilterStatus] = useState("ALL");
   const [filterPriority, setFilterPriority] = useState("ALL");
+  const [sortBy, setSortBy] = useState("default");
+  const [activeColumnMenu, setActiveColumnMenu] = useState(null);
+  const [selectedTaskIds, setSelectedTaskIds] = useState(new Set());
+  const [bulkSelectionMode, setBulkSelectionMode] = useState(false);
+  const [updatingBulkStatus, setUpdatingBulkStatus] = useState(false);
+  const [newTaskStatus, setNewTaskStatus] = useState("TODO");
+
+  const setViewMode = (newMode) => {
+    setViewModeState(newMode);
+    try {
+      localStorage.setItem("teamguard_pref_view", newMode);
+    } catch {}
+    if (onViewTypeChange) {
+      const code =
+        newMode === "list"
+          ? "l"
+          : newMode === "table"
+          ? "gr"
+          : newMode === "calendar"
+          ? "c"
+          : newMode === "chat"
+          ? "chat"
+          : "b";
+      onViewTypeChange(code);
+    }
+  };
+
+  const setFilterProject = (projId) => {
+    setFilterProjectState(projId);
+    if (onProjectChange && projId !== "ALL") {
+      onProjectChange(projId);
+    }
+  };
+
+  // Sync when initialProjectId changes
+  useEffect(() => {
+    if (initialProjectId) {
+      setFilterProjectState(String(initialProjectId));
+      if (!newProjectId) {
+        setNewProjectId(String(initialProjectId));
+      }
+    }
+  }, [initialProjectId]);
+
+  // Sync when initialViewType changes
+  useEffect(() => {
+    if (initialViewType) {
+      setViewModeState(resolveInitialViewMode(initialViewType));
+    }
+  }, [initialViewType]);
 
   // Pagination state (TASK-206)
   const [currentPage, setCurrentPage] = useState(1);
@@ -73,9 +188,12 @@ export function KanbanBoardView({ user, activeOrg, userPermissions, onShowNotice
   // Detail Drawer state (TASK-204)
   const [editingTask, setEditingTask] = useState(null);
 
-  // Native HTML5 Drag-and-Drop state (TASK-204)
+  // Native HTML5 & Pointer Drag-and-Drop state (TASK-204)
   const [draggingTaskId, setDraggingTaskId] = useState(null);
   const [dragOverColumn, setDragOverColumn] = useState(null);
+  const draggedTaskRef = useRef(null);
+  const dragEnterCountRef = useRef({});
+  const wasDraggingRef = useRef(false);
 
   // Permission checks
   const canCreateTask = userPermissions.has("task:create");
@@ -85,6 +203,8 @@ export function KanbanBoardView({ user, activeOrg, userPermissions, onShowNotice
   const canAssign = userPermissions.has("task:assign") || userPermissions.has("task:manage") || canUpdateAny;
   const canManageProjects = userPermissions.has("project:manage") || userPermissions.has("task:manage") || canUpdateAny;
   const canDeleteTask = userPermissions.has("task:delete") || canUpdateAny;
+  const selectedProject = projects.find((p) => String(p.id) === String(filterProject));
+  const isSelectedProjectArchived = selectedProject?.isArchived === true;
 
   async function loadTasks() {
     try {
@@ -95,11 +215,25 @@ export function KanbanBoardView({ user, activeOrg, userPermissions, onShowNotice
         api.getProjects(),
         api.getMembers().catch(() => ({ members: [] })),
       ]);
-      setTasks(tasksRes.tasks || []);
-      setProjects(projectsRes.projects || []);
+      const fetchedTasks = tasksRes.tasks || [];
+      const fetchedProjects = projectsRes.projects || [];
+      const activeProjects = fetchedProjects.filter((p) => !p.isArchived);
+
+      setTasks(fetchedTasks);
+      setProjects(fetchedProjects);
       setMembers(membersRes.members || []);
-      if (projectsRes.projects?.length > 0 && !newProjectId) {
-        setNewProjectId(String(projectsRes.projects[0].id));
+
+      if (activeProjects.length > 0) {
+        if (!filterProject || filterProject === "ALL") {
+          const defaultProject = activeProjects[0];
+          setFilterProjectState(String(defaultProject.id));
+          setNewProjectId(String(defaultProject.id));
+          if (onProjectChange) {
+            onProjectChange(defaultProject.id);
+          }
+        } else if (!newProjectId) {
+          setNewProjectId(String(activeProjects[0].id));
+        }
       }
     } catch (err) {
       setError(err.message);
@@ -197,10 +331,85 @@ export function KanbanBoardView({ user, activeOrg, userPermissions, onShowNotice
     return () => window.removeEventListener("teamguard:navigate-task", handleNavigate);
   }, [tasks]);
 
+  // Close column menu on outside click
+  useEffect(() => {
+    function handleClickOutside() {
+      setActiveColumnMenu(null);
+    }
+    window.addEventListener("click", handleClickOutside);
+    return () => window.removeEventListener("click", handleClickOutside);
+  }, []);
+
+  function toggleColumnMenu(colId) {
+    setActiveColumnMenu((prev) => (prev === colId ? null : colId));
+  }
+
+  function toggleTaskSelection(taskId) {
+    setSelectedTaskIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(taskId)) next.delete(taskId);
+      else next.add(taskId);
+      return next;
+    });
+  }
+
+  function handleSelectAllInColumn(colId, colTasks) {
+    const ids = colTasks.map((t) => t.id);
+    setSelectedTaskIds(new Set(ids));
+    setBulkSelectionMode(true);
+    setActiveColumnMenu(null);
+  }
+
+  async function handleBulkUpdateStatus(newStatus) {
+    if (selectedTaskIds.size === 0) return;
+    setUpdatingBulkStatus(true);
+    try {
+      const ids = Array.from(selectedTaskIds);
+      await Promise.all(ids.map((id) => api.updateTask(id, { status: newStatus })));
+      setTasks((prev) =>
+        prev.map((t) => (selectedTaskIds.has(t.id) ? { ...t, status: newStatus } : t))
+      );
+      const targetLabel = COLUMNS.find((c) => c.id === newStatus)?.label || newStatus;
+      onShowNotice({
+        type: "success",
+        message: `Updated status of ${ids.length} tasks to "${targetLabel}".`,
+      });
+      setSelectedTaskIds(new Set());
+      setBulkSelectionMode(false);
+      setActiveColumnMenu(null);
+    } catch (err) {
+      onShowNotice({ type: "error", message: `Failed to update status: ${err.message}` });
+    } finally {
+      setUpdatingBulkStatus(false);
+    }
+  }
+
+  async function handleMoveAllColumnTasks(sourceColId, targetColId, colTasks) {
+    if (colTasks.length === 0) return;
+    setActiveColumnMenu(null);
+    setUpdatingBulkStatus(true);
+    try {
+      const ids = colTasks.map((t) => t.id);
+      await Promise.all(ids.map((id) => api.updateTask(id, { status: targetColId })));
+      setTasks((prev) =>
+        prev.map((t) => (ids.includes(t.id) ? { ...t, status: targetColId } : t))
+      );
+      const targetLabel = COLUMNS.find((c) => c.id === targetColId)?.label || targetColId;
+      onShowNotice({
+        type: "success",
+        message: `Moved all ${ids.length} tasks to "${targetLabel}".`,
+      });
+    } catch (err) {
+      onShowNotice({ type: "error", message: `Failed to move column tasks: ${err.message}` });
+    } finally {
+      setUpdatingBulkStatus(false);
+    }
+  }
+
   // Reset pagination page when filters change
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchTerm, filterProject, filterAssignee, filterStatus, filterPriority, pageSize]);
+  }, [searchTerm, filterProject, filterAssignee, filterStatus, filterPriority, sortBy, pageSize]);
 
   // US-A11Y-002: Listen for global 'C' key quick create task trigger
   useEffect(() => {
@@ -306,45 +515,158 @@ export function KanbanBoardView({ user, activeOrg, userPermissions, onShowNotice
     }
   }
 
-  // Native Drag and Drop Event Handlers (TASK-204)
+  // Native Drag and Drop & Pointer Fallback Event Handlers (TASK-204)
   function handleCardDragStart(e, task) {
     if (!canEditTask(task)) {
       e.preventDefault();
       return;
     }
+    wasDraggingRef.current = true;
+    draggedTaskRef.current = task;
+    if (typeof window !== "undefined") {
+      window.__teamguard_dragging_task_id = task.id;
+    }
     setDraggingTaskId(task.id);
-    e.dataTransfer.setData("text/plain", String(task.id));
-    e.dataTransfer.effectAllowed = "move";
+    if (e.dataTransfer) {
+      e.dataTransfer.setData("text/plain", String(task.id));
+      e.dataTransfer.setData("text", String(task.id));
+      e.dataTransfer.effectAllowed = "move";
+    }
   }
 
   function handleCardDragEnd() {
-    setDraggingTaskId(null);
-    setDragOverColumn(null);
+    dragEnterCountRef.current = {};
+    setTimeout(() => {
+      wasDraggingRef.current = false;
+      draggedTaskRef.current = null;
+      if (typeof window !== "undefined") {
+        window.__teamguard_dragging_task_id = null;
+      }
+      setDraggingTaskId(null);
+      setDragOverColumn(null);
+    }, 150);
+  }
+
+  function handleColumnDragEnter(e, colId) {
+    e.preventDefault();
+    dragEnterCountRef.current[colId] = (dragEnterCountRef.current[colId] || 0) + 1;
+    if (dragOverColumn !== colId) {
+      setDragOverColumn(colId);
+    }
   }
 
   function handleColumnDragOver(e, colId) {
     e.preventDefault();
-    e.dataTransfer.dropEffect = "move";
+    if (e.dataTransfer) {
+      e.dataTransfer.dropEffect = "move";
+    }
     if (dragOverColumn !== colId) {
       setDragOverColumn(colId);
     }
   }
 
   function handleColumnDragLeave(e, colId) {
-    if (e.currentTarget.contains(e.relatedTarget)) return;
-    if (dragOverColumn === colId) {
-      setDragOverColumn(null);
+    dragEnterCountRef.current[colId] = (dragEnterCountRef.current[colId] || 0) - 1;
+    if (dragEnterCountRef.current[colId] <= 0) {
+      dragEnterCountRef.current[colId] = 0;
+      if (dragOverColumn === colId) {
+        setDragOverColumn(null);
+      }
     }
   }
 
   function handleColumnDrop(e, targetColId) {
     e.preventDefault();
+    e.stopPropagation();
+    dragEnterCountRef.current = {};
     setDragOverColumn(null);
-    const taskIdStr = e.dataTransfer.getData("text/plain") || (draggingTaskId ? String(draggingTaskId) : null);
+    const taskIdStr =
+      e.dataTransfer?.getData("text/plain") ||
+      e.dataTransfer?.getData("text") ||
+      (draggedTaskRef.current?.id ? String(draggedTaskRef.current.id) : null) ||
+      (typeof window !== "undefined" && window.__teamguard_dragging_task_id ? String(window.__teamguard_dragging_task_id) : null) ||
+      (draggingTaskId ? String(draggingTaskId) : null);
+    if (typeof window !== "undefined") {
+      window.__teamguard_dragging_task_id = null;
+    }
+    draggedTaskRef.current = null;
     setDraggingTaskId(null);
     if (!taskIdStr) return;
     const taskId = Number(taskIdStr);
     handleStatusChange(taskId, targetColId);
+  }
+
+  // Seamless pointer & mouse drag support
+  function handleCardMouseDown(e, task) {
+    if (e.button !== 0 || !canEditTask(task)) return;
+    if (e.target.closest("button, select, input, a, .card-action-btn, .status-dropdown")) {
+      return;
+    }
+    const startX = e.clientX;
+    const startY = e.clientY;
+    let isDraggingPointer = false;
+
+    function onPointerMove(moveEvent) {
+      const dx = Math.abs(moveEvent.clientX - startX);
+      const dy = Math.abs(moveEvent.clientY - startY);
+      if (!isDraggingPointer && (dx > 4 || dy > 4)) {
+        isDraggingPointer = true;
+        wasDraggingRef.current = true;
+        draggedTaskRef.current = task;
+        if (typeof window !== "undefined") {
+          window.__teamguard_dragging_task_id = task.id;
+        }
+        setDraggingTaskId(task.id);
+      }
+      if (isDraggingPointer) {
+        const elem = document.elementFromPoint(moveEvent.clientX, moveEvent.clientY);
+        const colElem = elem?.closest(".kanban-column");
+        if (colElem) {
+          const colTestId = colElem.getAttribute("data-testid");
+          const matchedCol = COLUMNS.find((c) => `kanban-column-${c.id.toLowerCase()}` === colTestId);
+          if (matchedCol && dragOverColumn !== matchedCol.id) {
+            setDragOverColumn(matchedCol.id);
+          }
+        } else if (dragOverColumn) {
+          setDragOverColumn(null);
+        }
+      }
+    }
+
+    function onPointerUp(upEvent) {
+      window.removeEventListener("mousemove", onPointerMove);
+      window.removeEventListener("mouseup", onPointerUp);
+      window.removeEventListener("pointermove", onPointerMove);
+      window.removeEventListener("pointerup", onPointerUp);
+      window.removeEventListener("pointercancel", onPointerUp);
+      if (isDraggingPointer) {
+        const elem = document.elementFromPoint(upEvent.clientX, upEvent.clientY);
+        const colElem = elem?.closest(".kanban-column");
+        if (colElem) {
+          const colTestId = colElem.getAttribute("data-testid");
+          const matchedCol = COLUMNS.find((c) => `kanban-column-${c.id.toLowerCase()}` === colTestId);
+          if (matchedCol) {
+            console.log("[DnD Pointer Up] Moving task", task.id, "to", matchedCol.id);
+            handleStatusChange(task.id, matchedCol.id);
+          }
+        }
+        setTimeout(() => {
+          wasDraggingRef.current = false;
+          draggedTaskRef.current = null;
+          if (typeof window !== "undefined") {
+            window.__teamguard_dragging_task_id = null;
+          }
+          setDraggingTaskId(null);
+          setDragOverColumn(null);
+        }, 150);
+      }
+    }
+
+    window.addEventListener("mousemove", onPointerMove);
+    window.addEventListener("mouseup", onPointerUp);
+    window.addEventListener("pointermove", onPointerMove);
+    window.addEventListener("pointerup", onPointerUp);
+    window.addEventListener("pointercancel", onPointerUp);
   }
 
   async function handleCreateTask(e) {
@@ -388,7 +710,7 @@ export function KanbanBoardView({ user, activeOrg, userPermissions, onShowNotice
 
   // Multi-parameter filter engine (TASK-206)
   const filteredTasks = tasks.filter((t) => {
-    // 1. Search term
+    // 1. Search term (preserved for programmatically dispatched searches)
     if (searchTerm.trim()) {
       const q = searchTerm.trim().toLowerCase();
       const titleMatch = (t.title || "").toLowerCase().includes(q);
@@ -398,7 +720,7 @@ export function KanbanBoardView({ user, activeOrg, userPermissions, onShowNotice
       if (!titleMatch && !descMatch && !keyMatch) return false;
     }
 
-    // 2. Project filter
+    // 2. Project filter (scoped to selected sidebar project)
     if (filterProject !== "ALL" && String(t.projectId) !== String(filterProject)) {
       return false;
     }
@@ -425,27 +747,53 @@ export function KanbanBoardView({ user, activeOrg, userPermissions, onShowNotice
     return true;
   });
 
+  const PRIORITY_ORDER = { URGENT: 4, HIGH: 3, MEDIUM: 2, LOW: 1 };
+
+  // Sort tasks engine
+  const sortedTasks = [...filteredTasks].sort((a, b) => {
+    if (sortBy === "priority_desc") {
+      return (PRIORITY_ORDER[b.priority] || 0) - (PRIORITY_ORDER[a.priority] || 0);
+    }
+    if (sortBy === "priority_asc") {
+      return (PRIORITY_ORDER[a.priority] || 0) - (PRIORITY_ORDER[b.priority] || 0);
+    }
+    if (sortBy === "created_desc") {
+      return new Date(b.createdAt || 0) - new Date(a.createdAt || 0);
+    }
+    if (sortBy === "created_asc") {
+      return new Date(a.createdAt || 0) - new Date(b.createdAt || 0);
+    }
+    if (sortBy === "due_asc") {
+      if (!a.dueDate) return 1;
+      if (!b.dueDate) return -1;
+      return new Date(a.dueDate) - new Date(b.dueDate);
+    }
+    if (sortBy === "due_desc") {
+      if (!a.dueDate) return 1;
+      if (!b.dueDate) return -1;
+      return new Date(b.dueDate) - new Date(a.dueDate);
+    }
+    if (sortBy === "title_asc") {
+      return (a.title || "").localeCompare(b.title || "");
+    }
+    return 0;
+  });
+
   // Pagination calculation for List and Table representations (TASK-206)
-  const totalTasks = filteredTasks.length;
+  const totalTasks = sortedTasks.length;
   const totalPages = Math.max(1, Math.ceil(totalTasks / pageSize));
   const validPage = Math.min(currentPage, totalPages);
   const startIndex = (validPage - 1) * pageSize;
-  const paginatedTasks = filteredTasks.slice(startIndex, startIndex + pageSize);
+  const paginatedTasks = sortedTasks.slice(startIndex, startIndex + pageSize);
 
   const hasActiveFilters =
-    Boolean(searchTerm.trim()) ||
-    filterProject !== "ALL" ||
     filterAssignee !== "ALL" ||
     filterStatus !== "ALL" ||
-    filterPriority !== "ALL";
+    filterPriority !== "ALL" ||
+    sortBy !== "default";
 
   if (loading) {
-    return (
-      <div className="view-loading-container">
-        <div className="loading-spinner" />
-        <span>Loading tasks…</span>
-      </div>
-    );
+    return <LoadingView message="Loading tasks…" />;
   }
 
   return (
@@ -459,7 +807,7 @@ export function KanbanBoardView({ user, activeOrg, userPermissions, onShowNotice
 
         <div className="kanban-header-controls">
           {/* Real-time State Synchronization Badge (TASK-503 / UD-003) */}
-          <div
+          {/* <div
             className={`live-sync-indicator ${syncStatus}`}
             title={`Real-Time SSE Sync: ${syncStatus}`}
             data-testid="live-sync-indicator"
@@ -472,7 +820,7 @@ export function KanbanBoardView({ user, activeOrg, userPermissions, onShowNotice
                 ? "Reconnecting..."
                 : "Sync Offline"}
             </span>
-          </div>
+          </div> */}
 
           {/* Multi-View Mode Tabs (TASK-205) */}
           <div className="view-mode-tabs" role="tablist" aria-label="Task View Modes">
@@ -512,9 +860,33 @@ export function KanbanBoardView({ user, activeOrg, userPermissions, onShowNotice
               <Table size={15} />
               <span>Table</span>
             </button>
+            {/* <button
+              type="button"
+              role="tab"
+              aria-selected={viewMode === "calendar"}
+              className={`view-tab-btn ${viewMode === "calendar" ? "active" : ""}`}
+              onClick={() => setViewMode("calendar")}
+              data-testid="view-tab-calendar"
+              title="Interactive monthly calendar scheduling view"
+            >
+              <CalendarIcon size={15} />
+              <span>Calendar</span>
+            </button> */}
+            {/* <button
+              type="button"
+              role="tab"
+              aria-selected={viewMode === "chat"}
+              className={`view-tab-btn ${viewMode === "chat" ? "active" : ""}`}
+              onClick={() => setViewMode("chat")}
+              data-testid="view-tab-chat"
+              title="Project team discussion channel"
+            >
+              <MessageSquare size={15} />
+              <span>Chat</span>
+            </button> */}
           </div>
 
-          {canCreateTask && (
+          {canCreateTask && !isSelectedProjectArchived && (
             <button
               type="button"
               className="btn-primary-emerald"
@@ -536,50 +908,8 @@ export function KanbanBoardView({ user, activeOrg, userPermissions, onShowNotice
 
       {/* Search, Filter & Pagination Toolbar (TASK-206) */}
       <div className="tasks-filter-toolbar" data-testid="tasks-filter-toolbar">
-        {/* Search Box */}
-        <div className="tasks-search-box">
-          <Search size={15} className="search-icon-muted" />
-          <input
-            type="text"
-            className="tasks-search-input"
-            placeholder="Search by title, description or JIRA key..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            data-testid="tasks-search-input"
-          />
-          {searchTerm && (
-            <button
-              type="button"
-              className="search-clear-btn"
-              onClick={() => setSearchTerm("")}
-              title="Clear search"
-            >
-              <X size={13} />
-            </button>
-          )}
-        </div>
-
         {/* Dropdown Filters */}
         <div className="tasks-dropdown-filters">
-          {/* Project Filter */}
-          <div className="filter-dropdown-group">
-            <Layers size={13} className="filter-icon" />
-            <select
-              className="toolbar-select"
-              value={filterProject}
-              onChange={(e) => setFilterProject(e.target.value)}
-              data-testid="filter-project-select"
-              title="Filter by project container"
-            >
-              <option value="ALL">All Projects</option>
-              {projects.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.key ? `[${p.key}] ` : ""}{p.name}
-                </option>
-              ))}
-            </select>
-          </div>
-
           {/* Assignee Filter */}
           <div className="filter-dropdown-group">
             <User size={13} className="filter-icon" />
@@ -634,6 +964,27 @@ export function KanbanBoardView({ user, activeOrg, userPermissions, onShowNotice
             </select>
           </div>
 
+          {/* Sort Button next to All Priorities */}
+          <div className="filter-dropdown-group">
+            <ArrowUpDown size={13} className="filter-icon" />
+            <select
+              className="toolbar-select"
+              value={sortBy}
+              onChange={(e) => setSortBy(e.target.value)}
+              data-testid="toolbar-sort-select"
+              title="Sort tasks"
+            >
+              <option value="default">Sort by</option>
+              <option value="priority_desc">Priority (High to Low)</option>
+              <option value="priority_asc">Priority (Low to High)</option>
+              <option value="created_desc">Added Date (Newest first)</option>
+              <option value="created_asc">Added Date (Oldest first)</option>
+              <option value="due_asc">Due Date (Earliest first)</option>
+              <option value="due_desc">Due Date (Latest first)</option>
+              <option value="title_asc">Title (A - Z)</option>
+            </select>
+          </div>
+
           {/* Reset Filters */}
           {hasActiveFilters && (
             <button
@@ -641,13 +992,13 @@ export function KanbanBoardView({ user, activeOrg, userPermissions, onShowNotice
               className="btn-reset-filters"
               onClick={() => {
                 setSearchTerm("");
-                setFilterProject("ALL");
                 setFilterAssignee("ALL");
                 setFilterStatus("ALL");
                 setFilterPriority("ALL");
+                setSortBy("default");
               }}
               data-testid="btn-reset-filters"
-              title="Reset all active search and filters"
+              title="Reset active filters and sort"
             >
               Reset
             </button>
@@ -655,16 +1006,35 @@ export function KanbanBoardView({ user, activeOrg, userPermissions, onShowNotice
         </div>
       </div>
 
+      {/* Archival Freeze Banner (TASK-204 / US-ABAC-003) */}
+      {isSelectedProjectArchived && (
+        <div className="archived-project-freeze-banner" role="alert" data-testid="archived-project-banner">
+          <div className="archived-banner-icon">
+            <Lock size={18} />
+          </div>
+          <div className="archived-banner-text">
+            <div className="archived-banner-title-row">
+              <strong className="archived-banner-title">Archival Freeze Active</strong>
+              <span className="archived-banner-rule-pill">US-ABAC-003</span>
+            </div>
+            <p className="archived-banner-description">
+              This project is archived. In accordance with TeamGuard ABAC governance, all tasks are locked in read-only mode and cannot be moved, edited, or reordered.
+            </p>
+          </div>
+        </div>
+      )}
+
       {/* View 1: Kanban Board with Native Drag-and-Drop (TASK-204) */}
       {viewMode === "board" && (
         <div className="kanban-columns-grid">
           {COLUMNS.map((col) => {
-            const colTasks = filteredTasks.filter((t) => t.status === col.id);
+            const colTasks = sortedTasks.filter((t) => t.status === col.id);
             const isOver = dragOverColumn === col.id;
             return (
               <div
                 key={col.id}
                 className={`kanban-column ${isOver ? "drag-over-column" : ""}`}
+                onDragEnter={(e) => handleColumnDragEnter(e, col.id)}
                 onDragOver={(e) => handleColumnDragOver(e, col.id)}
                 onDragLeave={(e) => handleColumnDragLeave(e, col.id)}
                 onDrop={(e) => handleColumnDrop(e, col.id)}
@@ -677,11 +1047,61 @@ export function KanbanBoardView({ user, activeOrg, userPermissions, onShowNotice
                     <span className="column-count-badge">{colTasks.length}</span>
                   </div>
                   <div className="kanban-column-actions">
-                    {canCreateTask && (
+                    {/* Column (...) action button before [+] action button */}
+                    <div className="column-menu-wrapper">
+                      <button
+                        type="button"
+                        className="icon-btn-ghost column-more-btn"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          toggleColumnMenu(col.id);
+                        }}
+                        title={`Column options for ${col.label}`}
+                        aria-label={`Column options for ${col.label}`}
+                      >
+                        <MoreHorizontal size={15} />
+                      </button>
+
+                      {activeColumnMenu === col.id && (
+                        <div className="column-actions-popover" onClick={(e) => e.stopPropagation()}>
+                          <div className="column-popover-header">
+                            <span>{col.label} Actions</span>
+                          </div>
+                          <button
+                            type="button"
+                            className="column-popover-item"
+                            disabled={colTasks.length === 0}
+                            onClick={() => handleSelectAllInColumn(col.id, colTasks)}
+                          >
+                            <CheckSquare size={13} />
+                            <span>Select all to update status</span>
+                          </button>
+                          <div className="column-popover-divider" />
+                          <div className="column-popover-section-label">Move all tasks to:</div>
+                          {COLUMNS.filter((c) => c.id !== col.id).map((targetCol) => (
+                            <button
+                              key={targetCol.id}
+                              type="button"
+                              className="column-popover-item"
+                              disabled={colTasks.length === 0 || isSelectedProjectArchived}
+                              onClick={() => handleMoveAllColumnTasks(col.id, targetCol.id, colTasks)}
+                            >
+                              <span className="column-dot-mini" style={{ backgroundColor: targetCol.dotColor }} />
+                              <span>{targetCol.label}</span>
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+
+                    {canCreateTask && !isSelectedProjectArchived && (
                       <button
                         type="button"
                         className="icon-btn-ghost"
-                        onClick={() => setCreateModalOpen(true)}
+                        onClick={() => {
+                          setNewTaskStatus(col.id);
+                          setCreateModalOpen(true);
+                        }}
                         title="Add task in this column"
                       >
                         <Plus size={16} />
@@ -690,18 +1110,35 @@ export function KanbanBoardView({ user, activeOrg, userPermissions, onShowNotice
                   </div>
                 </div>
 
-                <div className="kanban-column-cards column-drop-zone">
+                <div
+                  className="kanban-column-cards column-drop-zone"
+                  onDragEnter={(e) => handleColumnDragEnter(e, col.id)}
+                  onDragOver={(e) => handleColumnDragOver(e, col.id)}
+                  onDragLeave={(e) => handleColumnDragLeave(e, col.id)}
+                  onDrop={(e) => handleColumnDrop(e, col.id)}
+                >
                   {colTasks.map((task) => {
                     const editable = canEditTask(task);
                     const isDragging = draggingTaskId === task.id;
+                    const isSelected = selectedTaskIds.has(task.id);
                     return (
                       <div
                         key={task.id}
-                        className={`kanban-card ${editable ? "draggable-card" : "card-non-draggable"} ${isDragging ? "is-dragging" : ""} ${!editable ? "card-abac-restricted" : ""}`}
+                        className={`kanban-card ${editable ? "draggable-card" : "card-non-draggable"} ${isDragging ? "is-dragging" : ""} ${isSelected ? "card-selected" : ""}`}
                         draggable={editable}
                         onDragStart={(e) => handleCardDragStart(e, task)}
                         onDragEnd={handleCardDragEnd}
-                        onClick={() => openTaskDetail(task)}
+                        onDragOver={(e) => handleColumnDragOver(e, col.id)}
+                        onDrop={(e) => handleColumnDrop(e, col.id)}
+                        onMouseDown={(e) => handleCardMouseDown(e, task)}
+                        onClick={() => {
+                          if (wasDraggingRef.current) return;
+                          if (bulkSelectionMode) {
+                            toggleTaskSelection(task.id);
+                          } else {
+                            openTaskDetail(task);
+                          }
+                        }}
                         tabIndex={0}
                         role="button"
                         data-testid={`kanban-card-${task.id}`}
@@ -711,122 +1148,60 @@ export function KanbanBoardView({ user, activeOrg, userPermissions, onShowNotice
                             openTaskDetail(task);
                           }
                         }}
-                        title={editable ? "Drag to reorder status or click to view details" : "ABAC Restricted: Click to view details"}
+                        title={bulkSelectionMode ? "Click to toggle selection" : "Click to view task details"}
                       >
-                        <div className="kanban-card-top">
-                          <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-                            <span
-                              className="task-jira-key-badge"
-                              style={{
-                                fontSize: "11px",
-                                fontWeight: "700",
-                                color: "#64748b",
-                                background: "rgba(100, 116, 139, 0.12)",
-                                padding: "2px 6px",
-                                borderRadius: "4px",
-                                letterSpacing: "0.5px",
-                              }}
-                            >
-                              {(task.project?.key || "PROJ")}-{task.id}
-                            </span>
-                            <span className={`tag-priority tag-${task.priority.toLowerCase()}`}>
-                              {task.priority}
-                            </span>
-                            {task.project?.isArchived && (
-                              <span
-                                style={{
-                                  fontSize: "10px",
-                                  fontWeight: "700",
-                                  color: "#f59e0b",
-                                  background: "rgba(245, 158, 11, 0.15)",
-                                  padding: "2px 5px",
-                                  borderRadius: "4px",
-                                }}
-                                title="Project is archived and read-only"
-                              >
-                                ARCHIVED
-                              </span>
-                            )}
+                        {bulkSelectionMode && (
+                          <div className="card-selection-check" onClick={(e) => e.stopPropagation()}>
+                            <input
+                              type="checkbox"
+                              checked={isSelected}
+                              onChange={() => toggleTaskSelection(task.id)}
+                              aria-label={`Select task ${task.title}`}
+                            />
                           </div>
-                          <div className="card-top-actions">
-                            {!editable && (
-                              <span
-                                className="abac-lock-badge"
-                                title={
-                                  task.project?.isArchived
-                                    ? "Project is archived and read-only"
-                                    : `ABAC Restricted: Assigned to ${task.assignee?.name || "another member"}. You cannot edit this task.`
-                                }
-                              >
-                                <Lock size={12} />
-                              </span>
-                            )}
-                            <div className="card-quick-actions">
-                              <button
-                                type="button"
-                                className="card-action-btn"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  openTaskDetail(task);
-                                }}
-                                title="View or edit task details"
-                              >
-                                <Edit3 size={13} />
-                              </button>
-                            </div>
-                          </div>
-                        </div>
-
-                        <h4 className="kanban-card-title">{task.title}</h4>
-                        {task.description && (
-                          <p className="kanban-card-desc">{task.description}</p>
                         )}
 
-                        {/* Interactive Status Transition Pill */}
-                        <div className="kanban-card-status-selector" onClick={(e) => e.stopPropagation()}>
-                          <label className="card-status-label">Move to:</label>
-                          <select
-                            className="status-dropdown"
-                            value={task.status}
-                            disabled={!editable}
-                            onChange={(e) => handleStatusChange(task.id, e.target.value, e)}
-                            title={!editable ? "ABAC Restricted: Only assignee or manager can update status" : "Change task status"}
-                          >
-                            {COLUMNS.map((c) => (
-                              <option key={c.id} value={c.id}>
-                                {c.label}
-                              </option>
-                            ))}
-                          </select>
-                        </div>
+                        <h4 className="kanban-card-title">{task.title}</h4>
 
                         <div className="kanban-card-footer">
-                          <div className="card-assignee-info">
-                            {task.assignee?.avatarUrl ? (
-                              <img
-                                src={task.assignee.avatarUrl}
-                                alt={task.assignee.name}
-                                className="card-avatar"
-                              />
-                            ) : (
-                              <span className="card-avatar-initials">
-                                {task.assignee?.name ? task.assignee.name[0] : "U"}
-                              </span>
+                          <div className="card-meta-left">
+                            <div
+                              className="card-avatar-wrap"
+                              title={task.assignee?.name ? `Assigned to ${task.assignee.name}` : "Unassigned"}
+                            >
+                              {task.assignee?.avatarUrl ? (
+                                <img
+                                  src={task.assignee.avatarUrl}
+                                  alt={task.assignee.name}
+                                  className="card-avatar-img"
+                                />
+                              ) : task.assignee?.name ? (
+                                <span
+                                  className="card-avatar-pill"
+                                  style={{ backgroundColor: getAvatarColor(task.assignee.name) }}
+                                >
+                                  {getAvatarInitial(task.assignee.name)}
+                                </span>
+                              ) : (
+                                <span className="card-avatar-unassigned">
+                                  <User size={11} />
+                                </span>
+                              )}
+                            </div>
+
+                            {task.dueDate && (
+                              <DueDateBadge dueDate={task.dueDate} status={task.status} compact />
                             )}
-                            <span className="assignee-name-snippet">
-                              {task.assignee?.name?.split(" ")[0] || "Unassigned"}
-                            </span>
+
+                            <div className="card-priority-flag" title={`${task.priority} Priority`}>
+                              {getPriorityFlag(task.priority)}
+                            </div>
                           </div>
 
-                          <div className="card-meta-counters">
-                            <DueDateBadge dueDate={task.dueDate} status={task.status} compact />
+                          <div className="card-meta-right">
                             {task.subtasks && task.subtasks.length > 0 && (
                               <span
-                                className={`subtask-card-badge ${
-                                  task.subtasks.every((s) => s.isCompleted)
-                                    ? "subtask-card-badge-complete"
-                                    : ""
-                                }`}
+                                className="subtask-card-badge"
                                 title={`Subtasks: ${task.subtasks.filter((s) => s.isCompleted).length}/${task.subtasks.length} completed`}
                               >
                                 <CheckSquare size={11} />
@@ -835,18 +1210,16 @@ export function KanbanBoardView({ user, activeOrg, userPermissions, onShowNotice
                                 </span>
                               </span>
                             )}
+
                             {Number(task.commentsCount) > 0 && (
                               <span
                                 className="comment-card-badge"
-                                title={`Comments: ${task.commentsCount} discussion items`}
+                                title={`Comments: ${task.commentsCount} discussions`}
                               >
                                 <MessageSquare size={11} />
                                 <span>{task.commentsCount}</span>
                               </span>
                             )}
-                            <span className="counter-item" title="Associated project">
-                              <Layers size={12} /> {task.project?.name || "Project"}
-                            </span>
                           </div>
                         </div>
                       </div>
@@ -854,8 +1227,12 @@ export function KanbanBoardView({ user, activeOrg, userPermissions, onShowNotice
                   })}
 
                   {colTasks.length === 0 && (
-                    <div className="empty-column-placeholder">
-                      <span>No tasks in {col.label}</span>
+                    <div className="empty-column-placeholder" onDragOver={(e) => handleColumnDragOver(e, col.id)} onDrop={(e) => handleColumnDrop(e, col.id)}>
+                      <Inbox size={20} className="empty-column-icon" />
+                      <span className="empty-column-title">No tasks in {col.label}</span>
+                      <small className="empty-column-subtext">
+                        {canCreateTask && !isSelectedProjectArchived ? "Drop tasks here or create one" : "No tasks assigned"}
+                      </small>
                     </div>
                   )}
                 </div>

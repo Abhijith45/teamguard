@@ -1,3 +1,4 @@
+import { cache } from "../lib/cache.js";
 import { z } from "zod";
 import {
   checkPrototypePollution,
@@ -9,6 +10,7 @@ import {
 } from "../services/tasks.service.js";
 
 import { validateDescriptionSize } from "../utils/sanitize.js";
+import { maskTaskPayloadForGuest } from "../utils/mask-guest-fields.js";
 
 const createTaskSchema = z.object({
   projectId: z.number().int().positive(),
@@ -39,6 +41,15 @@ export async function listTasks(req, res, next) {
       query: req.query,
     });
 
+    if (result?.tasks) {
+      result.tasks = maskTaskPayloadForGuest(
+        result.tasks,
+        req.membership?.accountType,
+        req.userPermissions,
+        req.membership?.roles
+      );
+    }
+
     return res.json(result);
   } catch (error) {
     next(error);
@@ -54,8 +65,15 @@ export async function getTask(req, res, next) {
 
     const orgId = req.organizationId;
     const task = await getTaskService({ organizationId: orgId, taskId });
+    const maskedTask = maskTaskPayloadForGuest(
+      task,
+      req.membership?.accountType,
+      req.userPermissions,
+      req.membership?.roles
+    );
 
-    return res.json({ task });
+    cache.invalidateTags([`dashboard:${req.organizationId}`, `reports:${req.organizationId}`]);
+    return res.json({ task: maskedTask });
   } catch (error) {
     next(error);
   }
@@ -78,7 +96,15 @@ export async function createTask(req, res, next) {
       permissions,
     });
 
-    return res.status(201).json({ task });
+    const maskedTask = maskTaskPayloadForGuest(
+      task,
+      req.membership?.accountType,
+      req.userPermissions,
+      req.membership?.roles
+    );
+
+    cache.invalidateTags([`dashboard:${orgId}`, `reports:${orgId}`]);
+    return res.status(201).json({ task: maskedTask });
   } catch (error) {
     if (error.statusCode) {
       return res.status(error.statusCode).json({
@@ -133,7 +159,14 @@ export async function updateTask(req, res, next) {
       permissions,
     });
 
-    return res.json({ task: updated });
+    const maskedTask = maskTaskPayloadForGuest(
+      updated,
+      req.membership?.accountType,
+      req.userPermissions,
+      req.membership?.roles
+    );
+
+    return res.json({ task: maskedTask });
   } catch (error) {
     if (error.statusCode) {
       return res.status(error.statusCode).json({
@@ -162,10 +195,18 @@ export async function deleteTask(req, res, next) {
       actorId,
       taskId,
       permissions,
+      membership: req.membership,
     });
 
-    return res.status(204).end();
+    return cache.invalidateTags([`dashboard:${req.organizationId}`, `reports:${req.organizationId}`]);
+    res.status(204).end();
   } catch (error) {
+    if (error.statusCode) {
+      return res.status(error.statusCode).json({
+        error: error.message,
+        ...(error.code ? { code: error.code } : {}),
+      });
+    }
     next(error);
   }
 }

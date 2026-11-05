@@ -113,6 +113,16 @@ export function getQuickActions({ currentSection = "", permissions = [] } = {}) 
       targetSection: "account",
       keywords: ["settings", "account", "profile", "password", "security"],
     },
+    {
+      id: "action-toggle-theme",
+      type: "action",
+      category: "Quick Actions",
+      title: "Toggle Light / Dark Theme",
+      subtitle: "Switch between dark and light appearance (T)",
+      iconName: "Sun",
+      actionType: "theme-toggle",
+      keywords: ["theme", "dark", "light", "mode", "color", "appearance", "toggle"],
+    },
   ];
 
   // Dynamic creation actions based on RBAC permissions

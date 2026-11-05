@@ -1,31 +1,317 @@
-@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Plus+Jakarta+Sans:wght@500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap');
+
+/* ==========================================================================
+   Minimal UI Design System Tokens & Base Foundation
+   Aligned with TeamGuard ui-ux-pro-max MASTER.md specification
+   ========================================================================== */
 
 :root {
-  font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-  color: #0F172A;
-  background: #F8FAFC;
+  /* Typography */
+  --font-sans: 'Inter', 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-family: var(--font-sans);
+
+  /* Primary Brand & Accent (ClickUp Signature Teal / Emerald) */
+  /* Primary Brand & Accent (High Opacity Emerald) */
+  --color-primary: #00B884;
+  --color-primary-hover: #00A676;
+  --color-primary-active: #008F65;
+  --color-primary-light: #0D2E24;
+  --color-primary-border: #1B5E4A;
+  --color-on-primary: #FFFFFF;
+
+  --color-accent: #00B884;
+  --color-accent-hover: #00A676;
+  --color-accent-light: #0D2E24;
+  --color-accent-border: #1B5E4A;
+  --color-on-accent: #FFFFFF;
+
+  /* Solid Neutrals & Dark Surfaces (High Opacity Elevation Hierarchy) */
+  --color-bg: #0B0E14;            /* Solid Deep Obsidian Canvas */
+  --color-sidebar: #11151F;       /* Solid Elevation 1 */
+  --color-topbar: #11151F;        /* Solid Elevation 1 */
+  --color-surface: #171C26;       /* Solid Elevation 2 (Cards, Panels) */
+  --color-surface-hover: #1F2633; /* Solid Elevation 3 (Hover States) */
+  --color-surface-active: #273042;/* Solid Elevation 4 (Active States) */
+  --color-surface-elevated: #1D2330; /* Solid Floating Modals/Drawers */
+  --color-border: #283142;        /* Solid 100% Opaque Structural Border */
+  --color-border-subtle: #1F2633; /* Solid Opaque Subtle Separator */
+  --color-border-strong: #3B465C; /* High-Contrast Active/Focused Border */
+
+  /* Text & Hierarchy (High Contrast WCAG AAA) */
+  --color-text-main: #F8FAFC;
+  --color-text-primary: #F8FAFC;
+  --color-text-muted: #94A3B8;
+  --color-text-subtle: #64748B;
+  --color-text-disabled: #475569;
+
+  /* High Opacity Status Capsule Tokens (Dark Mode) */
+  --color-status-in-progress: #3B82F6;
+  --color-status-in-progress-bg: #142347;     /* Solid rich cobalt navy */
+  --color-status-in-progress-border: #1E3A8A; /* Solid border */
+  --color-status-in-progress-text: #93C5FD;
+
+  --color-status-todo: #94A3B8;
+  --color-status-todo-bg: #1A202C;            /* Solid slate */
+  --color-status-todo-border: #2D3748;
+  --color-status-todo-text: #E2E8F0;
+
+  --color-status-revision: #F59E0B;
+  --color-status-revision-bg: #352109;        /* Solid rich amber */
+  --color-status-revision-border: #78350F;
+  --color-status-revision-text: #FDE047;
+
+  --color-status-done: #00B884;
+  --color-status-done-bg: #0C2E22;            /* Solid rich emerald */
+  --color-status-done-border: #14533D;
+  --color-status-done-text: #6EE7B7;
+
+  /* Semantic Feedback Tokens (High Opacity Solid Tints) */
+  --color-success: #00B884;
+  --color-success-bg: #0C2E22;
+  --color-success-border: #14533D;
+  --color-success-text: #34D399;
+
+  --color-warning: #F59E0B;
+  --color-warning-bg: #352109;
+  --color-warning-border: #78350F;
+  --color-warning-text: #FBBF24;
+
+  --color-destructive: #EF4444;
+  --color-destructive-bg: #371417;
+  --color-destructive-border: #7F1D1D;
+  --color-destructive-text: #F87171;
+  --color-on-destructive: #FFFFFF;
+
+  --color-ring: #00B884;
+
+  /* Priority Tokens (High Opacity Solid Badges) */
+  --color-urgent: #EF4444;
+  --color-urgent-bg: #371417;
+  --color-urgent-border: #7F1D1D;
+  --color-urgent-text: #FCA5A5;
+
+  --color-high: #F97316;
+  --color-high-bg: #381A08;
+  --color-high-border: #7C2D12;
+  --color-high-text: #FDBA74;
+
+  --color-med: #EAB308;
+  --color-med-bg: #352506;
+  --color-med-border: #713F12;
+  --color-med-text: #FDE047;
+
+  --color-low: #00B884;
+  --color-low-bg: #0C2E22;
+  --color-low-border: #14533D;
+  --color-low-text: #86EFAC;
+
+  /* Spacing Scale (Minimized Density: Margin -50%, Padding -30%) */
+  --space-xs: 2.8px;
+  --space-sm: 5.6px;
+  --space-md: 11.2px;
+  --space-lg: 16.8px;
+  --space-xl: 22.4px;
+  --space-2xl: 33.6px;
+
+  /* Explicit Token Scaling */
+  --pad-xs: 2.8px;
+  --pad-sm: 5.6px;
+  --pad-md: 11.2px;
+  --pad-lg: 16.8px;
+  --pad-xl: 22.4px;
+
+  --mar-xs: 2px;
+  --mar-sm: 4px;
+  --mar-md: 8px;
+  --mar-lg: 12px;
+  --mar-xl: 16px;
+
+  /* Radii */
+  --radius-xs: 4px;
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 10px;
+  --radius-xl: 14px;
+  --radius-full: 9999px;
+
+  /* Minimalist Elevation & Shadows (Crisp dark glow) */
+  --shadow-xs: 0 1px 2px 0 rgba(0, 0, 0, 0.35);
+  --shadow-sm: 0 1px 3px 0 rgba(0, 0, 0, 0.4), 0 1px 2px -1px rgba(0, 0, 0, 0.4);
+  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.45), 0 2px 4px -2px rgba(0, 0, 0, 0.35);
+  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.5), 0 4px 6px -4px rgba(0, 0, 0, 0.4);
+  --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.6), 0 8px 10px -6px rgba(0, 0, 0, 0.4);
+
+  /* Layout Dimensions (ClickUp Standard 48px topbar) */
+  --sidebar-width: 240px;
+  --topbar-height: 48px;
+
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
-* {
+/* ==========================================================================
+   ClickUp 3.0 Light Theme System Tokens
+   Active when documentElement has data-theme="light"
+   ========================================================================== */
+:root[data-theme="light"],
+[data-theme="light"] {
+  /* Solid Light Neutrals & Surfaces (High Opacity Contrast) */
+  --color-bg: #F4F6F9;            /* Solid cool-slate canvas giving white cards punchy pop */
+  --color-sidebar: #FFFFFF;       /* Solid Pure White */
+  --color-topbar: #FFFFFF;        /* Solid Pure White */
+  --color-surface: #FFFFFF;       /* Solid Pure White Surface */
+  --color-surface-hover: #EDF2F7; /* Solid Light Slate Hover */
+  --color-surface-active: #E2E8F0;/* Solid Active State */
+  --color-surface-elevated: #FFFFFF;
+  --color-border: #D3DCE6;        /* Solid 100% Opaque Structural Border */
+  --color-border-subtle: #E5EBF2; /* Solid Subtle Border */
+  --color-border-strong: #CBD5E1; /* High-contrast outline */
+
+  /* Crisp Light Typography & Hierarchy (WCAG AAA) */
+  --color-text-main: #0F172A;
+  --color-text-primary: #0F172A;
+  --color-text-muted: #475569;
+  --color-text-subtle: #64748B;
+  --color-text-disabled: #94A3B8;
+
+  /* Primary Brand & Accent */
+  --color-primary: #00875A;
+  --color-primary-hover: #00704A;
+  --color-primary-active: #005A3B;
+  --color-primary-light: #E6F7F0;
+  --color-primary-border: #A3E3CB;
+  --color-on-primary: #FFFFFF;
+
+  --color-accent: #00875A;
+  --color-accent-hover: #00704A;
+  --color-accent-light: #E6F7F0;
+  --color-accent-border: #A3E3CB;
+  --color-on-accent: #FFFFFF;
+
+  /* High Opacity Status Capsule Tokens (Light Mode) */
+  --color-status-in-progress: #1D4ED8;
+  --color-status-in-progress-bg: #EFF6FF;
+  --color-status-in-progress-border: #BFDBFE;
+  --color-status-in-progress-text: #1E40AF;
+
+  --color-status-todo: #475569;
+  --color-status-todo-bg: #F1F5F9;
+  --color-status-todo-border: #CBD5E1;
+  --color-status-todo-text: #334155;
+
+  --color-status-revision: #B45309;
+  --color-status-revision-bg: #FFFBEB;
+  --color-status-revision-border: #FDE68A;
+  --color-status-revision-text: #92400E;
+
+  --color-status-done: #047857;
+  --color-status-done-bg: #ECFDF5;
+  --color-status-done-border: #A7F3D0;
+  --color-status-done-text: #065F46;
+
+  /* Semantic Feedback Tokens */
+  --color-success: #047857;
+  --color-success-bg: #ECFDF5;
+  --color-success-border: #A7F3D0;
+  --color-success-text: #065F46;
+
+  --color-warning: #B45309;
+  --color-warning-bg: #FFFBEB;
+  --color-warning-border: #FDE68A;
+  --color-warning-text: #92400E;
+
+  --color-destructive: #B91C1C;
+  --color-destructive-bg: #FEF2F2;
+  --color-destructive-border: #FECACA;
+  --color-destructive-text: #991B1B;
+  --color-on-destructive: #FFFFFF;
+
+  --color-ring: #00875A;
+
+  /* Priority Tokens */
+  --color-urgent: #B91C1C;
+  --color-urgent-bg: #FEF2F2;
+  --color-urgent-border: #FECACA;
+  --color-urgent-text: #991B1B;
+
+  --color-high: #C2410C;
+  --color-high-bg: #FFF7ED;
+  --color-high-border: #FED7AA;
+  --color-high-text: #9A3412;
+
+  --color-med: #B45309;
+  --color-med-bg: #FFFBEB;
+  --color-med-border: #FDE68A;
+  --color-med-text: #92400E;
+
+  --color-low: #047857;
+  --color-low-bg: #ECFDF5;
+  --color-low-border: #A7F3D0;
+  --color-low-text: #065F46;
+
+  /* Light Elevation Shadows */
+  --shadow-xs: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+  --shadow-sm: 0 1px 3px 0 rgba(0, 0, 0, 0.08), 0 1px 2px -1px rgba(0, 0, 0, 0.08);
+  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.08), 0 2px 4px -2px rgba(0, 0, 0, 0.05);
+  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.08), 0 4px 6px -4px rgba(0, 0, 0, 0.04);
+  --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.05);
+}
+
+*, *::before, *::after {
   box-sizing: border-box;
+}
+
+html {
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--color-text-main);
+  background: var(--color-bg);
 }
 
 body {
   margin: 0;
   min-width: 360px;
   min-height: 100vh;
-  background: #F8FAFC;
+  background: var(--color-bg);
+  color: var(--color-text-main);
+  font-family: var(--font-sans);
+  overflow-x: hidden;
 }
 
+/* Accessible Interactive Base */
 button, input, select, textarea {
-  font: inherit;
+  font-family: inherit;
+  font-size: inherit;
+  line-height: inherit;
   color: inherit;
 }
 
-/* WCAG AA Compliant High-Contrast Focus Indicators */
+button {
+  cursor: pointer;
+  border: none;
+  background: transparent;
+}
+
+/* Modern Minimalist Scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: #2A2B31;
+  border-radius: 9999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #3E4049;
+}
+
+/* WCAG AA High-Contrast Focus Ring */
 button:focus-visible,
 input:focus-visible,
 select:focus-visible,
@@ -33,9 +319,9 @@ textarea:focus-visible,
 a:focus-visible,
 [tabindex]:focus-visible,
 summary:focus-visible {
-  outline: 2px solid #047857;
+  outline: 2px solid var(--color-accent);
   outline-offset: 2px;
-  box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.25);
+  box-shadow: 0 0 0 3px rgba(0, 184, 132, 0.2);
 }
 
 a {
@@ -44,23 +330,23 @@ a {
 }
 
 ::selection {
-  color: #064E3B;
-  background: #A7F3D0;
+  color: #FFFFFF;
+  background: rgba(0, 184, 132, 0.35);
 }
 
-/* Accessible Skip-To-Content Navigation Anchor (WCAG 2.4.1 Bypass Blocks) */
+/* Accessible Skip-To-Content */
 .skip-to-content-link {
   position: absolute;
   top: -120px;
   left: 16px;
   z-index: 999999;
-  padding: 10px 18px;
-  background: #064E3B;
+  padding: 8px 16px;
+  background: #0F172A;
   color: #FFFFFF !important;
-  font-size: 0.875rem;
-  font-weight: 700;
-  border-radius: 8px;
-  box-shadow: 0 10px 25px rgba(6, 78, 59, 0.4);
+  font-size: 0.85rem;
+  font-weight: 600;
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-lg);
   text-decoration: none;
   transition: top 0.15s cubic-bezier(0.16, 1, 0.3, 1);
 }
@@ -68,11 +354,10 @@ a {
 .skip-to-content-link:focus,
 .skip-to-content-link:focus-visible {
   top: 16px;
-  outline: 3px solid #10B981;
-  outline-offset: 3px;
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
 }
 
-/* Screen Reader Only Utility */
 .visually-hidden,
 .sr-only {
   position: absolute;
@@ -84,4 +369,316 @@ a {
   clip: rect(0, 0, 0, 0);
   white-space: nowrap;
   border-width: 0;
+}
+
+/* ==========================================================================
+   Minimalist Shared Layout & Component Utilities
+   Used across Member, Reports, Tasks, and Dashboard modules
+   ========================================================================== */
+
+/* Flexbox Utilities */
+.flex { display: flex; }
+.inline-flex { display: inline-flex; }
+.flex-col { flex-direction: column; }
+.flex-row { flex-direction: row; }
+.flex-wrap { flex-wrap: wrap; }
+.flex-1 { flex: 1 1 0%; }
+.items-center { align-items: center; }
+.items-start { align-items: flex-start; }
+.items-end { align-items: flex-end; }
+.justify-between { justify-content: space-between; }
+.justify-center { justify-content: center; }
+.justify-end { justify-content: flex-end; }
+.justify-start { justify-content: flex-start; }
+
+/* Gap Utilities */
+.gap-1 { gap: 4px; }
+.gap-1\.5 { gap: 6px; }
+.gap-2 { gap: 8px; }
+.gap-2\.5 { gap: 10px; }
+.gap-3 { gap: 12px; }
+.gap-4 { gap: 16px; }
+.gap-5 { gap: 20px; }
+.gap-6 { gap: 24px; }
+
+/* Spacing Utilities */
+.p-1 { padding: 4px; }
+.p-2 { padding: 8px; }
+.p-2\.5 { padding: 10px; }
+.p-3 { padding: 12px; }
+.p-4 { padding: 16px; }
+.px-2 { padding-left: 8px; padding-right: 8px; }
+.px-3 { padding-left: 12px; padding-right: 12px; }
+.px-4 { padding-left: 16px; padding-right: 16px; }
+.py-1 { padding-top: 4px; padding-bottom: 4px; }
+.py-1\.5 { padding-top: 6px; padding-bottom: 6px; }
+.py-2 { padding-top: 8px; padding-bottom: 8px; }
+.py-2\.5 { padding-top: 10px; padding-bottom: 10px; }
+.m-0 { margin: 0; }
+.mt-1 { margin-top: 4px; }
+.mt-2 { margin-top: 8px; }
+.mb-2 { margin-bottom: 8px; }
+.mb-3 { margin-bottom: 12px; }
+.mb-4 { margin-bottom: 16px; }
+.w-full { width: 100%; }
+.h-full { height: 100%; }
+
+/* Text Utilities */
+.text-xs { font-size: 0.75rem; }
+.text-sm { font-size: 0.85rem; }
+.text-base { font-size: 0.95rem; }
+.text-lg { font-size: 1.15rem; }
+.text-xl { font-size: 1.3rem; }
+.text-2xl { font-size: 1.5rem; }
+.font-normal { font-weight: 400; }
+.font-medium { font-weight: 500; }
+.font-semibold { font-weight: 600; }
+.font-bold { font-weight: 700; }
+.font-extrabold { font-weight: 800; }
+.tracking-tight { letter-spacing: -0.02em; }
+.text-text-primary { color: var(--color-text-main); }
+.text-text-muted { color: var(--color-text-muted); }
+.text-text-subtle { color: var(--color-text-subtle); }
+.text-primary { color: var(--color-accent); }
+.text-emerald-500 { color: #10B981; }
+.text-blue-500 { color: #2563EB; }
+.truncate {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Surface & Border Utilities */
+.bg-surface-active { background-color: var(--color-surface); }
+.bg-primary\/10 { background-color: rgba(37, 99, 235, 0.08); }
+.border-b { border-bottom: 1px solid var(--color-border); }
+.border-border-subtle { border-color: var(--color-border); }
+.rounded-md { border-radius: var(--radius-sm); }
+.rounded-lg { border-radius: var(--radius-md); }
+.rounded-xl { border-radius: var(--radius-lg); }
+.rounded-full { border-radius: 9999px; }
+.shadow-sm { box-shadow: var(--shadow-sm); }
+.shadow-md { box-shadow: var(--shadow-md); }
+
+/* Minimal UI Tab Navigation Component */
+.tab-nav-container,
+.members-tab-nav,
+.reports-tab-nav {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px;
+  background: var(--color-surface);
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--color-border);
+  width: fit-content;
+}
+
+.tab-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 14px;
+  font-size: 0.82rem;
+  font-weight: 500;
+  color: var(--color-text-muted);
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+}
+
+.tab-btn:hover {
+  color: var(--color-text-main);
+  background: var(--color-surface-hover);
+}
+
+.tab-btn.active,
+.tab-btn[aria-selected="true"],
+.tab-btn.bg-surface-active {
+  background: var(--color-surface-active);
+  color: var(--color-text-main);
+  font-weight: 600;
+  border-color: var(--color-border-strong);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+}
+
+/* Minimalist KPI Metrics Layout */
+.kpi-content,
+.members-kpi-content {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.kpi-label,
+.members-kpi-label {
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--color-text-subtle);
+  display: block;
+}
+
+.kpi-value,
+.members-kpi-value {
+  font-size: 1.35rem;
+  font-weight: 700;
+  color: var(--color-text-main);
+  letter-spacing: -0.02em;
+  font-feature-settings: 'tnum';
+  display: block;
+  line-height: 1.2;
+}
+
+/* Buttons System */
+.btn-primary,
+.button-primary,
+.btn-primary-emerald {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 8px 16px;
+  background: var(--color-primary);
+  color: #FFFFFF !important;
+  border: 1px solid transparent;
+  border-radius: var(--radius-md);
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: var(--shadow-xs);
+  transition: all 0.15s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.btn-primary:hover,
+.button-primary:hover,
+.btn-primary-emerald:hover {
+  background: var(--color-primary-hover);
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-sm);
+}
+
+.btn-secondary,
+.button-secondary,
+.button-quiet {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 8px 14px;
+  background: var(--color-surface);
+  color: var(--color-text-main);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  font-size: 0.82rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.btn-secondary:hover,
+.button-secondary:hover,
+.button-quiet:hover {
+  background: var(--color-surface-hover);
+  border-color: var(--color-border-strong);
+  color: var(--color-text-main);
+}
+
+/* ClickUp Modern Toggle Switch */
+.clickup-toggle {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  width: 34px;
+  height: 20px;
+  background: #3A3B43;
+  border-radius: 9999px;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+  border: none;
+  padding: 2px;
+}
+
+.clickup-toggle.active {
+  background: #00B884;
+}
+
+.clickup-toggle-thumb {
+  width: 16px;
+  height: 16px;
+  background: #FFFFFF;
+  border-radius: 50%;
+  transition: transform 0.2s ease;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
+}
+
+.clickup-toggle.active .clickup-toggle-thumb {
+  transform: translateX(14px);
+}
+
+/* ClickUp Status Pill */
+.clickup-status-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 8px;
+  border-radius: var(--radius-full);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.clickup-status-todo {
+  background: #26282E;
+  color: #94A3B8;
+  border: 1px solid #3A3B43;
+}
+
+.clickup-status-in-progress {
+  background: #1D4ED8;
+  color: #FFFFFF;
+}
+
+.clickup-status-revision {
+  background: #D97706;
+  color: #FFFFFF;
+}
+
+.clickup-status-done {
+  background: #00B884;
+  color: #FFFFFF;
+}
+
+/* ClickUp Assignee Avatar Badge */
+.clickup-avatar {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.68rem;
+  font-weight: 700;
+  background: #334155;
+  color: #FFFFFF;
+  flex-shrink: 0;
+  position: relative;
+}
+
+.clickup-avatar-dot {
+  position: absolute;
+  bottom: -1px;
+  right: -1px;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #00B884;
+  border: 1px solid #16171B;
 }

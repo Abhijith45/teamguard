@@ -348,4 +348,81 @@ describe("TASK-507: Compliance & Velocity Reporting CSV Export (DP-REP-001 / US-
     assert.equal(typeof res.data.summary.avgLeadTimeDays, "number");
     assert.equal(typeof res.data.summary.totalAuditLogs, "number");
   });
+
+  test("REQ 14 [Trend Endpoint]: GET /api/reports/trend returns daily completion array", async () => {
+    const res = await api("/api/reports/trend?days=14", {
+      headers: {
+        authorization: `Bearer ${superAdminToken}`,
+        "x-organization-id": String(acmeOrg.id),
+      },
+    });
+
+    assert.equal(res.status, 200);
+    assert.ok(Array.isArray(res.data.trend));
+    assert.ok(res.data.trend.length > 0);
+    assert.equal(typeof res.data.trend[0].date, "string");
+    assert.equal(typeof res.data.trend[0].count, "number");
+  });
+
+  test("REQ 15 [Workload Endpoint]: GET /api/reports/workload returns member task distribution", async () => {
+    const res = await api("/api/reports/workload", {
+      headers: {
+        authorization: `Bearer ${superAdminToken}`,
+        "x-organization-id": String(acmeOrg.id),
+      },
+    });
+
+    assert.equal(res.status, 200);
+    assert.ok(Array.isArray(res.data.members));
+    assert.ok(res.data.unassigned);
+    assert.equal(typeof res.data.unassigned.total, "number");
+  });
+
+  test("REQ 16 [Member Activity Endpoint]: GET /api/reports/member-activity returns activity stats", async () => {
+    const res = await api("/api/reports/member-activity", {
+      headers: {
+        authorization: `Bearer ${superAdminToken}`,
+        "x-organization-id": String(acmeOrg.id),
+      },
+    });
+
+    assert.equal(res.status, 200);
+    assert.ok(Array.isArray(res.data.members));
+  });
+
+  test("REQ 17 [Storage Endpoint]: GET /api/reports/storage returns project storage breakdown", async () => {
+    const res = await api("/api/reports/storage", {
+      headers: {
+        authorization: `Bearer ${superAdminToken}`,
+        "x-organization-id": String(acmeOrg.id),
+      },
+    });
+
+    assert.equal(res.status, 200);
+    assert.equal(typeof res.data.totalBytes, "number");
+    assert.equal(typeof res.data.totalFiles, "number");
+    assert.ok(Array.isArray(res.data.breakdown));
+    assert.ok(Array.isArray(res.data.recentFiles));
+  });
+
+  test("REQ 18 [Overdue Tasks Endpoint]: GET /api/reports/overdue returns overdue tasks list", async () => {
+    const res = await api("/api/reports/overdue?limit=5", {
+      headers: {
+        authorization: `Bearer ${superAdminToken}`,
+        "x-organization-id": String(acmeOrg.id),
+      },
+    });
+
+    assert.equal(res.status, 200);
+    assert.ok(Array.isArray(res.data.tasks));
+  });
+
+  test("REQ 19 [Negative Auth / Tenant Isolation]: Unauthenticated requests are rejected with 401", async () => {
+    const res = await api("/api/reports/workload", {
+      headers: {
+        "x-organization-id": String(acmeOrg.id),
+      },
+    });
+    assert.equal(res.status, 401);
+  });
 });

@@ -509,3 +509,107 @@ test("TASK-005 [REQ 8 / US-ACC-001 / TG-ACC-001]: Password change verifies curre
   });
   assert.equal(newLoginRes.status, 200, "Login with new password must succeed");
 });
+
+
+test("TASK-005 [REQ 9 / SEC-10]: 'Keep me signed in' persistent session with Max-Age when enabled", async () => {
+  const uniqueSuffix = Date.now().toString().slice(-6);
+  const userPayload = {
+    name: "Persistent User",
+    username: `persist_${uniqueSuffix}`,
+    email: `persist_${uniqueSuffix}@example.com`,
+    password: "Password123!",
+  };
+
+  const regRes = await api("/api/auth/register", {
+    method: "POST",
+    body: { ...userPayload, rememberMe: true },
+  });
+  assert.equal(regRes.status, 201);
+
+  const cookieHeader = regRes.headers.get("set-cookie") || "";
+  assert.ok(cookieHeader.includes("Max-Age="), "Cookie must have Max-Age attribute for persistent sessions");
+  assert.ok(cookieHeader.includes("HttpOnly"), "Cookie must be HttpOnly");
+
+  // Verify session expiration in DB is ~30 days
+  const token = parseCookie(cookieHeader);
+  const session = await prisma.refreshSession.findUnique({
+    where: { tokenHash: hashRefreshToken(token) },
+  });
+  assert.ok(session, "Session must exist in DB");
+  const ttlMs = session.expiresAt.getTime() - session.createdAt.getTime();
+  const ttlDays = ttlMs / (1000 * 60 * 60 * 24);
+  assert.ok(ttlDays >= 28 && ttlDays <= 31, `Expected ~30 days TTL, got ${ttlDays}`);
+});
+
+test("TASK-005 [REQ 10 / SEC-10]: 'Keep me signed in' disabled sets browser session cookie and preserves transient state across rotation", async () => {
+  const uniqueSuffix = Date.now().toString().slice(-6);
+  const userPayload = {
+    name: "Transient User",
+    username: `transient_${uniqueSuffix}`,
+    email: `transient_${uniqueSuffix}@example.com`,
+    password: "Password123!",
+  };
+
+  // 1. Register with rememberMe = false
+  const regRes = await api("/api/auth/register", {
+    method: "POST",
+    body: { ...userPayload, rememberMe: false },
+  });
+  assert.equal(regRes.status, 201);
+
+  const regCookie = regRes.headers.get("set-cookie") || "";
+  assert.ok(!regCookie.includes("Max-Age="), "Session cookie must NOT have Max-Age attribute");
+  assert.ok(!regCookie.includes("Expires="), "Session cookie must NOT have Expires attribute");
+  assert.ok(regCookie.includes("HttpOnly"), "Session cookie must be HttpOnly");
+
+  // Verify session in DB has ~1 day TTL
+  const regToken = parseCookie(regCookie);
+  const regSession = await prisma.refreshSession.findUnique({
+    where: { tokenHash: hashRefreshToken(regToken) },
+  });
+  const regTtlMs = regSession.expiresAt.getTime() - regSession.createdAt.getTime();
+  const regTtlHours = regTtlMs / (1000 * 60 * 60);
+  assert.ok(regTtlHours >= 23 && regTtlHours <= 25, `Expected ~24h TTL, got ${regTtlHours}`);
+
+  // 2. Explicit login with rememberMe = false
+  const loginRes = await api("/api/auth/login", {
+    method: "POST",
+    body: {
+      identifier: userPayload.username,
+      password: userPayload.password,
+      rememberMe: false,
+    },
+  });
+  assert.equal(loginRes.status, 200);
+
+  const loginCookie = loginRes.headers.get("set-cookie") || "";
+  assert.ok(!loginCookie.includes("Max-Age="), "Login session cookie must NOT have Max-Age");
+  assert.ok(!loginCookie.includes("Expires="), "Login session cookie must NOT have Expires");
+
+  const loginToken = parseCookie(loginCookie);
+  const loginSession = await prisma.refreshSession.findUnique({
+    where: { tokenHash: hashRefreshToken(loginToken) },
+  });
+  const loginTtlMs = loginSession.expiresAt.getTime() - loginSession.createdAt.getTime();
+  const loginTtlHours = loginTtlMs / (1000 * 60 * 60);
+  assert.ok(loginTtlHours >= 23 && loginTtlHours <= 25, `Expected ~24h TTL, got ${loginTtlHours}`);
+
+  // 3. Silent refresh rotation preserves session-cookie (non-persistent) behavior
+  const refreshRes = await api("/api/auth/refresh", {
+    method: "POST",
+    headers: { cookie: `refreshToken=${loginToken}` },
+  });
+  assert.equal(refreshRes.status, 200);
+
+  const refreshCookie = refreshRes.headers.get("set-cookie") || "";
+  assert.ok(!refreshCookie.includes("Max-Age="), "Rotated cookie must also be a session cookie (no Max-Age)");
+  assert.ok(!refreshCookie.includes("Expires="), "Rotated cookie must also be a session cookie (no Expires)");
+
+  const rotatedToken = parseCookie(refreshCookie);
+  const rotatedSession = await prisma.refreshSession.findUnique({
+    where: { tokenHash: hashRefreshToken(rotatedToken) },
+  });
+  const rotTtlMs = rotatedSession.expiresAt.getTime() - rotatedSession.createdAt.getTime();
+  const rotTtlHours = rotTtlMs / (1000 * 60 * 60);
+  assert.ok(rotTtlHours >= 23 && rotTtlHours <= 25, `Expected rotated session to preserve ~24h TTL, got ${rotTtlHours}`);
+});

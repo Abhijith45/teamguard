@@ -18,9 +18,12 @@ import {
   Plus,
   Loader2,
   ExternalLink,
+  Sun,
+  Moon,
 } from "lucide-react";
 import { api } from "../../services/api-client.js";
 import { useFocusTrap } from "../../hooks/useFocusTrap.js";
+import { useTheme } from "../../context/ThemeContext.jsx";
 import {
   getQuickActions,
   filterQuickActions,
@@ -53,6 +56,7 @@ export function CommandPaletteModal({
   const inputRef = useRef(null);
   const listRef = useRef(null);
   const debounceTimerRef = useRef(null);
+  const { toggleTheme } = useTheme();
 
   useFocusTrap({
     containerRef,
@@ -146,6 +150,8 @@ export function CommandPaletteModal({
           onCreateTask();
         } else if (item.actionType === "create-task" && onNavigateSection) {
           onNavigateSection("tasks");
+        } else if (item.actionType === "theme-toggle") {
+          toggleTheme();
         }
       } else if (item.type === "project") {
         if (onNavigateSection) {
@@ -226,6 +232,10 @@ export function CommandPaletteModal({
           return <Calendar size={16} className="cmd-icon-action" />;
         case "User":
           return <User size={16} className="cmd-icon-action" />;
+        case "Sun":
+          return <Sun size={16} className="cmd-icon-action" style={{ color: "#F59E0B" }} />;
+        case "Moon":
+          return <Moon size={16} className="cmd-icon-action" style={{ color: "#38BDF8" }} />;
         default:
           return <ExternalLink size={16} className="cmd-icon-action" />;
       }

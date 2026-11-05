@@ -1,3 +1,4 @@
+import { cache } from "../lib/cache.js";
 import { z } from "zod";
 import { prisma } from "../../config/prisma.js";
 import { logAuditEvent } from "../services/audit.service.js";
@@ -33,6 +34,15 @@ function parseMembershipId(param) {
 export async function listMembers(req, res, next) {
   try {
     const orgId = req.organizationId;
+    const accountType = req.membership?.accountType || req.user?.accountType;
+
+    // F-10: Sandboxed Guest Directory Barrier
+    if (accountType === "GUEST") {
+      return res.status(403).json({
+        error: "Forbidden: Guests cannot view member directory",
+      });
+    }
+
     const { search, department, role, status } = req.query;
 
     const hasManagePerm = req.userPermissions?.has("members:manage") || req.userPermissions?.has("roles:manage");
@@ -124,7 +134,7 @@ export async function listMembers(req, res, next) {
     ]);
 
     const formatted = members.map((m) => {
-      const isSuperAdmin = m.roles.some((r) => r.role.slug === "super-admin");
+      const isSuperAdmin = m.roles.some((r) => r.role?.slug === "super-admin");
       const isLastOwner = isSuperAdmin && activeOwnersCount === 1 && m.status === "ACTIVE";
 
       return {
@@ -134,7 +144,7 @@ export async function listMembers(req, res, next) {
         department: m.department || "General",
         status: m.status,
         joinedAt: m.joinedAt,
-        roles: m.roles.map((r) => r.role),
+        roles: m.roles.map((r) => r.role).filter(Boolean),
         isLastOwner,
       };
     });
@@ -229,7 +239,7 @@ export async function reassignMemberRole(req, res, next) {
     }
 
     // 3. Last-Owner Safeguard (BR-010 / US-INV-004 / US-INV-005)
-    const currentlySuperAdmin = membership.roles.some((r) => r.role.slug === "super-admin");
+    const currentlySuperAdmin = membership.roles.some((r) => r.role?.slug === "super-admin");
     const isNewRoleSuperAdmin = targetRole.slug === "super-admin";
 
     if (currentlySuperAdmin && !isNewRoleSuperAdmin && membership.status === "ACTIVE") {
@@ -276,7 +286,7 @@ export async function reassignMemberRole(req, res, next) {
     }
 
     // 4. Atomically update membership roles
-    const oldRoleNames = membership.roles.map((r) => r.role.name).join(", ");
+    const oldRoleNames = membership.roles.map((r) => r.role?.name).join(", ");
     await prisma.$transaction(async (tx) => {
       await tx.membershipRole.deleteMany({
         where: { membershipId },
@@ -321,7 +331,7 @@ export async function reassignMemberRole(req, res, next) {
         user: updated.user,
         department: updated.department,
         status: updated.status,
-        roles: updated.roles.map((r) => r.role),
+        roles: updated.roles.map((r) => r.role).filter(Boolean),
       },
     });
   } catch (error) {
@@ -382,7 +392,7 @@ export async function updateMemberDepartment(req, res, next) {
         user: updated.user,
         department: updated.department,
         status: updated.status,
-        roles: updated.roles.map((r) => r.role),
+        roles: updated.roles.map((r) => r.role).filter(Boolean),
       },
     });
   } catch (error) {
@@ -419,7 +429,7 @@ export async function updateMemberStatus(req, res, next) {
 
     // Last-Owner Safeguard (BR-010) on deactivation/suspension
     if (status !== "ACTIVE" && membership.status === "ACTIVE") {
-      const isSuperAdmin = membership.roles.some((r) => r.role.slug === "super-admin");
+      const isSuperAdmin = membership.roles.some((r) => r.role?.slug === "super-admin");
       if (isSuperAdmin) {
         const otherActiveOwners = await prisma.membership.count({
           where: {
@@ -482,7 +492,7 @@ export async function updateMemberStatus(req, res, next) {
         user: updated.user,
         department: updated.department,
         status: updated.status,
-        roles: updated.roles.map((r) => r.role),
+        roles: updated.roles.map((r) => r.role).filter(Boolean),
       },
     });
   } catch (error) {
@@ -517,7 +527,7 @@ export async function removeMember(req, res, next) {
     }
 
     // Last-Owner Safeguard (BR-010)
-    const isSuperAdmin = membership.roles.some((r) => r.role.slug === "super-admin");
+    const isSuperAdmin = membership.roles.some((r) => r.role?.slug === "super-admin");
     if (isSuperAdmin && membership.status === "ACTIVE") {
       const otherActiveOwners = await prisma.membership.count({
         where: {
@@ -564,7 +574,7 @@ export async function removeMember(req, res, next) {
       details: {
         targetUserId: membership.user.id,
         targetEmail: membership.user.email,
-        roles: membership.roles.map((r) => r.role.name),
+        roles: membership.roles.map((r) => r.role?.name),
       },
     });
 

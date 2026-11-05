@@ -18,11 +18,13 @@ const registerSchema = z.object({
   username: z.string().trim().toLowerCase().regex(/^[a-z0-9_]{3,32}$/),
   email: z.string().trim().toLowerCase().email().max(254),
   password: z.string().min(8).max(128).refine(passwordFitsBcrypt, "Password must be no more than 72 UTF-8 bytes"),
+  rememberMe: z.boolean().optional().default(true),
 }).strict();
 
 const loginSchema = z.object({
   identifier: z.string().trim().min(3).max(254),
   password: z.string().min(1).max(128).refine(passwordFitsBcrypt, "Password must be no more than 72 UTF-8 bytes"),
+  rememberMe: z.boolean().optional().default(true),
 }).strict();
 
 const profileUpdateSchema = z.object({
@@ -48,22 +50,22 @@ function sessionMetadata(req) {
   return { userAgent: req.get("user-agent"), ipAddress: req.ip };
 }
 
-function setRefreshCookie(res, token) {
-  res.cookie(refreshCookieName, token, refreshCookieOptions());
+function setRefreshCookie(res, token, rememberMe = true) {
+  res.cookie(refreshCookieName, token, refreshCookieOptions(rememberMe));
 }
 
 export async function register(req, res) {
   const input = registerSchema.parse(req.body);
   const session = await registerUser(input, sessionMetadata(req));
-  setRefreshCookie(res, session.refreshToken);
+  setRefreshCookie(res, session.refreshToken, session.rememberMe);
   return res.status(201).json({ user: session.user, accessToken: session.accessToken });
 }
 
 export async function login(req, res) {
   const input = loginSchema.parse(req.body);
   const activeOrgId = req.get("x-organization-id");
-  const session = await loginUser(input.identifier, input.password, sessionMetadata(req), activeOrgId);
-  setRefreshCookie(res, session.refreshToken);
+  const session = await loginUser(input.identifier, input.password, sessionMetadata(req), activeOrgId, input.rememberMe);
+  setRefreshCookie(res, session.refreshToken, session.rememberMe);
   return res.json({ user: session.user, accessToken: session.accessToken });
 }
 
@@ -74,13 +76,13 @@ export async function refresh(req, res) {
     sessionMetadata(req),
     activeOrgId
   );
-  setRefreshCookie(res, session.refreshToken);
+  setRefreshCookie(res, session.refreshToken, session.rememberMe);
   return res.json({ user: session.user, accessToken: session.accessToken });
 }
 
 export async function logout(req, res) {
   await revokeRefreshToken(req.cookies[refreshCookieName]);
-  const { maxAge: _maxAge, ...cookieOptions } = refreshCookieOptions();
+  const { maxAge: _maxAge, ...cookieOptions } = refreshCookieOptions(false);
   res.clearCookie(refreshCookieName, cookieOptions);
   return res.status(204).end();
 }

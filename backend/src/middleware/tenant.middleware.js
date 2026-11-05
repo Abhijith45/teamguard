@@ -1,10 +1,11 @@
 import { prisma } from "../../config/prisma.js";
+import { cache } from "../lib/cache.js";
 
 /**
- * Tenant isolation middleware.
- * Resolves active organization from 'x-organization-id' header (or fallback to primary membership),
- * verifies that the authenticated user belongs to that organization with status ACTIVE,
- * and attaches req.organizationId and req.membership (with roles and permissions).
+ * Tenant isolation middleware with In-Memory Caching (TASK-CACHE).
+ * Resolves active organization from 'x-organization-id' header,
+ * checks membership and effective permissions against cache or database,
+ * and attaches req.organizationId, req.membership, and req.userPermissions (Set).
  */
 export async function resolveTenant(req, res, next) {
   try {
@@ -24,8 +25,19 @@ export async function resolveTenant(req, res, next) {
     }
 
     const targetOrgId = Number(trimmed);
+    const cacheKey = `membership:${targetOrgId}:${userId}`;
 
-    // Verify membership in requested organization
+    // 1. Try cache lookup
+    const cached = cache.get(cacheKey);
+    if (cached) {
+      req.organizationId = targetOrgId;
+      req.organization = cached.organization;
+      req.membership = cached.membership;
+      req.userPermissions = new Set(cached.permissions);
+      return next();
+    }
+
+    // 2. Database query on cache miss
     const membership = await prisma.membership.findUnique({
       where: {
         userId_organizationId: {
@@ -62,10 +74,26 @@ export async function resolveTenant(req, res, next) {
     // Extract all effective permissions from membership roles
     const permissionsSet = new Set();
     for (const mr of membership.roles) {
+      if (!mr.role || !Array.isArray(mr.role.permissions)) continue;
       for (const rp of mr.role.permissions) {
+        if (!rp.permission) continue;
         permissionsSet.add(`${rp.permission.resource}:${rp.permission.action}`);
       }
     }
+
+    // Store in cache with multi-tenant and user tags (TTL 60s)
+    cache.set(
+      cacheKey,
+      {
+        membership,
+        organization: membership.organization,
+        permissions: Array.from(permissionsSet),
+      },
+      {
+        ttlMs: 60 * 1000,
+        tags: [`tenant:${targetOrgId}`, `user:${userId}`],
+      }
+    );
 
     req.organizationId = targetOrgId;
     req.organization = membership.organization;

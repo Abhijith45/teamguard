@@ -36,7 +36,11 @@ export function hashRefreshToken(token) {
   return createHash("sha256").update(token).digest("hex");
 }
 
-export function refreshTokenExpiry(from = new Date()) {
+export function refreshTokenExpiry(from = new Date(), rememberMe = true) {
+  if (!rememberMe) {
+    // Non-remembered / session login: 1 day TTL
+    return new Date(from.getTime() + 24 * 60 * 60 * 1000);
+  }
   const days = Number(process.env.REFRESH_TOKEN_TTL_DAYS ?? 30);
   if (!Number.isInteger(days) || days < 1 || days > 365) {
     throw new Error("REFRESH_TOKEN_TTL_DAYS must be an integer from 1 to 365");
@@ -46,12 +50,20 @@ export function refreshTokenExpiry(from = new Date()) {
 
 export const refreshCookieName = "refreshToken";
 
-export function refreshCookieOptions() {
-  return {
+export function refreshCookieOptions(rememberMe = true) {
+  const isProd = process.env.NODE_ENV === "production";
+  const sameSite = process.env.COOKIE_SAME_SITE || (isProd ? "none" : "lax");
+  const secure = process.env.COOKIE_SECURE !== undefined
+    ? process.env.COOKIE_SECURE === "true"
+    : (isProd || sameSite === "none");
+  const options = {
     httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "lax",
+    secure,
+    sameSite,
     path: "/api/auth",
-    maxAge: Number(process.env.REFRESH_TOKEN_TTL_DAYS ?? 30) * 24 * 60 * 60 * 1000,
   };
+  if (rememberMe) {
+    options.maxAge = Number(process.env.REFRESH_TOKEN_TTL_DAYS ?? 30) * 24 * 60 * 60 * 1000;
+  }
+  return options;
 }

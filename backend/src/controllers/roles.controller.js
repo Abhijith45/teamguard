@@ -1,3 +1,4 @@
+import { cache } from "../lib/cache.js";
 import { z } from "zod";
 import { prisma } from "../../config/prisma.js";
 import { logAuditEvent } from "../services/audit.service.js";
@@ -448,6 +449,7 @@ export async function replaceRolePermissions(req, res, next) {
       }
     });
 
+    cache.invalidateTags([`tenant:${req.organizationId}`]);
     return res.json({ message: "Role permissions updated", roleId, count: permissionIds.length });
   } catch (error) {
     next(error);

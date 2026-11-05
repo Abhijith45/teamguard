@@ -13,6 +13,13 @@ import {
   formatMonthYear,
   getCalendarMetrics,
   filterCalendarTasks,
+  getWeekDays,
+  getAdjacentWeek,
+  getAdjacentDay,
+  formatWeekRange,
+  formatDayDate,
+  getUnscheduledTasks,
+  groupTasksForAgenda,
 } from "./calendarUtils.js";
 
 test("TASK-402 [US-CAL-001 / Calendar Grid Math]: Leap year and days in month calculation", () => {
@@ -224,4 +231,75 @@ test("TASK-402 [US-CAL-001 / Metrics & Filtering]: Computes monthly summary metr
   const myTasks = filterCalendarTasks(tasks, { assigneeId: "me", currentUserId: 4 });
   assert.equal(myTasks.length, 3);
   assert.ok(myTasks.every((t) => t.assigneeId === 4));
+});
+test("TASK-402 [Phase 1 / Week & Day Math]: Generates 7-day week matrix and navigates weeks/days", () => {
+  // Wednesday, Oct 14, 2026
+  const refWednesday = new Date("2026-10-14T12:00:00.000Z");
+  const todayDate = new Date("2026-10-14T00:00:00.000Z");
+  const weekDays = getWeekDays(refWednesday, todayDate);
+
+  assert.equal(weekDays.length, 7, "Week must have exactly 7 days");
+  assert.equal(weekDays[0].weekdayName, "Mon");
+  assert.equal(weekDays[0].day, 12, "Monday of that week is Oct 12");
+  assert.equal(weekDays[6].weekdayName, "Sun");
+  assert.equal(weekDays[6].day, 18, "Sunday of that week is Oct 18");
+  assert.equal(weekDays[2].isToday, true, "Wednesday Oct 14 is marked isToday");
+
+  // Format week range
+  const rangeStr = formatWeekRange(weekDays[0].date, weekDays[6].date);
+  assert.equal(rangeStr, "Oct 12 – 18, 2026");
+
+  // Navigate adjacent week
+  const nextWeek = getAdjacentWeek(refWednesday, "next");
+  assert.equal(nextWeek.getDate(), 21);
+  const prevWeek = getAdjacentWeek(refWednesday, "prev");
+  assert.equal(prevWeek.getDate(), 7);
+
+  // Navigate adjacent day
+  const nextDay = getAdjacentDay(refWednesday, "next");
+  assert.equal(nextDay.getDate(), 15);
+  const prevDay = getAdjacentDay(refWednesday, "prev");
+  assert.equal(prevDay.getDate(), 13);
+
+  // Format day date
+  const dayStr = formatDayDate(refWednesday);
+  assert.equal(dayStr, "Wednesday, October 14, 2026");
+});
+
+test("TASK-402 [Phase 1 / Unscheduled & Agenda Grouping]: Filters unscheduled tasks and builds chronological agenda feed", () => {
+  const refToday = new Date("2026-10-14T00:00:00.000Z");
+  const testTasks = [
+    { id: 1, title: "Unscheduled 1", dueDate: null, status: "TODO", priority: "MEDIUM" },
+    { id: 2, title: "Unscheduled 2", dueDate: undefined, status: "TODO", priority: "HIGH" },
+    { id: 3, title: "Overdue Item", dueDate: "2026-10-10T12:00:00.000Z", status: "TODO", priority: "URGENT" },
+    { id: 4, title: "Today Release", dueDate: "2026-10-14T15:00:00.000Z", status: "IN_PROGRESS", priority: "HIGH" },
+    { id: 5, title: "Tomorrow Delivery", dueDate: "2026-10-15T09:00:00.000Z", status: "TODO", priority: "MEDIUM" },
+    { id: 6, title: "Upcoming Sprint Review", dueDate: "2026-10-18T18:00:00.000Z", status: "TODO", priority: "LOW" },
+    { id: 7, title: "Next Month Feature", dueDate: "2026-11-20T12:00:00.000Z", status: "TODO", priority: "LOW" },
+  ];
+
+  // 1. Unscheduled tasks extraction
+  const unscheduled = getUnscheduledTasks(testTasks);
+  assert.equal(unscheduled.length, 2);
+  assert.equal(unscheduled[0].id, 1);
+  assert.equal(unscheduled[1].id, 2);
+
+  // 2. Agenda grouping
+  const agendaGroups = groupTasksForAgenda(testTasks, refToday);
+  assert.ok(agendaGroups.length >= 4);
+
+  const overdueGroup = agendaGroups.find((g) => g.key === "overdue");
+  assert.ok(overdueGroup);
+  assert.equal(overdueGroup.tasks.length, 1);
+  assert.equal(overdueGroup.tasks[0].id, 3);
+
+  const todayGroup = agendaGroups.find((g) => g.key === "today");
+  assert.ok(todayGroup);
+  assert.equal(todayGroup.tasks.length, 1);
+  assert.equal(todayGroup.tasks[0].id, 4);
+
+  const tomorrowGroup = agendaGroups.find((g) => g.key === "tomorrow");
+  assert.ok(tomorrowGroup);
+  assert.equal(tomorrowGroup.tasks.length, 1);
+  assert.equal(tomorrowGroup.tasks[0].id, 5);
 });

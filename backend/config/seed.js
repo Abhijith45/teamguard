@@ -33,6 +33,18 @@ const permissionsData = [
   { resource: "profile", action: "read", description: "Read user profile" },
   // Reports & Analytics (DP-REP-001 / US-REP-001 / TASK-507)
   { resource: "report", action: "export", description: "Export workspace compliance and velocity reports" },
+  // Spatial Containers (ReBAC)
+  { resource: "space", action: "view", description: "View workspace spaces" },
+  { resource: "space", action: "create", description: "Create spaces" },
+  { resource: "space", action: "update", description: "Update spaces" },
+  { resource: "space", action: "delete", description: "Delete spaces" },
+  { resource: "space", action: "manage", description: "Manage space settings and private members" },
+  // Two-Key Action Authorization Gate
+  { resource: "task", action: "delete:own", description: "Delete tasks created by yourself" },
+  { resource: "task", action: "delete:any", description: "Delete any task across workspace" },
+  // Access Requests
+  { resource: "access_request", action: "create", description: "Submit access requests for private resources" },
+  { resource: "access_request", action: "review", description: "Review and approve/reject access requests" },
 ];
 
 async function main() {
@@ -125,9 +137,12 @@ async function main() {
     const managerKeys = [
       "dashboard:view", "dashboard:export",
       "project:view", "project:create", "project:update",
+      "space:view", "space:create", "space:update",
       "task:view", "task:create", "task:update:any", "task:assign", "task:export",
+      "task:delete:any", "task:delete:own",
       "files:view", "files:upload", "files:update", "files:download",
       "report:export",
+      "access_request:review",
       "profile:read"
     ];
     for (const key of managerKeys) {
@@ -145,8 +160,11 @@ async function main() {
     const memberKeys = [
       "dashboard:view",
       "project:view",
+      "space:view",
       "task:view", "task:create", "task:update:own", "task:update:assigned",
+      "task:delete:own",
       "files:view", "files:download",
+      "access_request:create",
       "profile:read"
     ];
     for (const key of memberKeys) {
@@ -164,6 +182,7 @@ async function main() {
     const stakeholderKeys = [
       "dashboard:view",
       "project:view",
+      "space:view",
       "task:view",
       "files:view",
       "profile:read"
@@ -286,6 +305,37 @@ async function main() {
     create: { membershipId: memRizkyAcme.id, roleId: acmeRoles.stakeholderRole.id },
   });
 
+  // Demo Guest User (Sprint 1 / ReBAC Isolation & Masking)
+  const guestPasswordHash = await hashPassword("password123");
+  const guestUser = await prisma.user.upsert({
+    where: { email: "guest@teamguard.io" },
+    update: { name: "Guest Collaborator", username: "guest" },
+    create: {
+      name: "Guest Collaborator",
+      username: "guest",
+      email: "guest@teamguard.io",
+      passwordHash: guestPasswordHash,
+      avatarUrl: "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=120&auto=format&fit=crop&q=80",
+    },
+  });
+
+  const memGuestAcme = await prisma.membership.upsert({
+    where: { userId_organizationId: { userId: guestUser.id, organizationId: acme.id } },
+    update: { accountType: "GUEST" },
+    create: {
+      userId: guestUser.id,
+      organizationId: acme.id,
+      department: "External Contractor",
+      status: "ACTIVE",
+      accountType: "GUEST",
+    },
+  });
+  await prisma.membershipRole.upsert({
+    where: { membershipId_roleId: { membershipId: memGuestAcme.id, roleId: acmeRoles.stakeholderRole.id } },
+    update: {},
+    create: { membershipId: memGuestAcme.id, roleId: acmeRoles.stakeholderRole.id },
+  });
+
   // In Nova Labs:
   // Annisa -> Stakeholder (Viewer only) - demonstrates multi-tenant role distinction!
   const memAnnisaNova = await prisma.membership.upsert({
@@ -299,7 +349,49 @@ async function main() {
     create: { membershipId: memAnnisaNova.id, roleId: novaRoles.stakeholderRole.id },
   });
 
-  // 6. Projects in Acme Corp
+  // 6. Spaces & Projects in Acme Corp
+  const acmeGeneralSpace = await prisma.space.upsert({
+    where: { organizationId_slug: { organizationId: acme.id, slug: "general-workspace" } },
+    update: {},
+    create: {
+      organizationId: acme.id,
+      creatorId: memAnnisaAcme.id,
+      name: "General Workspace",
+      slug: "general-workspace",
+      description: "Default workspace for Acme Corp team projects",
+      icon: "Folder",
+      color: "#6366f1",
+      isPrivate: false,
+    },
+  });
+
+  const acmeStrategySpace = await prisma.space.upsert({
+    where: { organizationId_slug: { organizationId: acme.id, slug: "executive-strategy" } },
+    update: {},
+    create: {
+      organizationId: acme.id,
+      creatorId: memAnnisaAcme.id,
+      name: "Executive Strategy",
+      slug: "executive-strategy",
+      description: "Confidential roadmap and strategic initiatives",
+      icon: "Lock",
+      color: "#ec4899",
+      isPrivate: true,
+    },
+  });
+
+  await prisma.spaceMember.upsert({
+    where: { spaceId_membershipId: { spaceId: acmeStrategySpace.id, membershipId: memAnnisaAcme.id } },
+    update: { accessLevel: "FULL" },
+    create: { spaceId: acmeStrategySpace.id, membershipId: memAnnisaAcme.id, accessLevel: "FULL" },
+  });
+
+  await prisma.spaceMember.upsert({
+    where: { spaceId_membershipId: { spaceId: acmeStrategySpace.id, membershipId: memAlexAcme.id } },
+    update: { accessLevel: "EDIT" },
+    create: { spaceId: acmeStrategySpace.id, membershipId: memAlexAcme.id, accessLevel: "EDIT" },
+  });
+
   const projectsData = [
     { name: "Nova UI Revamp", key: "NOV", description: "Complete visual redesign of core web platform", progress: 40, priority: "HIGH", isArchived: false },
     { name: "Orion SaaS Platform", key: "ORION", description: "Enterprise multi-tenant backend infrastructure", progress: 80, priority: "MEDIUM", isArchived: false },
@@ -313,14 +405,17 @@ async function main() {
       where: { organizationId: acme.id, name: p.name },
     });
     if (existing) {
-      if (!existing.key) {
-        await prisma.project.update({ where: { id: existing.id }, data: { key: p.key } });
-        existing.key = p.key;
+      const updateData = {};
+      if (!existing.key) updateData.key = p.key;
+      if (!existing.spaceId) updateData.spaceId = acmeGeneralSpace.id;
+      if (Object.keys(updateData).length > 0) {
+        await prisma.project.update({ where: { id: existing.id }, data: updateData });
+        Object.assign(existing, updateData);
       }
       projects.push(existing);
     } else {
       const created = await prisma.project.create({
-        data: { ...p, organizationId: acme.id },
+        data: { ...p, organizationId: acme.id, spaceId: acmeGeneralSpace.id },
       });
       projects.push(created);
     }
@@ -531,6 +626,22 @@ async function main() {
     create: { membershipId: memElenaNova.id, roleId: novaRoles.superAdminRole.id },
   });
 
+  // Nova Labs Default Space
+  const novaGeneralSpace = await prisma.space.upsert({
+    where: { organizationId_slug: { organizationId: nova.id, slug: "general-workspace" } },
+    update: {},
+    create: {
+      organizationId: nova.id,
+      creatorId: memElenaNova.id,
+      name: "General Workspace",
+      slug: "general-workspace",
+      description: "Default workspace for Nova Labs research projects",
+      icon: "Folder",
+      color: "#6366f1",
+      isPrivate: false,
+    },
+  });
+
   // Nova Labs Projects
   const novaProjectsData = [
     { name: "Quantum Core Engine", key: "QCE", description: "High-performance distributed engine", progress: 50, priority: "HIGH", isArchived: false },
@@ -542,14 +653,17 @@ async function main() {
       where: { organizationId: nova.id, name: p.name },
     });
     if (existing) {
-      if (!existing.key) {
-        await prisma.project.update({ where: { id: existing.id }, data: { key: p.key } });
-        existing.key = p.key;
+      const updateData = {};
+      if (!existing.key) updateData.key = p.key;
+      if (!existing.spaceId) updateData.spaceId = novaGeneralSpace.id;
+      if (Object.keys(updateData).length > 0) {
+        await prisma.project.update({ where: { id: existing.id }, data: updateData });
+        Object.assign(existing, updateData);
       }
       novaProjects.push(existing);
     } else {
       const created = await prisma.project.create({
-        data: { ...p, organizationId: nova.id },
+        data: { ...p, organizationId: nova.id, spaceId: novaGeneralSpace.id },
       });
       novaProjects.push(created);
     }

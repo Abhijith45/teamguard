@@ -1,3 +1,4 @@
+import { cache } from "../lib/cache.js";
 import { z } from "zod";
 import {
   archiveProjectService,
@@ -17,6 +18,7 @@ const createProjectSchema = z.object({
   priority: z.enum(["LOW", "MEDIUM", "HIGH"]).default("MEDIUM"),
   status: z.enum(["ACTIVE", "PLANNING", "COMPLETED", "ARCHIVED"]).default("ACTIVE"),
   isArchived: z.boolean().optional(),
+  spaceId: z.number().int().positive().nullable().optional(),
   teamMembers: z.array(z.object({
     email: z.string().email(),
     role: z.string().optional(),
@@ -38,6 +40,7 @@ const updateProjectSchema = z.object({
   priority: z.enum(["LOW", "MEDIUM", "HIGH"]).optional(),
   status: z.enum(["ACTIVE", "PLANNING", "COMPLETED", "ARCHIVED"]).optional(),
   isArchived: z.boolean().optional(),
+  spaceId: z.number().int().positive().nullable().optional(),
 });
 
 export async function listProjects(req, res, next) {
@@ -198,7 +201,8 @@ export async function deleteProject(req, res, next) {
       return res.status(404).json({ error: "Project not found in this organization" });
     }
 
-    return res.status(204).end();
+    return cache.invalidateTags([`dashboard:${req.organizationId}`, `reports:${req.organizationId}`, `projects:${req.organizationId}`, `spaces:${req.organizationId}`]);
+    res.status(204).end();
   } catch (error) {
     next(error);
   }

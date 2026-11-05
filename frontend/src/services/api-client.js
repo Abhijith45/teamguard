@@ -1,4 +1,12 @@
-const apiBase = (typeof import.meta !== "undefined" && import.meta.env?.VITE_API_URL) ?? "http://localhost:5000/api";
+function resolveApiBase() {
+  const envUrl = typeof import.meta !== "undefined" && import.meta.env?.VITE_API_URL
+    ? String(import.meta.env.VITE_API_URL).trim()
+    : "http://localhost:5000/api";
+  const cleaned = envUrl.endsWith("/") ? envUrl.slice(0, -1) : envUrl;
+  return cleaned.endsWith("/api") ? cleaned : `${cleaned}/api`;
+}
+
+const apiBase = resolveApiBase();
 let accessToken = null;
 let activeOrganizationId = null;
 let refreshRequest = null;
@@ -36,6 +44,17 @@ export function getActiveOrgId() {
 }
 
 const queryCache = new Map();
+const MAX_CLIENT_CACHE = 150;
+
+function setClientCache(key, data, etag = null) {
+  if (queryCache.has(key)) {
+    queryCache.delete(key);
+  } else if (queryCache.size >= MAX_CLIENT_CACHE) {
+    const oldestKey = queryCache.keys().next().value;
+    if (oldestKey !== undefined) queryCache.delete(oldestKey);
+  }
+  queryCache.set(key, { timestamp: Date.now(), data, etag });
+}
 
 /**
  * TASK-003: Purges all client-side query caches and in-memory tenant state.
@@ -86,7 +105,7 @@ export function clearSessionStorageAndCache() {
     const keysToRemove = [];
     for (let i = 0; i < localStorage.length; i++) {
       const key = localStorage.key(i);
-      if (key && key.startsWith("teamguard_")) {
+      if (key && key.startsWith("teamguard_") && key !== "teamguard_remember_me") {
         keysToRemove.push(key);
       }
     }
@@ -201,40 +220,104 @@ async function request(path, options = {}, retry = true) {
   const method = (options.method || "GET").toUpperCase();
   const cacheKey = `${currentOrgId || "global"}:${path}`;
 
-  if (method === "GET" && !options.skipCache) {
-    const cached = queryCache.get(cacheKey);
-    if (cached && Date.now() - cached.timestamp < 30000) {
+  const cached = method === "GET" && !options.skipCache ? queryCache.get(cacheKey) : null;
+  const now = Date.now();
+
+  // Fresh cache hit (< 15s) -> instant return
+  if (cached && now - cached.timestamp < 15000) {
+    return typeof structuredClone === "function"
+      ? structuredClone(cached.data)
+      : JSON.parse(JSON.stringify(cached.data));
+  }
+
+  // If cached entry has an ETag, send conditional If-None-Match header
+  if (cached?.etag) {
+    headers.set("If-None-Match", cached.etag);
+  }
+
+  let response;
+  try {
+    response = await fetch(`${apiBase}${path}`, {
+      ...options,
+      headers,
+      credentials: "include",
+      body: options.body === undefined ? undefined : JSON.stringify(options.body),
+    });
+
+    if (response.status === 401 && retry && !path.startsWith("/auth/")) {
+      const session = await refreshSession();
+      if (session) return request(path, options, false);
+    }
+
+    // HTTP 304 Not Modified: Reuse cached data and refresh timestamp
+    if (response.status === 304 && cached) {
+      cached.timestamp = now;
       return typeof structuredClone === "function"
         ? structuredClone(cached.data)
         : JSON.parse(JSON.stringify(cached.data));
     }
-  }
 
-  const response = await fetch(`${apiBase}${path}`, {
-    ...options,
-    headers,
-    credentials: "include",
-    body: options.body === undefined ? undefined : JSON.stringify(options.body),
-  });
+    const payload = await readResponse(response);
+    const responseETag = response.headers?.get("etag") || null;
 
-  if (response.status === 401 && retry && !path.startsWith("/auth/")) {
-    const session = await refreshSession();
-    if (session) return request(path, options, false);
-  }
-  const payload = await readResponse(response);
+    if (method === "GET") {
+      setClientCache(cacheKey, payload, responseETag);
+    } else {
+      // Smart Invalidation for mutated tenant
+      const pathLower = path.toLowerCase();
+      for (const k of queryCache.keys()) {
+        const isCurrentTenant = k.startsWith(`${currentOrgId}:`);
+        if (!isCurrentTenant) continue;
 
-  if (method === "GET") {
-    queryCache.set(cacheKey, { timestamp: Date.now(), data: payload });
-  } else {
-    // Invalidate queries for current tenant upon mutation
-    for (const k of queryCache.keys()) {
-      if (k.startsWith(`${currentOrgId}:`)) {
-        queryCache.delete(k);
+        if (
+          (pathLower.includes("/tasks") && (k.includes("/tasks") || k.includes("/dashboard") || k.includes("/reports"))) ||
+          (pathLower.includes("/projects") && (k.includes("/projects") || k.includes("/spaces") || k.includes("/dashboard") || k.includes("/reports"))) ||
+          (pathLower.includes("/members") && (k.includes("/members") || k.includes("/reports"))) ||
+          (pathLower.includes("/roles") && (k.includes("/roles") || k.includes("/permissions"))) ||
+          (pathLower.includes("/files") && (k.includes("/files") || k.includes("/reports"))) ||
+          (pathLower.includes("/spaces") && (k.includes("/spaces") || k.includes("/projects")))
+        ) {
+          queryCache.delete(k);
+        }
       }
     }
-  }
 
-  return payload;
+    if (typeof window !== "undefined" && window.dispatchEvent) {
+      window.dispatchEvent(
+        new CustomEvent("teamguard:api-intercept", {
+          detail: {
+            path,
+            method,
+            status: response.status,
+            ok: true,
+            timestamp: new Date().toISOString(),
+            headers: Object.fromEntries(headers.entries()),
+            body: options.body,
+          },
+        })
+      );
+    }
+
+    return payload;
+  } catch (err) {
+    if (typeof window !== "undefined" && window.dispatchEvent) {
+      window.dispatchEvent(
+        new CustomEvent("teamguard:api-intercept", {
+          detail: {
+            path,
+            method,
+            status: err.status || (response ? response.status : 500),
+            ok: false,
+            error: err.message,
+            timestamp: new Date().toISOString(),
+            headers: Object.fromEntries(headers.entries()),
+            body: options.body,
+          },
+        })
+      );
+    }
+    throw err;
+  }
 }
 
 export const api = {
@@ -362,7 +445,7 @@ export const api = {
   getAuditStats: () => request("/audit/stats"),
 
   // Files
-  getFiles: (params = "") => {
+  getFiles: (params = "", skipCache = false) => {
     let queryStr = "";
     if (typeof params === "string") {
       queryStr = params ? (params.startsWith("?") ? params : `?${params}`) : "";
@@ -376,7 +459,7 @@ export const api = {
       const s = q.toString();
       queryStr = s ? `?${s}` : "";
     }
-    return request(`/files${queryStr}`);
+    return request(`/files${queryStr}`, { skipCache: Boolean(skipCache) });
   },
   getFile: (id) => request(`/files/${id}`),
   createFile: (body) => request("/files", { method: "POST", body }),
@@ -459,6 +542,17 @@ export const api = {
 
   // Compliance & Velocity Reporting (TASK-507 / DP-REP-001 / US-REP-001)
   getReportsSummary: () => request("/reports/summary"),
+  getReportsTrend: (days = 30) => request(`/reports/trend?days=${days}`),
+  getReportsWorkload: () => request("/reports/workload"),
+  getReportsMemberActivity: (params = {}) => {
+    const q = new URLSearchParams();
+    if (params.from) q.set("from", params.from);
+    if (params.to) q.set("to", params.to);
+    const queryStr = q.toString() ? `?${q.toString()}` : "";
+    return request(`/reports/member-activity${queryStr}`);
+  },
+  getReportsStorage: () => request("/reports/storage"),
+  getReportsOverdue: (limit = 10) => request(`/reports/overdue?limit=${limit}`),
   downloadTasksVelocityCsv: async (params = {}) => {
     const q = new URLSearchParams();
     if (params.projectId) q.set("projectId", params.projectId);
@@ -476,6 +570,29 @@ export const api = {
     const queryStr = q.toString() ? `?${q.toString()}` : "";
     return request(`/reports/audit/csv${queryStr}`, { skipCache: true });
   },
+  // Spaces (ReBAC Container Hierarchy)
+  getSpaces: () =>
+    request("/spaces")
+      .then((data) => ({ spaces: Array.isArray(data) ? data : (data?.spaces || []) }))
+      .catch(() => ({ spaces: [] })),
+  createSpace: (body) => request("/spaces", { method: "POST", body }),
+
+  // Access Requests (Self-Service Privilege Escalation)
+  getAccessRequests: (status) =>
+    request(status ? `/access-requests?status=${status}` : "/access-requests")
+      .then((data) => ({ requests: Array.isArray(data) ? data : (data?.accessRequests || data?.requests || []) }))
+      .catch(() => ({ requests: [] })),
+  createAccessRequest: (body) => request("/access-requests", { method: "POST", body }),
+  reviewAccessRequest: (id, body) => request(`/access-requests/${id}/review`, { method: "PATCH", body }),
+
+  // Time Tracking Engine
+  getTimeEntries: (taskId) => request(`/tasks/${taskId}/time-entries`).catch(() => ({ timeEntries: [] })),
+  createTimeEntry: (taskId, body) => request(`/tasks/${taskId}/time-entries`, { method: "POST", body }),
+
+  // Team Collaboration Channels (#Chat)
+  getChannels: () => request("/channels").catch(() => ({ channels: [] })),
+  getChannelMessages: (channelId) => request(`/channels/${channelId}/messages`).catch(() => ({ messages: [] })),
+  sendChannelMessage: (channelId, body) => request(`/channels/${channelId}/messages`, { method: "POST", body }),
 };
 
 export const apiClient = api;

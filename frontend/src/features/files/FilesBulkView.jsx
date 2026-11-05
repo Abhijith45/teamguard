@@ -21,6 +21,7 @@ import {
   X,
 } from "lucide-react";
 import { api } from "../../services/api-client.js";
+import { LoadingView } from "../../components/LoadingView.jsx";
 import { FloatingBulkDock } from "../../components/FloatingBulkDock.jsx";
 import { useFocusTrap } from "../../hooks/useFocusTrap.js";
 import {
@@ -122,11 +123,11 @@ export function FilesBulkView({ user, activeOrg, userPermissions, onShowNotice }
     }
   }
 
-  async function loadFiles() {
+  async function loadFiles(skipCache = true) {
     try {
       setLoading(true);
       setError(null);
-      const res = await api.getFiles();
+      const res = await api.getFiles("", skipCache);
       setFiles(res.files || []);
       setSelectedIds(new Set());
     } catch (err) {
@@ -222,9 +223,11 @@ export function FilesBulkView({ user, activeOrg, userPermissions, onShowNotice }
       setSubmitting(true);
       const ids = Array.from(selectedIds);
       const res = await api.bulkDeleteFiles(ids);
-      setFiles((prev) => prev.filter((f) => !selectedIds.has(f.id)));
-      onShowNotice({ type: "success", message: `Successfully deleted ${res.count || ids.length} files.` });
+      const idSet = new Set(ids.map(String));
+      setFiles((prev) => prev.filter((f) => !idSet.has(String(f.id))));
       setSelectedIds(new Set());
+      await loadQuota();
+      onShowNotice({ type: "success", message: `Successfully deleted ${res.count || ids.length} files.` });
     } catch (err) {
       onShowNotice({ type: "error", message: err.message });
     } finally {
@@ -265,12 +268,15 @@ export function FilesBulkView({ user, activeOrg, userPermissions, onShowNotice }
     try {
       setSubmitting(true);
       await api.deleteFile(file.id);
-      setFiles((prev) => prev.filter((f) => f.id !== file.id));
+      setFiles((prev) => prev.filter((f) => String(f.id) !== String(file.id)));
       setSelectedIds((prev) => {
         const next = new Set(prev);
         next.delete(file.id);
+        next.delete(String(file.id));
+        next.delete(Number(file.id));
         return next;
       });
+      await loadQuota();
       onShowNotice({ type: "success", message: `File "${file.name}" deleted.` });
     } catch (err) {
       onShowNotice({ type: "error", message: err.message });
@@ -686,11 +692,13 @@ export function FilesBulkView({ user, activeOrg, userPermissions, onShowNotice }
             {displayedFiles.length === 0 && (
               <tr>
                 <td colSpan={8} className="empty-table-cell">
-                  {loading
-                    ? "Loading files…"
-                    : searchQuery || projectFilter !== "ALL"
-                    ? "No files match the active search and filter criteria."
-                    : "No files found in this workspace."}
+                  {loading ? (
+                    <LoadingView compact message="Loading workspace files…" />
+                  ) : searchQuery || projectFilter !== "ALL" ? (
+                    "No files match the active search and filter criteria."
+                  ) : (
+                    "No files found in this workspace."
+                  )}
                 </td>
               </tr>
             )}

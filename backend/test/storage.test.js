@@ -16,6 +16,21 @@ test.before(async () => {
 });
 
 test.after(async () => {
+  await prisma.fileAsset.deleteMany({
+    where: {
+      OR: [
+        { name: { contains: "confidential-acme" } },
+        { name: { contains: "downloadable-spec" } },
+        { name: { contains: "idempotent-doc" } },
+        { name: { contains: "verified-document" } },
+        { name: { contains: "unuploaded-file" } },
+        { name: { contains: "etc_passwd" } },
+        { name: { contains: "bulk-" } },
+        { name: { contains: "architecture-design" } },
+        { name: { contains: "dataset-v1" } },
+      ],
+    },
+  }).catch(() => {});
   await new Promise((resolve) => server.close(resolve));
 });
 

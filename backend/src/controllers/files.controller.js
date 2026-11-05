@@ -37,7 +37,7 @@ const updateFileSchema = z.object({
 });
 
 const bulkActionSchema = z.object({
-  fileIds: z.array(z.number().int().positive()).min(1),
+  fileIds: z.array(z.coerce.number().int().positive()).min(1),
 });
 
 /**

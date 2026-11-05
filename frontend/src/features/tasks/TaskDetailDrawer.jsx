@@ -18,6 +18,7 @@ import { TaskCommentsSection } from "./TaskCommentsSection.jsx";
 import TaskActivityStream from "./TaskActivityStream.jsx";
 import { useFocusTrap } from "../../hooks/useFocusTrap.js";
 import { RichTextEditor } from "../../components/RichTextEditor.jsx";
+import { TaskTimeTracker } from "./TaskTimeTracker.jsx";
 
 export function TaskDetailDrawer({
   task,
@@ -233,7 +234,7 @@ export function TaskDetailDrawer({
 
         {/* Drawer Scrollable Body: Overview Tab vs Activity Tab */}
         {activeDrawerTab === "overview" ? (
-          <form id="task-drawer-form" onSubmit={handleSubmit} className="drawer-body">
+          <div id="task-drawer-body" className="drawer-body">
           {/* Metadata Bar */}
           <div
             style={{
@@ -241,7 +242,7 @@ export function TaskDetailDrawer({
               alignItems: "center",
               justifyContent: "space-between",
               padding: "10px 14px",
-              background: "#F8FAFC",
+              background: "var(--color-bg)",
               borderRadius: "8px",
               border: "1px solid var(--color-border-subtle)",
               fontSize: "0.8rem",
@@ -407,6 +408,11 @@ export function TaskDetailDrawer({
             </div>
           </div>
 
+          {/* Native Task Time Tracking Engine (ClickUp 3.0 Time Tracker) */}
+          <div style={{ marginTop: "14px", marginBottom: "14px" }}>
+            <TaskTimeTracker task={task} />
+          </div>
+
           {/* Subtasks / Checklist Section (TASK-301 / TG-SUB-001 & TG-SUB-002) */}
           <SubtaskChecklist
             taskId={task.id}
@@ -440,7 +446,7 @@ export function TaskDetailDrawer({
               View Full Timeline →
             </button>
           </div>
-        </form>
+        </div>
       ) : (
         <div className="drawer-body drawer-activity-body">
           <TaskActivityStream
@@ -491,8 +497,8 @@ export function TaskDetailDrawer({
               </button>
               {canEdit && !isArchived && (
                 <button
-                  type="submit"
-                  form="task-drawer-form"
+                  type="button"
+                  onClick={handleSubmit}
                   className="btn-primary-emerald"
                   disabled={saving}
                 >

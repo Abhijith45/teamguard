@@ -383,3 +383,179 @@ export function filterCalendarTasks(tasks = [], filters = {}) {
     return true;
   });
 }
+/**
+ * Returns 7 days for the week containing referenceDate (Monday through Sunday).
+ * @param {Date|string} [referenceDate=new Date()]
+ * @param {Date|string} [todayDate=new Date()]
+ * @returns {Array<Object>} 7 day objects with full week metadata
+ */
+export function getWeekDays(referenceDate = new Date(), todayDate = new Date()) {
+  const d = new Date(referenceDate);
+  const todayKey = normalizeDateKey(todayDate);
+  const dayOfWeek = d.getDay();
+  const monOffset = (dayOfWeek + 6) % 7;
+
+  const monday = new Date(d);
+  monday.setDate(d.getDate() - monOffset);
+
+  const days = [];
+  for (let i = 0; i < 7; i++) {
+    const current = new Date(monday);
+    current.setDate(monday.getDate() + i);
+    const dateKey = normalizeDateKey(current);
+    days.push({
+      date: current,
+      year: current.getFullYear(),
+      month: current.getMonth(),
+      day: current.getDate(),
+      dateString: dateKey,
+      weekdayName: WEEKDAYS[i],
+      weekdayFull: WEEKDAYS_FULL[i],
+      isToday: dateKey === todayKey,
+      isWeekend: i === 5 || i === 6,
+      colIndex: i,
+      tasks: [],
+    });
+  }
+  return days;
+}
+
+/**
+ * Returns adjacent week reference date.
+ * @param {Date|string} referenceDate
+ * @param {"prev"|"next"} direction
+ * @returns {Date}
+ */
+export function getAdjacentWeek(referenceDate, direction) {
+  const d = new Date(referenceDate);
+  const diff = direction === "prev" ? -7 : 7;
+  d.setDate(d.getDate() + diff);
+  return d;
+}
+
+/**
+ * Returns adjacent day reference date.
+ * @param {Date|string} referenceDate
+ * @param {"prev"|"next"} direction
+ * @returns {Date}
+ */
+export function getAdjacentDay(referenceDate, direction) {
+  const d = new Date(referenceDate);
+  const diff = direction === "prev" ? -1 : 1;
+  d.setDate(d.getDate() + diff);
+  return d;
+}
+
+/**
+ * Formats a clean date range label for a week (e.g. "Nov 2 – Nov 8, 2026").
+ * @param {Date|string} start
+ * @param {Date|string} end
+ * @returns {string}
+ */
+export function formatWeekRange(start, end) {
+  const s = new Date(start);
+  const e = new Date(end);
+  const sMonth = MONTH_NAMES[s.getMonth()]?.slice(0, 3) || "";
+  const eMonth = MONTH_NAMES[e.getMonth()]?.slice(0, 3) || "";
+  const sYear = s.getFullYear();
+  const eYear = e.getFullYear();
+
+  if (sYear === eYear && sMonth === eMonth) {
+    return `${sMonth} ${s.getDate()} – ${e.getDate()}, ${sYear}`;
+  }
+  if (sYear === eYear) {
+    return `${sMonth} ${s.getDate()} – ${eMonth} ${e.getDate()}, ${sYear}`;
+  }
+  return `${sMonth} ${s.getDate()}, ${sYear} – ${eMonth} ${e.getDate()}, ${eYear}`;
+}
+
+/**
+ * Formats a single day date header (e.g. "Wednesday, November 4, 2026").
+ * @param {Date|string} date
+ * @returns {string}
+ */
+export function formatDayDate(date) {
+  const d = new Date(date);
+  const weekday = WEEKDAYS_FULL[(d.getDay() + 6) % 7] || "";
+  const month = MONTH_NAMES[d.getMonth()] || "";
+  return `${weekday}, ${month} ${d.getDate()}, ${d.getFullYear()}`;
+}
+
+/**
+ * Extracts tasks that do not have a scheduled due date.
+ * @param {Array<Object>} tasks
+ * @returns {Array<Object>}
+ */
+export function getUnscheduledTasks(tasks = []) {
+  return (tasks || []).filter((t) => !t.dueDate);
+}
+
+/**
+ * Groups tasks chronologically for Agenda / Feed view.
+ * @param {Array<Object>} tasks
+ * @param {Date|string} [todayDate=new Date()]
+ * @returns {Array<{ key: string, title: string, tasks: Array<Object> }>}
+ */
+export function groupTasksForAgenda(tasks = [], todayDate = new Date()) {
+  const todayKey = normalizeDateKey(todayDate);
+  const today = new Date(todayDate);
+  const tomorrow = new Date(today);
+  tomorrow.setDate(today.getDate() + 1);
+  const tomorrowKey = normalizeDateKey(tomorrow);
+
+  const groups = {
+    overdue: { key: "overdue", title: "Overdue Deliverables", tasks: [] },
+    today: { key: "today", title: "Due Today", tasks: [] },
+    tomorrow: { key: "tomorrow", title: "Due Tomorrow", tasks: [] },
+    upcoming: { key: "upcoming", title: "Next 7 Days", tasks: [] },
+    later: { key: "later", title: "Later Releases", tasks: [] },
+    unscheduled: { key: "unscheduled", title: "Unscheduled Tasks", tasks: [] },
+  };
+
+  const in7Days = new Date(today);
+  in7Days.setDate(today.getDate() + 7);
+  const in7DaysKey = normalizeDateKey(in7Days);
+
+  for (const t of tasks || []) {
+    if (!t.dueDate) {
+      groups.unscheduled.tasks.push(t);
+      continue;
+    }
+    const dKey = normalizeDateKey(t.dueDate);
+    if (!dKey) {
+      groups.unscheduled.tasks.push(t);
+      continue;
+    }
+
+    if (t.status !== "DONE" && dKey < todayKey) {
+      groups.overdue.tasks.push(t);
+    } else if (dKey === todayKey) {
+      groups.today.tasks.push(t);
+    } else if (dKey === tomorrowKey) {
+      groups.tomorrow.tasks.push(t);
+    } else if (dKey > tomorrowKey && dKey <= in7DaysKey) {
+      groups.upcoming.tasks.push(t);
+    } else {
+      groups.later.tasks.push(t);
+    }
+  }
+
+  Object.values(groups).forEach((grp) => {
+    grp.tasks.sort((a, b) => {
+      const priorityOrder = { URGENT: 0, HIGH: 1, MEDIUM: 2, LOW: 3 };
+      const pA = priorityOrder[a.priority] ?? 2;
+      const pB = priorityOrder[b.priority] ?? 2;
+      if (pA !== pB) return pA - pB;
+      return (a.dueDate || "").localeCompare(b.dueDate || "");
+    });
+  });
+
+  return [
+    groups.overdue,
+    groups.today,
+    groups.tomorrow,
+    groups.upcoming,
+    groups.later,
+    groups.unscheduled,
+  ].filter((g) => g.tasks.length > 0);
+}

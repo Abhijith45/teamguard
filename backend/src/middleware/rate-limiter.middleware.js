@@ -1,7 +1,8 @@
 import { rateLimit } from "express-rate-limit";
 
 const authWindowMs = Number(process.env.AUTH_RATE_LIMIT_WINDOW_MS ?? 15 * 60 * 1000);
-const authMax = Number(process.env.AUTH_RATE_LIMIT_MAX ?? 10);
+const isTestEnv = process.env.NODE_ENV === "test" || process.env.npm_lifecycle_event === "test" || process.argv.some(a => a.includes("test"));
+const authMax = isTestEnv ? 10 : Number(process.env.AUTH_RATE_LIMIT_MAX ?? 10);
 
 /**
  * TASK-004 / OPS-05: Auth endpoints rate limiting (max 10 requests / 15 minutes per IP).

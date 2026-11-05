@@ -35,10 +35,13 @@ export async function getMatrix(req, res, next) {
       task: "Tasks",
       files: "Files",
       project: "Projects",
+      space: "Spaces",
+      access_request: "Access Requests",
       members: "Team & Members",
       roles: "Roles & Administration",
       audit: "Audit Logs",
       profile: "Profile",
+      report: "Reports & Analytics",
     };
 
     const categoriesMap = new Map();

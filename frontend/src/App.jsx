@@ -13,6 +13,7 @@ import { CalendarView } from "./features/calendar/CalendarView.jsx";
 import { PlatformAdminView } from "./features/platform/PlatformAdminView.jsx";
 import { AcceptInvitationModal } from "./features/invitations/AcceptInvitationModal.jsx";
 import { AppShell } from "./layout/AppShell.jsx";
+import { ErrorBoundary } from "./components/ErrorBoundary.jsx";
 import {
   api,
   clearAccessToken,
@@ -23,12 +24,93 @@ import {
 } from "./services/api-client.js";
 import "./App.css";
 
+
+// Parses /{workspace_id}/{view_type}/{project_id}
+// view_type: b (Board), l (List), gr (Table grouped by status)
+const PROJECT_VIEW_ROUTE_REGEX = /^\/([^\/]+)\/(b|l|gr|table)\/(0|[1-9][0-9]*)\/?$/i;
+
+function parseProjectViewRoute(pathname) {
+  if (!pathname) return null;
+  let decoded = pathname;
+  try {
+    decoded = decodeURIComponent(pathname);
+  } catch {
+    // fallback
+  }
+  const match = decoded.trim().match(PROJECT_VIEW_ROUTE_REGEX);
+  if (!match) return null;
+  const rawType = match[2].toLowerCase();
+  return {
+    workspaceId: match[1],
+    viewType: rawType === "table" ? "gr" : rawType,
+    projectId: Number(match[3]),
+  };
+}
+
+
+
+// Canonical URL route-to-section mapping
+const SECTION_TO_PATH = {
+  dashboard: "/dashboard",
+  tasks: "/tasks",
+  files: "/files",
+  calendar: "/calendar",
+  members: "/members",
+  "permissions-matrix": "/permissions",
+  reports: "/reports",
+  account: "/profile",
+  support: "/support",
+  "platform-admin": "/platform-governance",
+};
+
+const PATH_TO_SECTION = {
+  "/": "dashboard",
+  "/dashboard": "dashboard",
+  "/tasks": "tasks",
+  "/files": "files",
+  "/calendar": "calendar",
+  "/members": "members",
+  "/permissions": "permissions-matrix",
+  "/team-and-permissions": "permissions-matrix",
+  "/reports": "reports",
+  "/profile": "account",
+  "/account": "account",
+  "/support": "support",
+  "/platform-governance": "platform-admin",
+  "/platform-admin": "platform-admin",
+};
+
+function getSectionFromPath(pathname) {
+  if (typeof window === "undefined") return "dashboard";
+  const clean = (pathname || window.location.pathname || "/").toLowerCase().replace(/\/+$/, "") || "/";
+  if (parseProjectViewRoute(clean)) return "tasks";
+  if (PATH_TO_SECTION[clean]) return PATH_TO_SECTION[clean];
+  for (const [route, sec] of Object.entries(PATH_TO_SECTION)) {
+    if (route !== "/" && clean.startsWith(route)) {
+      return sec;
+    }
+  }
+  return "dashboard";
+}
+
+function getPathForSection(sectionName) {
+  return SECTION_TO_PATH[sectionName] || "/dashboard";
+}
+
 export default function App() {
   const [user, setUser] = useState(null);
   const [restoring, setRestoring] = useState(true);
   const [activeOrg, setActiveOrg] = useState(null);
   const [projects, setProjects] = useState([]);
-  const [section, setSection] = useState("dashboard");
+  const initialProjectRoute = typeof window !== "undefined" ? parseProjectViewRoute(window.location.pathname) : null;
+  const [activeProjectId, setActiveProjectId] = useState(() => initialProjectRoute?.projectId || null);
+  const [taskViewType, setTaskViewType] = useState(() => initialProjectRoute?.viewType || "b");
+  const [section, setSectionState] = useState(() => {
+    if (typeof window !== "undefined") {
+      return getSectionFromPath(window.location.pathname);
+    }
+    return "dashboard";
+  });
   const [wizardOpen, setWizardOpen] = useState(false);
   const [notice, setNotice] = useState(null);
   const [switchingWorkspace, setSwitchingWorkspace] = useState(false);
@@ -39,6 +121,76 @@ export default function App() {
     }
     return null;
   });
+
+  // Route to /{workspace_id}/{view_type}/{project_id}
+  const navigateToProjectView = useCallback((projectId, viewType = "b", options = {}) => {
+    const rawKey = activeOrg?.slug || activeOrg?.name || activeOrg?.id || "workspace";
+    const orgKey = String(rawKey).trim().toLowerCase().replace(/\s+/g, "-");
+    const targetPath = `/${orgKey}/${viewType}/${projectId}`;
+    setActiveProjectId(Number(projectId));
+    setTaskViewType(viewType);
+    setSectionState("tasks");
+    if (typeof window !== "undefined" && window.history?.pushState) {
+      if (window.location.pathname !== targetPath) {
+        if (options.replace) {
+          window.history.replaceState({ section: "tasks", projectId, viewType }, "", targetPath);
+        } else {
+          window.history.pushState({ section: "tasks", projectId, viewType }, "", targetPath);
+        }
+      }
+    }
+  }, [activeOrg]);
+
+
+  const setSection = useCallback((nextSection, options = {}) => {
+    setSectionState(nextSection);
+    if (typeof window !== "undefined" && window.history?.pushState) {
+      const targetPath = getPathForSection(nextSection);
+      if (window.location.pathname !== targetPath) {
+        if (options.replace) {
+          window.history.replaceState({ section: nextSection }, "", targetPath);
+        } else {
+          window.history.pushState({ section: nextSection }, "", targetPath);
+        }
+      }
+    }
+  }, []);
+
+  // Synchronize route with browser back/forward buttons
+  useEffect(() => {
+    function handlePopState() {
+      const route = parseProjectViewRoute(window.location.pathname);
+      if (route) {
+        setActiveProjectId(route.projectId);
+        setTaskViewType(route.viewType);
+        setSectionState("tasks");
+      } else {
+        const routeSection = getSectionFromPath(window.location.pathname);
+        setSectionState(routeSection);
+      }
+    }
+    window.addEventListener("popstate", handlePopState);
+    return () => window.removeEventListener("popstate", handlePopState);
+  }, []);
+
+  // Synchronize route upon authentication restoration
+  useEffect(() => {
+    if (user && typeof window !== "undefined") {
+      const currentPath = window.location.pathname;
+      const projectRoute = parseProjectViewRoute(currentPath);
+      if (projectRoute) {
+        setActiveProjectId(projectRoute.projectId);
+        setTaskViewType(projectRoute.viewType);
+        setSectionState("tasks");
+      } else if (currentPath === "/" || currentPath === "") {
+        window.history.replaceState({ section: "dashboard" }, "", "/dashboard");
+        setSectionState("dashboard");
+      } else {
+        const routeSection = getSectionFromPath(currentPath);
+        setSectionState(routeSection);
+      }
+    }
+  }, [user]);
 
   const showNotice = useCallback((newNotice) => {
     setNotice(newNotice);
@@ -95,7 +247,11 @@ export default function App() {
       setActiveOrg(org);
       setActiveOrgId(org.id);
     }
-    setSection("dashboard");
+    const currentPath = typeof window !== "undefined" ? window.location.pathname : "/";
+    const targetSection = (currentPath && currentPath !== "/" && currentPath !== "")
+      ? getSectionFromPath(currentPath)
+      : "dashboard";
+    setSection(targetSection, { replace: true });
     showNotice({ type: "success", message: `Welcome back, ${authenticatedUser.name}!` });
   }
 
@@ -109,7 +265,7 @@ export default function App() {
     setUser(null);
     setActiveOrg(null);
     setProjects([]);
-    setSection("dashboard");
+    setSection("dashboard", { replace: true });
   }
 
   async function handleSwitchPersona(personaId, orgSlug = "acme-corp") {
@@ -131,6 +287,10 @@ export default function App() {
       const projRes = await api.getProjects().catch(() => ({ projects: [] }));
       setProjects(projRes.projects || []);
 
+      // Always redirect to "/dashboard" route upon workspace switch
+      setSection("dashboard");
+      setActiveProjectId(null);
+
       showNotice({
         type: "success",
         message: `Switched test persona to "${session.user.roles?.[0]?.name || personaId}" in ${session.activeOrganization?.name}.`,
@@ -143,11 +303,17 @@ export default function App() {
   }
 
   async function handleSwitchOrg(orgId) {
-    if (!orgId || orgId === activeOrg?.id) return;
+    if (!orgId) return;
+    if (orgId === activeOrg?.id) {
+      setSection("dashboard");
+      setActiveProjectId(null);
+      return;
+    }
     try {
       setSwitchingWorkspace(true);
       // TASK-003: Purge client-side caches and in-memory tenant state
       purgeTenantWorkspaceCache(orgId);
+      setActiveOrgId(orgId);
       setProjects([]);
       setWizardOpen(false);
 
@@ -158,6 +324,10 @@ export default function App() {
 
       const projRes = await api.getProjects().catch(() => ({ projects: [] }));
       setProjects(projRes.projects || []);
+
+      // Always redirect to "/dashboard" route upon workspace change
+      setSection("dashboard");
+      setActiveProjectId(null);
 
       showNotice({
         type: "success",
@@ -218,6 +388,8 @@ export default function App() {
       onOpenWizard={() => setWizardOpen(true)}
       onShowNotice={showNotice}
       onOrgCreated={handleOrgCreated}
+      onSelectProject={(projId) => navigateToProjectView(projId, taskViewType || "b")}
+      activeProjectId={activeProjectId}
     >
       {/* Toast Notice */}
       {notice && (
@@ -233,6 +405,11 @@ export default function App() {
       )}
 
       {/* View Routing with TASK-003 Tenant State Isolation Keys */}
+      <ErrorBoundary
+        key={`error-boundary-${section}-${activeOrg?.id}-${activeProjectId || "root"}`}
+        title={`Unable to display ${section} view`}
+        onNavigateHome={() => setSection("dashboard")}
+      >
       {section === "dashboard" && (
         <DashboardView
           key={`dashboard-${activeOrg?.id}`}
@@ -247,7 +424,7 @@ export default function App() {
               );
             }
           }}
-          onNavigateToProjects={() => setSection("tasks")}
+          onNavigateToProjects={(projId) => projId ? navigateToProjectView(projId, "b") : setSection("tasks")}
           onNavigateToCalendar={() => setSection("calendar")}
           onOpenWizard={() => setWizardOpen(true)}
           onShowNotice={showNotice}
@@ -256,11 +433,23 @@ export default function App() {
 
       {section === "tasks" && (
         <KanbanBoardView
-          key={`tasks-${activeOrg?.id}`}
+          key={`tasks-${activeOrg?.id}-${activeProjectId || 'all'}`}
           user={user}
           activeOrg={activeOrg}
           userPermissions={userPermissions}
           onShowNotice={showNotice}
+          initialProjectId={activeProjectId}
+          initialViewType={taskViewType}
+          onViewTypeChange={(newType) => {
+            setTaskViewType(newType);
+            if (activeProjectId) {
+              navigateToProjectView(activeProjectId, newType, { replace: true });
+            }
+          }}
+          onProjectChange={(newProjId) => {
+            setActiveProjectId(Number(newProjId));
+            navigateToProjectView(newProjId, taskViewType || "b", { replace: true });
+          }}
         />
       )}
 
@@ -347,6 +536,7 @@ export default function App() {
           onShowNotice={showNotice}
         />
       )}
+      </ErrorBoundary>
 
       {/* Project Setup Wizard Modal */}
       <ProjectSetupWizardModal

@@ -28,6 +28,7 @@ import {
   ExternalLink,
 } from "lucide-react";
 import { api } from "../../services/api-client.js";
+import { LoadingView } from "../../components/LoadingView.jsx";
 
 const ROLE_COLOR_MAP = {
   "super-admin": {
@@ -105,6 +106,12 @@ export function MembersView({ activeOrg, currentUser, onShowNotice }) {
   const [resendingId, setResendingId] = useState(null);
   const [revokingId, setRevokingId] = useState(null);
 
+  // Self-Service Access Requests State (Milestone 2 & 3 ReBAC)
+  const [accessRequests, setAccessRequests] = useState([]);
+  const [reviewingId, setReviewingId] = useState(null);
+  const [rejectModalRequest, setRejectModalRequest] = useState(null);
+  const [rejectionReason, setRejectionReason] = useState("");
+
   // Permission check: Does current user hold member management permissions?
   const canManageMembers = useMemo(() => {
     if (!currentUser) return false;
@@ -119,14 +126,16 @@ export function MembersView({ activeOrg, currentUser, onShowNotice }) {
     try {
       setLoading(true);
       setError(null);
-      const [membersRes, rolesRes, invitesRes] = await Promise.all([
+      const [membersRes, rolesRes, invitesRes, accessReqsRes] = await Promise.all([
         api.getMembers("status=ALL"),
         api.getMemberRoles().catch(() => ({ roles: [] })),
         canManageMembers ? api.getInvitations().catch(() => ({ invitations: [] })) : Promise.resolve({ invitations: [] }),
+        canManageMembers ? api.getAccessRequests().catch(() => ({ requests: [] })) : Promise.resolve({ requests: [] }),
       ]);
       setMembers(membersRes.members || []);
       setAvailableRoles(rolesRes.roles || []);
       setInvitations(invitesRes?.invitations || []);
+      setAccessRequests(accessReqsRes?.requests || []);
     } catch (err) {
       setError(err.message || "Failed to load organization members");
     } finally {
@@ -374,13 +383,36 @@ export function MembersView({ activeOrg, currentUser, onShowNotice }) {
     }
   }
 
+  async function handleReviewRequest(requestId, status, requestedLevel, reason) {
+    try {
+      setReviewingId(requestId);
+      await api.reviewAccessRequest(requestId, {
+        status,
+        accessLevel: requestedLevel,
+        rejectionReason: reason || undefined,
+      });
+      onShowNotice?.({
+        type: "success",
+        title: status === "APPROVED" ? "Access Approved" : "Access Rejected",
+        message: `Access request ${status === "APPROVED" ? "approved" : "rejected"} successfully.`,
+      });
+      setRejectModalRequest(null);
+      setRejectionReason("");
+      const res = await api.getAccessRequests();
+      setAccessRequests(res.requests || []);
+    } catch (err) {
+      onShowNotice?.({
+        type: "error",
+        title: "Review Action Failed",
+        message: err.message || "Failed to update access request.",
+      });
+    } finally {
+      setReviewingId(null);
+    }
+  }
+
   if (loading && members.length === 0) {
-    return (
-      <div className="view-loading-container" role="status" aria-live="polite">
-        <div className="loading-spinner" />
-        <span>Loading organization members…</span>
-      </div>
-    );
+    return <LoadingView message="Loading organization members…" />;
   }
 
   return (
@@ -454,6 +486,23 @@ export function MembersView({ activeOrg, currentUser, onShowNotice }) {
             <span>
               Invitations (
               {invitations.filter((i) => i.status === "PENDING").length} pending)
+            </span>
+          </button>
+        )}
+        {canManageMembers && (
+          <button
+            type="button"
+            className={`tab-btn flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+              activeTab === "access-requests"
+                ? "bg-surface-active text-text-primary border border-border-subtle shadow-sm"
+                : "text-text-muted hover:text-text-primary"
+            }`}
+            onClick={() => setActiveTab("access-requests")}
+          >
+            <Shield size={16} />
+            <span>
+              Access Requests (
+              {accessRequests.filter((r) => r.status === "PENDING").length} pending)
             </span>
           </button>
         )}
@@ -938,6 +987,199 @@ export function MembersView({ activeOrg, currentUser, onShowNotice }) {
                   })}
                 </tbody>
               </table>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* 3. Access Requests Tab View Content */}
+      {activeTab === "access-requests" && (
+        <div className="access-requests-container space-y-4">
+          <div className="flex items-center justify-between p-4 rounded-xl bg-surface border border-border">
+            <div>
+              <h2 className="text-base font-bold text-text-primary flex items-center gap-2">
+                <Shield size={18} className="text-indigo-400" />
+                <span>Self-Service Privilege Escalation & Access Requests</span>
+              </h2>
+              <p className="text-xs text-text-muted mt-1">
+                Review and approve access requests for private spaces and restricted workspace containers.
+              </p>
+            </div>
+            <button
+              type="button"
+              className="button button-secondary text-xs flex items-center gap-1.5"
+              onClick={async () => {
+                const res = await api.getAccessRequests();
+                setAccessRequests(res.requests || []);
+              }}
+            >
+              <RotateCw size={13} />
+              <span>Refresh</span>
+            </button>
+          </div>
+
+          {accessRequests.length === 0 ? (
+            <div className="p-12 text-center rounded-xl bg-surface border border-border text-text-muted">
+              <Shield size={32} className="mx-auto mb-2 opacity-40 text-indigo-400" />
+              <p className="text-sm font-medium text-text-primary">No Access Requests</p>
+              <p className="text-xs text-text-muted mt-1">
+                There are no pending or past privilege escalation requests in this workspace.
+              </p>
+            </div>
+          ) : (
+            <div className="overflow-x-auto rounded-xl border border-border bg-surface">
+              <table className="w-full text-left text-xs">
+                <thead className="bg-surface-active border-b border-border text-text-muted font-medium">
+                  <tr>
+                    <th className="p-3">Requester</th>
+                    <th className="p-3">Target Resource</th>
+                    <th className="p-3">Requested Tier</th>
+                    <th className="p-3">Justification</th>
+                    <th className="p-3">Status</th>
+                    <th className="p-3 text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border">
+                  {accessRequests.map((req) => {
+                    const isPending = req.status === "PENDING";
+                    const isApproved = req.status === "APPROVED";
+                    const isRejected = req.status === "REJECTED";
+
+                    return (
+                      <tr key={req.id} className="hover:bg-surface-hover/50 transition">
+                        <td className="p-3">
+                          <div className="font-semibold text-text-primary">
+                            {req.requester?.user?.name || `User #${req.requester?.userId}`}
+                          </div>
+                          <div className="text-[11px] text-text-muted">
+                            {req.requester?.user?.email || req.requester?.department || "Member"}
+                          </div>
+                        </td>
+                        <td className="p-3">
+                          <span className="font-medium text-text-primary">
+                            {req.resourceType}: #{req.resourceId}
+                          </span>
+                        </td>
+                        <td className="p-3">
+                          <span
+                            className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider ${
+                              req.requestedLevel === "FULL"
+                                ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30"
+                                : req.requestedLevel === "EDIT"
+                                ? "bg-purple-500/20 text-purple-400 border border-purple-500/30"
+                                : "bg-blue-500/20 text-blue-400 border border-blue-500/30"
+                            }`}
+                          >
+                            {req.requestedLevel}
+                          </span>
+                        </td>
+                        <td className="p-3 max-w-xs truncate text-text-muted" title={req.justification}>
+                          {req.justification || "—"}
+                        </td>
+                        <td className="p-3">
+                          <span
+                            className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                              isPending
+                                ? "bg-amber-500/20 text-amber-400 border border-amber-500/30"
+                                : isApproved
+                                ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30"
+                                : "bg-rose-500/20 text-rose-400 border border-rose-500/30"
+                            }`}
+                          >
+                            {req.status}
+                          </span>
+                        </td>
+                        <td className="p-3 text-right">
+                          {isPending ? (
+                            <div className="flex items-center justify-end gap-1.5">
+                              <button
+                                type="button"
+                                disabled={reviewingId === req.id}
+                                onClick={() => handleReviewRequest(req.id, "APPROVED", req.requestedLevel)}
+                                className="px-2.5 py-1 rounded bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-medium flex items-center gap-1 transition disabled:opacity-50"
+                              >
+                                <Check size={12} />
+                                <span>Approve</span>
+                              </button>
+                              <button
+                                type="button"
+                                disabled={reviewingId === req.id}
+                                onClick={() => setRejectModalRequest(req)}
+                                className="px-2.5 py-1 rounded bg-rose-600/20 hover:bg-rose-600/30 border border-rose-500/30 text-rose-300 text-xs font-medium flex items-center gap-1 transition disabled:opacity-50"
+                              >
+                                <X size={12} />
+                                <span>Reject</span>
+                              </button>
+                            </div>
+                          ) : (
+                            <span className="text-[11px] text-text-muted">
+                              {isApproved ? "Granted" : `Denied: ${req.rejectionReason || "No reason"}`}
+                            </span>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+
+          {/* Rejection Reason Modal */}
+          {rejectModalRequest && (
+            <div className="app-modal-backdrop" role="dialog" aria-modal="true">
+              <div className="member-dialog-content max-w-md">
+                <div className="member-dialog-header">
+                  <div className="flex items-center gap-2 text-rose-500">
+                    <AlertTriangle size={20} />
+                    <h3 className="text-base font-bold text-text-primary">Reject Access Request</h3>
+                  </div>
+                  <button
+                    type="button"
+                    className="modal-close-btn"
+                    onClick={() => setRejectModalRequest(null)}
+                  >
+                    <X size={16} />
+                  </button>
+                </div>
+                <div className="mt-4 space-y-3">
+                  <p className="text-xs text-text-muted">
+                    Provide a documented rejection reason for{" "}
+                    <strong>{rejectModalRequest.requester?.user?.name || "the requester"}</strong>:
+                  </p>
+                  <textarea
+                    value={rejectionReason}
+                    onChange={(e) => setRejectionReason(e.target.value)}
+                    placeholder="Enter reason (e.g. 'Outside of team charter', 'Security review required')..."
+                    rows={3}
+                    className="w-full bg-surface-active border border-border rounded-lg p-2.5 text-xs text-text-primary focus:outline-none focus:border-indigo-500 resize-none"
+                  />
+                  <div className="flex justify-end gap-2 pt-2">
+                    <button
+                      type="button"
+                      onClick={() => setRejectModalRequest(null)}
+                      className="button button-secondary text-xs"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="button"
+                      disabled={reviewingId === rejectModalRequest.id}
+                      onClick={() =>
+                        handleReviewRequest(
+                          rejectModalRequest.id,
+                          "REJECTED",
+                          rejectModalRequest.requestedLevel,
+                          rejectionReason
+                        )
+                      }
+                      className="px-3.5 py-1.5 rounded-lg bg-rose-600 hover:bg-rose-500 text-white text-xs font-medium transition"
+                    >
+                      Confirm Rejection
+                    </button>
+                  </div>
+                </div>
+              </div>
             </div>
           )}
         </div>

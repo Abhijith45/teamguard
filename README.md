@@ -7,11 +7,13 @@
 [![Vite](https://img.shields.io/badge/Vite-v8-646CFF?logo=vite&logoColor=white)](https://vitejs.dev/)
 [![Prisma](https://img.shields.io/badge/Prisma-v7-2D3748?logo=prisma&logoColor=white)](https://www.prisma.io/)
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-14+-4169E1?logo=postgresql&logoColor=white)](https://www.postgresql.org/)
+[![Netlify](https://img.shields.io/badge/Netlify-Ready-00C7B7?logo=netlify&logoColor=white)](https://www.netlify.com/)
+[![Render](https://img.shields.io/badge/Render-Ready-46E3B7?logo=render&logoColor=white)](https://render.com/)
 [![License](https://img.shields.io/badge/License-ISC-blue.svg)](LICENSE)
 
-**TeamGuard** is a full-stack, enterprise-grade multi-tenant workspace and authorization engine designed to demonstrate and enforce **Role-Based Access Control (RBAC)**, **Attribute-Based Access Control (ABAC)**, **strict tenant boundary isolation**, and **immutable security audit logging**.
+**TeamGuard** is an enterprise-grade multi-tenant workspace, task orchestration, and authorization platform. It demonstrates and enforces **Role-Based Access Control (RBAC)**, **Attribute-Based Access Control (ABAC)**, **Relationship-Based Access Control (ReBAC)**, and **tamper-evident security audit logging**.
 
-Every organization maintains its own members, custom roles, permissions, projects, tasks, and files. Authorization decisions are resolved dynamically on the server from relational join tables and resource attributes—never trusting client-side visibility flags or static JWT role claims.
+Every organization maintains its own members, custom roles, permissions, spaces, projects, tasks, and files. Authorization decisions are resolved dynamically on the server from relational join tables and resource attributes—never trusting client-side visibility flags or static JWT role claims.
 
 ---
 
@@ -27,49 +29,64 @@ Every organization maintains its own members, custom roles, permissions, project
 - **Custom Tenant Roles**: Organizations can define custom roles with granular permission sets (`project:create`, `task:update:own`, `member:manage`, etc.).
 - **Attribute-Based Policies (ABAC)**: Resource operations verify ownership and contextual attributes (e.g. team members can only edit tasks assigned to them, while managers can edit all tasks in their scope).
 
+### 📁 ReBAC Spaces & Container Hierarchy
+- **Hierarchical Scoping**: `Organization → Space → Project → Task → Subtask`.
+- **Sidebar Space Tree**: Collapsible workspace navigation with live badge counts summing active work (`Todo + In-Progress`).
+- **Granular Space Privacy**: Support for `PUBLIC`, `PRIVATE`, and `INVITE_ONLY` spaces with inheritance for contained projects.
+
+### 📅 Interactive High-Visibility Calendar
+- **Multi-View Modes**: Seamless switching between Month, Week, Day, and Agenda views.
+- **Date Box Tasks Modal**: Clicking any date cell opens a dedicated day modal displaying all tasks or an interactive empty state.
+- **One-Click Quick Add `[+]`**: Hovering on future date cells surfaces a `[+]` button to prefill and open the task scheduling modal.
+- **Past-Date Immutability**: Historical dates display subtle lock indicators with task creation, editing, and drag-and-drop operations disabled.
+
+### 📊 Compliance & Velocity Analytics
+- **Executive KPI Cards**: Real-time metrics for total tasks, completion rates, overdue alerts, and team headcount.
+- **30-Day Task Velocity Trend**: Planned vs. completed workload trajectories.
+- **Team Workload Breakdown**: Interactive member workload distribution and backlog balance.
+- **One-Click CSV Compliance Exports**: Instant audit-ready exports for Task Velocity and Security Compliance Logs.
+
+### ⚡ Smart In-Memory Query Caching & ETags
+- **Client Cache**: 15-second in-memory query cache in `api-client.js` with LRU eviction.
+- **Conditional HTTP 304 Validation**: API endpoints return `ETag` hashes; unchanged queries return 304 with zero payload re-transmission.
+- **Smart Tenant Mutation Invalidation**: Mutating tasks, projects, roles, or members automatically invalidates related tenant cache keys.
+- **Cross-Tenant Purge**: Switching active organization immediately purges cached memory.
+
 ### 👥 Interactive Persona Switcher (Live Demo Mode)
 - Test and verify permission enforcement in real time with a built-in persona switcher:
   - 👑 **Super Admin / Owner**: Full governance, role configuration, member invites, and audit log access.
   - 💼 **Project Manager**: Project lifecycle and scoped task management.
   - 🛠️ **Team Member**: Task progress updates on assigned items (`task:update:own`).
-  - 👁️ **Stakeholder / Viewer**: Read-only oversight with write operations strictly denied.
+  - 👁️ **Stakeholder / Viewer**: Read-only oversight with write operations strictly denied (`403 Forbidden`).
 
-### 📊 Modern Management Consoles
-- **Visual Permissions Matrix**: Interactive matrix grid displaying effective privileges for all roles.
-- **Interactive Kanban Board**: Organization-scoped project board with task assignment, status updates, and priority tagging.
-- **Bulk File Operations**: Asset management interface with tenant-isolated upload and delete actions.
-- **Security Audit Log Explorer**: Searchable, tamper-evident audit trail capturing actor, action, resource, timestamp, and outcome.
-
-### 🔒 Hardened Authentication & Session Lifecycle
-- Password hashing with **Bcrypt** ($\ge 10$ salt rounds).
-- Short-lived stateless **JWT Access Tokens** (`15m`).
-- Database-backed **Refresh Sessions** storing cryptographic SHA-256 hashes only.
-- Strict token rotation and instant multi-session revocation upon suspected token reuse or logout.
-- Safe serialization layers guaranteeing credentials and secret hashes are never sent in API responses.
+### 🎨 Accessible High-Opacity Theme System
+- Dual theme support: High-Contrast Dark (`#0B0E14` base, `#141824` cards, `#283142` borders) and High-Contrast Light (`#F4F6F9` base, `#FFFFFF` cards, `#D3DCE6` borders).
+- Eliminates low-contrast translucent overlays (`rgba`) in favor of solid surfaces with WCAG AAA compliant text contrast.
 
 ---
 
 ## 🏗️ Architecture & Tech Stack
 
 ```mermaid
-graph TD
-    Client[React 19 + Vite Frontend] -->|Bearer JWT + x-organization-id| API[Express 5 REST API]
-    API --> Auth[Authentication Middleware]
-    Auth --> Tenant[Tenant & Membership Resolver]
-    Tenant --> RBAC[Dynamic RBAC Middleware]
-    RBAC --> ABAC[Resource ABAC Policies]
-    ABAC --> Audit[Audit Logging Interceptor]
-    Audit --> Prisma[Prisma ORM Client]
-    Prisma --> DB[(PostgreSQL Database)]
+flowchart TD
+    Client["React 19 + Vite Frontend<br/>(Netlify Free Tier)"] -->|Bearer JWT + x-organization-id| API["Express 5 REST API<br/>(Render Free Tier)"]
+    API --> Auth["Authentication Middleware"]
+    Auth --> Tenant["Tenant & Membership Resolver"]
+    Tenant --> RBAC["Dynamic RBAC Middleware"]
+    RBAC --> ABAC["Resource ABAC Policies"]
+    ABAC --> Audit["Audit Logging Interceptor"]
+    Audit --> Prisma["Prisma ORM Client"]
+    Prisma --> DB[("PostgreSQL 14+ Database<br/>(Render / Supabase / Neon)")]
 ```
 
 | Layer | Technologies |
 |---|---|
-| **Frontend** | React 19, Vite 8, Lucide React, Custom CSS Design System |
-| **Backend** | Node.js (ESM), Express 5, Zod Schema Validation, Cookie-Parser, CORS |
-| **Database & ORM** | PostgreSQL, Prisma ORM 7 (`@prisma/client`, `@prisma/adapter-pg`) |
-| **Auth & Security** | JSON Web Tokens (`jsonwebtoken`), Bcrypt.js, SHA-256 Session Hashes |
-| **Testing** | Node.js Test Runner (`node --test`), Custom Assertion Suites |
+| **Frontend** | React 19, Vite 8, Lucide React, High-Opacity Design System |
+| **Backend** | Node.js (ESM), Express 5, Zod Schema Validation, Helmet, Cookie-Parser, CORS |
+| **Database & ORM** | PostgreSQL 14+, Prisma ORM 7 (`@prisma/client`, `@prisma/adapter-pg`) |
+| **Auth & Security** | JSON Web Tokens (`jsonwebtoken`), Bcrypt.js ($\ge 10$ rounds), SHA-256 Session Hashes |
+| **Testing** | Node.js Test Runner (`node --test`), Playwright Component & E2E Suites |
+| **Deployment** | Netlify (Frontend SPA), Render (Backend Web Service & PostgreSQL) |
 
 ---
 
@@ -78,121 +95,172 @@ graph TD
 ```text
 rbac/
 ├── backend/
-│   ├── config/              # Prisma database connection & client setup
-│   ├── prisma/              # Prisma schema, migrations & seed scripts
+│   ├── config/              # Prisma database connection & seed logic
+│   ├── prisma/              # Prisma schema & database migrations
 │   ├── src/
-│   │   ├── controllers/     # Express route controllers
-│   │   ├── lib/             # JWT token helpers & cookie utilities
-│   │   ├── middleware/      # Auth, tenant resolver, RBAC & error handlers
+│   │   ├── controllers/     # Express route controllers (Auth, Tasks, Spaces, Reports)
+│   │   ├── lib/             # JWT tokens, refresh sessions & cache engine
+│   │   ├── middleware/      # Auth, tenant resolver, RBAC, ETags & rate limiters
 │   │   ├── routes/          # REST route declarations
-│   │   ├── services/        # Business logic, permission resolution & audit logging
-│   │   ├── utils/           # Validation schemas & response helpers
-│   │   └── app.js           # Express app setup & route registry
+│   │   ├── services/        # Business logic, permissions & audit logging
+│   │   ├── utils/           # Validation schemas & data masking helpers
+│   │   └── app.js           # Express app setup, CORS & Helmet security
 │   ├── test/                # Automated RBAC & tenant isolation test suite
 │   ├── package.json
 │   └── server.js            # Server entrypoint & graceful shutdown handlers
 ├── frontend/
+│   ├── public/              # Static brand assets, favicons & _redirects (Netlify)
 │   ├── src/
-│   │   ├── components/      # UI primitives, Brand & Persona Switcher
-│   │   ├── features/        # Auth, Dashboard, Kanban, Roles, Members, Files
-│   │   ├── hooks/           # useSession, useAdminWorkspace hooks
-│   │   ├── services/        # Axios / Fetch API client with tenant headers
-│   │   ├── layout/          # AppShell & responsive navigation
+│   │   ├── components/      # UI primitives, Brand, Persona Switcher & Theme Toggle
+│   │   ├── features/        # Auth, Dashboard, Kanban, Calendar, Reports, Spaces
+│   │   ├── layout/          # AppShell & responsive SidebarSpaceTree
+│   │   ├── services/        # Fetch API client with tenant headers & caching
 │   │   └── main.jsx         # React application entrypoint
+│   ├── netlify.toml         # Netlify subdirectory deployment config
+│   ├── package.json
 │   └── vite.config.js
-├── docs/                    # Architectural decisions & product planning records
-├── AGENTS.md                # In-depth technical specifications & agent guide
-├── README.md                # GitHub project documentation
-└── .gitignore               # Strict exclusion rules for secrets, builds & caches
+├── PRD.md                   # Canonical Product Requirements Document
+├── netlify.toml             # Netlify root build & SPA redirect configuration
+├── render.yaml              # Render backend Blueprint specification
+└── .gitignore               # Strict exclusion rules for secrets & builds
 ```
 
 ---
 
-## 🚀 Quickstart Guide
+## 🚀 Live Cloud Deployment Guide
+
+TeamGuard is optimized for zero-cost deployment on the **Netlify Free Tier** (Frontend) and **Render Free Tier** (Backend + Database).
+
+### 1. Deploy Backend to Render (Free Tier)
+
+#### Option A: One-Click Render Blueprint (Recommended)
+1. Fork or push this repository to your GitHub account.
+2. Sign in to your [Render Dashboard](https://dashboard.render.com/).
+3. Click **New +** → **Blueprint**.
+4. Connect your GitHub repository. Render will automatically read `render.yaml`.
+5. Enter the required environment parameters:
+   - `DATABASE_URL`: Your Render PostgreSQL database connection string (or external connection string from Supabase/Neon).
+   - `FRONTEND_ORIGIN`: Your Netlify frontend URL (e.g. `https://your-teamguard.netlify.app`).
+   - `BOOTSTRAP_ADMIN_PASSWORD`: A secure admin password for initial seeding.
+6. Click **Apply**. Render will build and deploy the web service at `https://<your-service>.onrender.com`.
+
+#### Option B: Manual Web Service Setup
+1. On Render, click **New +** → **Web Service**.
+2. Select your repository and specify:
+   - **Name**: `teamguard-api`
+   - **Runtime**: `Node`
+   - **Region**: Choose closest to you (e.g. `Oregon (US West)`)
+   - **Root Directory**: `backend`
+   - **Build Command**: `npm install && npx prisma generate`
+   - **Start Command**: `npm start`
+   - **Plan**: `Free`
+3. Add the following **Environment Variables**:
+   | Variable | Value | Notes |
+   |---|---|---|
+   | `NODE_ENV` | `production` | Enables production security & cookies |
+   | `PORT` | `10000` | Render default web service port |
+   | `DATABASE_URL` | `postgresql://...` | Connection string with SSL enabled |
+   | `JWT_ACCESS_SECRET` | *32+ character random string* | Used to sign JWTs |
+   | `ACCESS_TOKEN_TTL` | `15m` | Short-lived access token expiry |
+   | `REFRESH_TOKEN_TTL_DAYS` | `30` | Refresh token lifespan |
+   | `FRONTEND_ORIGIN` | `https://your-app.netlify.app` | Whitelisted Netlify origin |
+   | `COOKIE_SAME_SITE` | `none` | Required for cross-site Netlify cookies |
+   | `COOKIE_SECURE` | `true` | Required with `sameSite=none` |
+   | `BOOTSTRAP_ADMIN_EMAIL` | `admin@teamguard.local` | Initial admin account |
+   | `BOOTSTRAP_ADMIN_PASSWORD` | *Your secure password* | Initial admin password |
+4. Set **Health Check Path** to `/health`.
+5. Click **Deploy Web Service**.
+
+---
+
+### 2. Deploy Frontend to Netlify (Free Tier)
+
+1. Sign in to your [Netlify Dashboard](https://app.netlify.com/).
+2. Click **Add new site** → **Import an existing project** → **GitHub**.
+3. Select your repository.
+4. Configure the **Build Settings**:
+   - **Base directory**: `frontend`
+   - **Build command**: `npm run build`
+   - **Publish directory**: `dist` (or `frontend/dist` if base directory is blank)
+5. Configure **Environment Variables**:
+   | Variable | Value |
+   |---|---|
+   | `VITE_API_URL` | `https://your-teamguard-api.onrender.com/api` |
+6. Click **Deploy Site**.
+7. Netlify will build the SPA. The bundled `public/_redirects` rule (`/* /index.html 200`) ensures that deep links like `/calendar` or `/reports` route properly without 404 errors.
+
+---
+
+## 💻 Local Development Setup
 
 ### Prerequisites
 - **Node.js** (v18.0.0 or higher)
-- **PostgreSQL** instance running locally or hosted (e.g. Neon, Supabase, Render)
-- **npm** or **pnpm**
-
----
+- **PostgreSQL 14+** running locally or a cloud database connection URL
+- **npm** (v9+)
 
 ### 1. Backend Setup
 
-1. **Navigate to the backend directory**:
-   ```bash
-   cd backend
-   ```
+```bash
+cd backend
 
-2. **Install dependencies**:
-   ```bash
-   npm install
-   ```
+# Install dependencies
+npm install
 
-3. **Configure environment variables**:
-   Create a `.env` file from the provided example:
-   ```bash
-   cp .env.example .env
-   ```
-   Update `.env` with your PostgreSQL connection string and secrets:
-   ```env
-   DATABASE_URL="postgresql://postgres:postgres@localhost:5432/teamguard"
-   PORT=5000
-   FRONTEND_ORIGIN="http://localhost:5173"
-   JWT_ACCESS_SECRET="your-super-secret-jwt-key-min-32-chars"
-   ACCESS_TOKEN_TTL="15m"
-   REFRESH_TOKEN_TTL_DAYS=30
-   ```
+# Copy environment template
+cp .env.example .env
 
-4. **Run database migrations & seed initial data**:
-   ```bash
-   npm run db:generate
-   npm run db:migrate
-   ```
+# Edit .env with your local PostgreSQL credentials:
+# DATABASE_URL="postgresql://postgres:postgres@localhost:5432/teamguard"
 
-5. **Start the backend development server**:
-   ```bash
-   npm run dev
-   ```
-   The backend API will run at `http://localhost:5000` (Health check: `http://localhost:5000/health`).
+# Generate Prisma Client & apply migrations
+npm run db:generate
+npm run db:migrate
 
----
+# Seed demo personas & organization data
+npm run db:seed
+
+# Start dev server with hot reload
+npm run dev
+```
+The API starts at `http://localhost:5000` (Health check: `http://localhost:5000/health`).
 
 ### 2. Frontend Setup
 
-1. **Navigate to the frontend directory**:
-   ```bash
-   cd ../frontend
-   ```
+```bash
+cd ../frontend
 
-2. **Install dependencies**:
-   ```bash
-   npm install
-   ```
+# Install dependencies
+npm install
 
-3. **Start the Vite development server**:
-   ```bash
-   npm run dev
-   ```
-   The application console will be accessible at `http://localhost:5173`.
+# Start Vite development server
+npm run dev
+```
+The UI starts at `http://localhost:5173`.
 
 ---
 
-## 🧪 Testing Authorization & Tenant Isolation
+## 🧪 Automated Testing
 
-TeamGuard includes a dedicated backend test suite to prove that permission rules and tenant boundaries cannot be bypassed via direct API calls:
+### Backend Authorization & Security Tests
+TeamGuard includes automated security tests verifying negative permissions, cross-tenant isolation, and privilege escalation prevention:
 
 ```bash
 cd backend
 npm test
 ```
 
-### Verified Test Cases
-- 🚫 **Denied Write**: A `Viewer` attempting `POST /api/projects` receives `403 Forbidden`.
-- 🚫 **Cross-Tenant Attack**: A user authenticated in Organization A attempting to read or modify resources belonging to Organization B receives `404 Not Found` or `403 Forbidden`.
-- 🚫 **Privilege Escalation**: Non-administrative users cannot grant roles or assign unheld permissions.
-- 🚫 **Attribute Restrictions**: A `Member` without `task:update:any` cannot edit tasks assigned to other colleagues.
-- 🛡️ **Session Revocation**: Logged out or rotated refresh tokens are immediately rejected.
+Verified test coverage includes:
+- 🚫 **Negative RBAC**: Viewers attempting `POST /api/projects` receive `403 Forbidden`.
+- 🚫 **Cross-Tenant Attack**: Users in Org 1 attempting to access resources in Org 2 receive `404 Not Found`.
+- 🚫 **Attribute Restrictions**: Members cannot edit unassigned tasks (`task:update:own` vs. `task:update:any`).
+- 🚫 **Privilege Escalation**: Non-admins cannot assign administrative roles or grant unheld permissions.
+- 🛡️ **Session Revocation**: Rotated or logged-out refresh tokens are rejected instantly.
+
+### Frontend Unit & Component Tests
+```bash
+cd frontend
+npm test
+```
 
 ---
 
@@ -210,24 +278,21 @@ All protected requests require:
 | `/api/auth/logout` | `POST` | Revoke active refresh session | Authenticated |
 | `/api/demo/switch-persona` | `POST` | Quick-switch active demo persona | Public / Demo |
 | `/api/organizations` | `GET` | List organizations for authenticated user | Authenticated |
+| `/api/spaces` | `GET` / `POST` | List spaces or create new space | `project:read` / `project:create` |
 | `/api/projects` | `GET` / `POST` | List projects or create a new project | `project:read` / `project:create` |
-| `/api/tasks` | `GET` / `POST` | Retrieve Kanban tasks or create task | `task:read` / `task:create` |
-| `/api/tasks/:id` | `PATCH` / `DELETE` | Update task status or delete task | `task:update:own` or `task:update:any` |
-| `/api/files` | `GET` / `POST` | Workspace file asset registry & bulk uploads | `file:read` / `file:upload` |
+| `/api/tasks` | `GET` / `POST` | Retrieve tasks or create a new task | `task:read` / `task:create` |
+| `/api/tasks/:id` | `PATCH` / `DELETE` | Update task or delete task | `task:update:own` or `task:update:any` |
+| `/api/reports/summary` | `GET` | Executive dashboard KPI metrics | `reports:read` / `project:read` |
+| `/api/reports/tasks/csv` | `GET` | Download tasks velocity CSV export | `reports:read` / `project:read` |
+| `/api/reports/audit/csv` | `GET` | Download security compliance CSV audit | `audit:read` |
+| `/api/files` | `GET` / `POST` | File asset registry & secure uploads | `file:read` / `file:upload` |
 | `/api/permissions-matrix` | `GET` | Visual role-permission matrix mapping | `role:read` |
-| `/api/dashboard` | `GET` | Aggregated analytics & audit summary | `member:read` |
 
 ---
 
-## 📖 Deep Architectural Guidance & Specifications
+## 📖 Product Documentation
 
-For comprehensive documentation on:
-- Formal authorization contracts & fail-closed error handling
-- Complete PostgreSQL Prisma entity relationships
-- Security audit compliance and token lifecycle policies
-- AI Agent rules and sprint planning roadmaps
-
-Please refer directly to [AGENTS.md](AGENTS.md).
+- [PRD.md](PRD.md): Canonical Product Requirements Document covering multi-tenant architecture, the 6-layer authorization pipeline, and enterprise RBAC/ABAC specifications.
 
 ---
 

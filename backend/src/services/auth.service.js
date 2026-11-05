@@ -111,7 +111,7 @@ export async function getPublicUser(userId, requestedOrgId = null) {
   };
 }
 
-async function createSession(userId, metadata = {}, activeOrgId = null) {
+async function createSession(userId, metadata = {}, activeOrgId = null, rememberMe = true) {
   const refresh = createRefreshToken();
   const familyId = refresh.sessionId;
   await prisma.refreshSession.create({
@@ -120,7 +120,7 @@ async function createSession(userId, metadata = {}, activeOrgId = null) {
       familyId,
       userId,
       tokenHash: refresh.tokenHash,
-      expiresAt: refreshTokenExpiry(),
+      expiresAt: refreshTokenExpiry(new Date(), rememberMe),
       userAgent: metadata?.userAgent ?? null,
       ipAddress: metadata?.ipAddress ?? null,
     },
@@ -132,6 +132,7 @@ async function createSession(userId, metadata = {}, activeOrgId = null) {
     refreshToken: refresh.token,
     sessionId: refresh.sessionId,
     familyId,
+    rememberMe,
   };
 }
 
@@ -214,10 +215,10 @@ export async function registerUser(input, metadata) {
     return newUser;
   });
 
-  return createSession(user.id, metadata);
+  return createSession(user.id, metadata, null, input.rememberMe ?? true);
 }
 
-export async function loginUser(identifier, password, metadata, activeOrgId = null) {
+export async function loginUser(identifier, password, metadata, activeOrgId = null, rememberMe = true) {
   const normalizedIdentifier = identifier.trim().toLowerCase();
   const user = await prisma.user.findFirst({
     where: {
@@ -230,7 +231,7 @@ export async function loginUser(identifier, password, metadata, activeOrgId = nu
     throw new HttpError(401, "Invalid username/email or password");
   }
 
-  return createSession(user.id, metadata, activeOrgId);
+  return createSession(user.id, metadata, activeOrgId, rememberMe);
 }
 
 export async function rotateRefreshToken(token, metadata = {}, activeOrgId = null) {
@@ -243,6 +244,10 @@ export async function rotateRefreshToken(token, metadata = {}, activeOrgId = nul
 
   const now = new Date();
   const familyId = current.familyId || current.id;
+
+  // Determine if this session family is persistent ("rememberMe") or transient
+  const sessionDurationMs = current.expiresAt.getTime() - current.createdAt.getTime();
+  const isRemembered = sessionDurationMs > (2 * 24 * 60 * 60 * 1000);
 
   // 1. Replay / Reuse Detection:
   // If an already-rotated or already-revoked token is re-presented,
@@ -288,7 +293,7 @@ export async function rotateRefreshToken(token, metadata = {}, activeOrgId = nul
         familyId,
         userId: current.userId,
         tokenHash: next.tokenHash,
-        expiresAt: refreshTokenExpiry(now),
+        expiresAt: refreshTokenExpiry(now, isRemembered),
         userAgent: metadata?.userAgent ?? current.userAgent,
         ipAddress: metadata?.ipAddress ?? current.ipAddress,
       },
@@ -301,6 +306,7 @@ export async function rotateRefreshToken(token, metadata = {}, activeOrgId = nul
     refreshToken: next.token,
     sessionId: next.sessionId,
     familyId,
+    rememberMe: isRemembered,
   };
 }
 
@@ -442,4 +448,3 @@ export async function changeUserPassword(userId, { currentPassword, newPassword,
 export async function getCurrentUser(userId, activeOrgId = null) {
   return getPublicUser(userId, activeOrgId);
 }
-

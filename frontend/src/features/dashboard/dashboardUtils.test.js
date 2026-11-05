@@ -5,6 +5,8 @@ import {
   getDueTimeLabel,
   formatAuditAction,
   formatRelativeTime,
+  groupTasksByHorizon,
+  calculateProjectHealth,
 } from "./dashboardUtils.js";
 
 test("TASK-403 [US-DASH-003 / Priorities]: calculatePriorityDistribution computes percentages", () => {
@@ -48,4 +50,31 @@ test("TASK-403 [US-DASH-005 / Activity]: formatAuditAction and formatRelativeTim
   const now = new Date("2026-10-17T12:00:00Z");
   const tenMinsAgo = new Date("2026-10-17T11:50:00Z");
   assert.equal(formatRelativeTime(tenMinsAgo.toISOString(), now), "10m ago");
+});
+
+test("TASK-403 [Redesign / Horizon Grouping]: groupTasksByHorizon groups tasks by time window", () => {
+  const now = new Date("2026-11-04T12:00:00Z");
+  const tasks = [
+    { id: 1, title: "Past Task", dueDate: "2026-11-02T10:00:00Z", status: "TODO" },
+    { id: 2, title: "Today Task", dueDate: "2026-11-04T18:00:00Z", status: "IN_PROGRESS" },
+    { id: 3, title: "Upcoming Task", dueDate: "2026-11-07T12:00:00Z", status: "TODO" },
+    { id: 4, title: "Review Task", dueDate: "2026-11-04T12:00:00Z", status: "REVISION" },
+    { id: 5, title: "Completed Task", dueDate: "2026-11-01T12:00:00Z", status: "DONE" },
+    { id: 6, title: "Unscheduled Task", dueDate: null, status: "TODO" },
+  ];
+
+  const grouped = groupTasksByHorizon(tasks, now);
+  assert.equal(grouped.overdue.length, 1);
+  assert.equal(grouped.overdue[0].id, 1);
+  assert.equal(grouped.today.length, 2); // includes id 2 and id 4
+  assert.equal(grouped.upcoming.length, 1);
+  assert.equal(grouped.inReview.length, 1);
+  assert.equal(grouped.later.length, 1);
+});
+
+test("TASK-403 [Redesign / Project Health]: calculateProjectHealth determines health tone", () => {
+  assert.equal(calculateProjectHealth({ isArchived: true }).tone, "archived");
+  assert.equal(calculateProjectHealth({ progress: 90 }).tone, "healthy");
+  assert.equal(calculateProjectHealth({ progress: 50 }).tone, "active");
+  assert.equal(calculateProjectHealth({ progress: 20 }).tone, "warning");
 });

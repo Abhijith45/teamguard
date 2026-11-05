@@ -118,10 +118,16 @@ export async function listProjectsService({ organizationId, includeDeleted = fal
     const progress = p.tasks?.length > 0
       ? calculateProjectProgress(p.tasks)
       : (p.progress ?? 0);
+    const todoCount = p.tasks?.filter((t) => t.status === "TODO").length || 0;
+    const inProgressCount = p.tasks?.filter((t) => t.status === "IN_PROGRESS").length || 0;
+    const activeTaskCount = todoCount + inProgressCount;
     const { tasks, ...rest } = p;
     return {
       ...rest,
       progress,
+      todoCount,
+      inProgressCount,
+      activeTaskCount,
     };
   });
 }
@@ -198,6 +204,7 @@ export async function createProjectService({ organizationId, actorId, input }) {
     const created = await tx.project.create({
       data: {
         organizationId,
+        spaceId: input.spaceId ?? null,
         name: input.name,
         key: projectKey,
         description: input.description || "",
@@ -319,6 +326,7 @@ export async function updateProjectService({ projectId, organizationId, actorId,
       ...(status ? { status } : {}),
       ...(isArchived !== undefined ? { isArchived } : {}),
       ...(input.progress !== undefined ? { progress: input.progress } : {}),
+      ...(input.spaceId !== undefined ? { spaceId: input.spaceId } : {}),
     },
   });
 

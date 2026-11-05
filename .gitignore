@@ -1,12 +1,9 @@
 # ==============================================================================
-# TeamGuard RBAC Repository - Git Ignore
+# TeamGuard Repository - Git Ignore
 # ==============================================================================
-# The files and directories listed below must NOT be pushed to GitHub.
-# They include sensitive secrets, dependencies, build artifacts, runtime logs,
-# database files, editor/OS caches, and developer scratch files.
 
 # ------------------------------------------------------------------------------
-# 1. Environment & Sensitive Secrets (NEVER push credentials or keys to GitHub)
+# 1. Environment & Sensitive Secrets
 # ------------------------------------------------------------------------------
 .env
 .env.*
@@ -14,11 +11,14 @@
 .env.development.local
 .env.test.local
 .env.production.local
-# Explicitly keep example configuration templates tracked
+backend/.env
+frontend/.env
 !.env.example
 !.env.*.example
+!backend/.env.example
+!frontend/.env.example
 
-# Private keys, certificates, and auth credentials
+# Private keys and certificates
 *.pem
 *.key
 *.cert
@@ -27,27 +27,31 @@ credentials.json
 *credentials*.json
 
 # ------------------------------------------------------------------------------
-# 2. Dependencies (Installed locally via npm / pnpm / yarn)
+# 2. Dependencies
 # ------------------------------------------------------------------------------
 node_modules/
+backend/node_modules/
+frontend/node_modules/
 .pnpm-store/
 jspm_packages/
 web_modules/
 
 # ------------------------------------------------------------------------------
-# 3. Build & Distribution Artifacts (Generated code from Vite / bundlers)
+# 3. Build & Distribution Artifacts
 # ------------------------------------------------------------------------------
 dist/
 dist-ssr/
+frontend/dist/
 build/
 out/
 .vite/
+frontend/.vite/
 .cache/
 .parcel-cache/
 *.tsbuildinfo
 
 # ------------------------------------------------------------------------------
-# 4. Logs, Diagnostics & Process Files
+# 4. Logs & Diagnostics
 # ------------------------------------------------------------------------------
 logs/
 *.log
@@ -55,23 +59,13 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
-lerna-debug.log*
 pids/
 *.pid
 *.seed
 *.pid.lock
 
 # ------------------------------------------------------------------------------
-# 5. Testing & Code Coverage
-# ------------------------------------------------------------------------------
-coverage/
-.nyc_output/
-*.lcov
-test-results/
-.playwright/
-
-# ------------------------------------------------------------------------------
-# 6. Database & Local Data Stores (Prevent leaking local databases & dumps)
+# 5. Database & Local Data Stores
 # ------------------------------------------------------------------------------
 *.db
 *.db-journal
@@ -81,64 +75,91 @@ test-results/
 *.sqlite-shm
 *.sql.bak
 dump.rdb
+backend/backups/
 
 # ------------------------------------------------------------------------------
-# 7. Python Artifacts (Automation scripts in .agents)
+# 6. AI Agent Workspaces, Skills, Rules & Handoffs
 # ------------------------------------------------------------------------------
-__pycache__/
-*.py[cod]
-*$py.class
-.pytest_cache/
-.venv/
-venv/
-env/
-ENV/
-*.egg-info/
-
-# ------------------------------------------------------------------------------
-# 8. Scratch Scripts & AI / Agent Workspaces
-# ------------------------------------------------------------------------------
-scratch/
+AGENTS.md
+**/AGENTS.md
+.agents/
+**/.agents/
+backend/.agents/
+frontend/.agents/
+frontend/design-system/
 .gemini/
 .tempmediaStorage/
-*.tmp
-*.temp
+
+# AI-generated audit reports, task scratch logs & planning archives
+audit_task_*.md
+*_report.md
+scratch/
+docs/
 
 # ------------------------------------------------------------------------------
-# 9. IDEs, Code Editors & Tooling Configs
+# 7. Screenshots, Visual Audits & Ephemeral Image Dumps
 # ------------------------------------------------------------------------------
-# JetBrains / WebStorm / IntelliJ
+audit_screenshots/
+calendar_v2_screenshots/
+click-up/
+phase2_screenshots/
+visual_audit_screenshots/
+frontend/views/
+frontend/visual_audit/
+frontend/visual_audit_screenshots/
+
+# Ephemeral test screenshot capture scripts
+frontend/capture_*.js
+frontend/visual_audit.js
+
+# Prevent accidental image and binary dumps while preserving app assets
+*.png
+*.jpg
+*.jpeg
+*.webp
+!frontend/public/*.png
+!frontend/public/*.jpg
+!frontend/public/*.jpeg
+!frontend/public/*.webp
+!frontend/public/*.ico
+!frontend/src/assets/*.png
+!frontend/src/assets/*.jpg
+!frontend/src/assets/*.jpeg
+!frontend/src/assets/*.webp
+!frontend/src/assets/*.svg
+
+# ------------------------------------------------------------------------------
+# 8. Testing & Code Coverage
+# ------------------------------------------------------------------------------
+coverage/
+.nyc_output/
+*.lcov
+test-results/
+.playwright/
+
+# ------------------------------------------------------------------------------
+# 9. IDEs & Operating System Metadata
+# ------------------------------------------------------------------------------
 .idea/
 *.iml
 *.iws
-
-# Visual Studio Code (allow team recommended settings, ignore workspace overrides)
 .vscode/*
 !.vscode/settings.json
 !.vscode/tasks.json
 !.vscode/launch.json
 !.vscode/extensions.json
 *.code-workspace
-
-# Vim / Emacs swap and backup files
 *.swp
 *.swo
 *.swn
 *~
 .#*
-
-# ------------------------------------------------------------------------------
-# 10. Operating System Metadata Files
-# ------------------------------------------------------------------------------
-# macOS
 .DS_Store
 .AppleDouble
 .LSOverride
 ._*
 .Spotlight-V100
 .Trashes
-
-# Windows
 Thumbs.db
 Thumbs.db:encryptable
 ehthumbs.db

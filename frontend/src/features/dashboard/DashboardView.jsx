@@ -1,35 +1,56 @@
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useMemo } from "react";
 import {
   AlertCircle,
+  AlertTriangle,
+  ArrowRight,
+  ArrowUpRight,
   Calendar,
+  Check,
   CheckCircle2,
+  ChevronDown,
+  ChevronRight,
+  Circle,
   Clock,
+  ExternalLink,
+  Flame,
   FolderGit2,
+  HardDrive,
+  Layout,
+  Layers,
   ListTodo,
   MessageSquare,
   MoreHorizontal,
   Paperclip,
-  Video,
+  Pin,
+  PinOff,
   Plus,
-  Sliders,
-  Sparkles,
-  ArrowRight,
+  RefreshCw,
+  Search,
   ShieldCheck,
-  Check,
-  Flame,
-  Activity,
+  Sparkles,
+  User,
   Users,
-  HardDrive,
-  ExternalLink,
+  Video,
+  X,
+  Zap,
 } from "lucide-react";
 import { api } from "../../services/api-client.js";
+import { LoadingView } from "../../components/LoadingView.jsx";
 import {
   calculatePriorityDistribution,
   getDueTimeLabel,
   formatAuditAction,
   formatRelativeTime,
+  groupTasksByHorizon,
+  calculateProjectHealth,
 } from "./dashboardUtils.js";
-import { NotificationPreferencesModal } from "../notifications/NotificationPreferencesModal.jsx";
+
+const STATUS_OPTIONS = [
+  { id: "TODO", label: "To do", color: "#94a3b8" },
+  { id: "IN_PROGRESS", label: "In Progress", color: "#2563eb" },
+  { id: "REVISION", label: "In Review", color: "#f59e0b" },
+  { id: "DONE", label: "Done", color: "#10b981" },
+];
 
 export function DashboardView({
   user,
@@ -44,9 +65,41 @@ export function DashboardView({
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [showPreferences, setShowPreferences] = useState(false);
-  const [completedTaskIds, setCompletedTaskIds] = useState(new Set());
-  const [activeTooltip, setActiveTooltip] = useState(null);
+
+  // Dual-Engine Mode Toggle: "my-work" (Default for IC focus) vs "team-velocity" (for leads & projects)
+  const [activeTab, setActiveTab] = useState(() => {
+    return localStorage.getItem("teamguard_dashboard_tab") || "my-work";
+  });
+
+  // Time horizon tab inside My Work: "all" | "overdue" | "today" | "upcoming" | "inReview"
+  const [horizonFilter, setHorizonFilter] = useState("all");
+
+  // Focus Lineup task IDs stored in localStorage
+  const [lineupIds, setLineupIds] = useState(() => {
+    try {
+      const stored = localStorage.getItem(`teamguard_lineup_${activeOrg?.id}`);
+      return stored ? JSON.parse(stored) : [];
+    } catch {
+      return [];
+    }
+  });
+
+  // Scratchpad quick notes
+  const [scratchNotes, setScratchNotes] = useState(() => {
+    return (
+      localStorage.getItem(`teamguard_scratchpad_${activeOrg?.id}`) ||
+      "- [ ] Review sprint blockers\n- [ ] Sync with backend on API contracts\n- [ ] Finalize production release notes"
+    );
+  });
+  const [scratchSaved, setScratchSaved] = useState(false);
+
+  // Optimistic tracking for tasks updated inline
+  const [localTaskChanges, setLocalTaskChanges] = useState({});
+
+  const handleTabChange = (tab) => {
+    setActiveTab(tab);
+    localStorage.setItem("teamguard_dashboard_tab", tab);
+  };
 
   const fetchDashboard = useCallback(async () => {
     try {
@@ -65,7 +118,7 @@ export function DashboardView({
     fetchDashboard();
   }, [activeOrg?.id, fetchDashboard]);
 
-  // TASK-003: Broadcast event listener for global workspace cache purges
+  // Global workspace cache purge listener
   useEffect(() => {
     function handlePurge() {
       setData(null);
@@ -76,48 +129,145 @@ export function DashboardView({
     return () => window.removeEventListener("teamguard:workspace-purged", handlePurge);
   }, [fetchDashboard]);
 
-  // Quick 1-click completion toggle for today's tasks (US-DASH-004)
-  const handleQuickComplete = async (e, task) => {
-    e.stopPropagation();
+  // Persist lineup
+  const toggleLineupPin = (taskId) => {
+    setLineupIds((prev) => {
+      const next = prev.includes(taskId) ? prev.filter((id) => id !== taskId) : [...prev, taskId].slice(0, 5);
+      try {
+        localStorage.setItem(`teamguard_lineup_${activeOrg?.id}`, JSON.stringify(next));
+      } catch {
+        // ignore storage errors
+      }
+      return next;
+    });
+  };
+
+  // Scratchpad autosave
+  const handleScratchpadChange = (e) => {
+    const val = e.target.value;
+    setScratchNotes(val);
+    try {
+      localStorage.setItem(`teamguard_scratchpad_${activeOrg?.id}`, val);
+      setScratchSaved(true);
+      setTimeout(() => setScratchSaved(false), 1500);
+    } catch {
+      // ignore
+    }
+  };
+
+  // Inline Task Status Transition with Optimistic UI Update
+  const handleInlineStatusChange = async (task, newStatus) => {
+    if (task.status === newStatus) return;
     const taskId = task.id;
-    const isAlreadyDone = task.status === "DONE" || completedTaskIds.has(taskId);
 
-    if (isAlreadyDone) return;
-
-    // Optimistic UI update
-    setCompletedTaskIds((prev) => new Set([...prev, taskId]));
+    // Apply optimistic update
+    setLocalTaskChanges((prev) => ({
+      ...prev,
+      [taskId]: { ...(prev[taskId] || {}), status: newStatus },
+    }));
 
     try {
-      await api.updateTask(taskId, { status: "DONE" });
+      await api.updateTask(taskId, { status: newStatus });
       if (onShowNotice) {
         onShowNotice({
           type: "success",
-          message: `Task "${task.title}" completed!`,
+          message: `Task updated to "${STATUS_OPTIONS.find((s) => s.id === newStatus)?.label}"`,
         });
       }
     } catch (err) {
       // Rollback on failure
-      setCompletedTaskIds((prev) => {
-        const next = new Set(prev);
-        next.delete(taskId);
+      setLocalTaskChanges((prev) => {
+        const next = { ...prev };
+        delete next[taskId];
         return next;
       });
       if (onShowNotice) {
         onShowNotice({
           type: "error",
-          message: err.message || "Failed to complete task",
+          message: err.message || "Failed to update task status",
         });
       }
     }
   };
 
+  // Quick Reschedule Nudge (+1 Day or +7 Days)
+  const handleRescheduleNudge = async (task, daysToAdd) => {
+    const taskId = task.id;
+    const currentBase = task.dueDate ? new Date(task.dueDate) : new Date();
+    const newDueDate = new Date(currentBase.getTime() + daysToAdd * 24 * 60 * 60 * 1000);
+    const dateIso = newDueDate.toISOString();
+
+    setLocalTaskChanges((prev) => ({
+      ...prev,
+      [taskId]: { ...(prev[taskId] || {}), dueDate: dateIso },
+    }));
+
+    try {
+      await api.updateTask(taskId, { dueDate: dateIso });
+      if (onShowNotice) {
+        onShowNotice({
+          type: "success",
+          message: `Task rescheduled by +${daysToAdd} day(s)`,
+        });
+      }
+    } catch (err) {
+      setLocalTaskChanges((prev) => {
+        const next = { ...prev };
+        delete next[taskId];
+        return next;
+      });
+      if (onShowNotice) {
+        onShowNotice({
+          type: "error",
+          message: err.message || "Failed to reschedule task",
+        });
+      }
+    }
+  };
+
+  // Merge server data with optimistic task state
+  const allRawTasks = useMemo(() => {
+    const list = [...(data?.todayTasks || []), ...(data?.urgent48hTasks || [])];
+    const unique = [];
+    const seen = new Set();
+    for (const t of list) {
+      if (!seen.has(t.id)) {
+        seen.add(t.id);
+        const patch = localTaskChanges[t.id] || {};
+        unique.push({ ...t, ...patch });
+      }
+    }
+    return unique;
+  }, [data, localTaskChanges]);
+
+  // Group tasks by horizon
+  const horizon = useMemo(() => {
+    return groupTasksByHorizon(allRawTasks);
+  }, [allRawTasks]);
+
+  // Filtered task stream for the active horizon filter
+  const displayedStreamTasks = useMemo(() => {
+    switch (horizonFilter) {
+      case "overdue":
+        return horizon.overdue;
+      case "today":
+        return horizon.today;
+      case "upcoming":
+        return horizon.upcoming;
+      case "inReview":
+        return horizon.inReview;
+      default:
+        return allRawTasks.filter((t) => t.status !== "DONE");
+    }
+  }, [horizon, horizonFilter, allRawTasks]);
+
+  // Lineup pinned tasks
+  const lineupTasks = useMemo(() => {
+    return allRawTasks.filter((t) => lineupIds.includes(t.id));
+  }, [allRawTasks, lineupIds]);
+
   if (loading) {
-    return (
-      <div className="view-loading-container">
-        <div className="loading-spinner" />
-        <span>Aggregating workspace analytics & release metrics…</span>
-      </div>
-    );
+    return <LoadingView message="Loading workspace dashboard…" />;
   }
 
   if (error) {
@@ -141,138 +291,182 @@ export function DashboardView({
     revision: 0,
     todo: 0,
     activeMembers: 1,
-    storageBytes: 0,
     storageFormatted: "0 KB",
-    urgentTasksCount: 0,
   };
 
   const dist = calculatePriorityDistribution(data?.taskDistribution);
-  const recentProjects = data?.recentProjects ?? [];
-  const urgentTasks = data?.urgent48hTasks ?? [];
-  const todayTasks = data?.todayTasks ?? [];
+  const recentProjects = (data?.recentProjects ?? []).filter((p) => !p.isArchived);
   const activityFeed = data?.activityFeed ?? [];
-  const heatmap = data?.contributionHeatmap ?? {
-    days: [],
-    weeks: data?.activityMap ?? [],
-    totalEvents: 0,
-    activeDaysCount: 0,
-  };
-
   const completionRate =
     stats.totalTasks > 0 ? Math.round((stats.completed / stats.totalTasks) * 100) : 0;
 
+  // Personalized Greeting
+  const currentHour = new Date().getHours();
+  const timeGreeting = currentHour < 12 ? "Good morning" : currentHour < 18 ? "Good afternoon" : "Good evening";
+  const firstName = user?.name ? user.name.split(" ")[0] : "there";
+  const formattedTodayDate = new Intl.DateTimeFormat("en-US", {
+    weekday: "long",
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  }).format(new Date());
+
   return (
-    <div className="dashboard-view-layout">
-      {/* Quick Action Shortcuts Bar (US-DASH-004 / TG-DASH-004) */}
-      <section className="dashboard-quick-actions-bar">
-        <div className="quick-actions-left">
-          <div className="workspace-kpi-badge">
-            <span className="kpi-live-dot" />
-            <span>Workspace: <strong>{activeOrg?.name || "Acme Corp"}</strong></span>
+    <div className="dashboard-view-layout modern-saas-dashboard">
+      {/* ====================================================================
+          1. HEADER & DUAL-ENGINE WORKSPACE CONTROLLER
+          ==================================================================== */}
+      <header className="dashboard-action-header">
+        <div className="dashboard-header-welcome">
+          <div className="welcome-greeting-row">
+            <h2>
+              {timeGreeting}, {firstName} <span className="greeting-wave">👋</span>
+            </h2>
+            <span className="dashboard-date-badge">{formattedTodayDate}</span>
           </div>
+          <p className="welcome-summary-pulse">
+            {horizon.overdue.length > 0 ? (
+              <span className="pulse-alert">
+                <AlertCircle size={14} className="text-destructive inline-mr" />
+                <strong>{horizon.overdue.length} overdue task(s)</strong> require immediate triage
+              </span>
+            ) : horizon.today.length > 0 ? (
+              <span className="pulse-today">
+                <CheckCircle2 size={14} className="text-emerald inline-mr" />
+                You have <strong>{horizon.today.length} task(s)</strong> scheduled for completion today
+              </span>
+            ) : (
+              <span className="pulse-good">
+                <Sparkles size={14} className="text-emerald inline-mr" />
+                All scheduled deliverables on track. Ready for focused work!
+              </span>
+            )}
+          </p>
         </div>
-        <div className="quick-actions-right">
-          {onOpenWizard && (
-            <button
-              type="button"
-              className="quick-action-btn action-primary"
-              onClick={onOpenWizard}
-              title="Launch 5-Step Project Setup Wizard"
-            >
-              <Plus size={15} />
-              <span>New Project</span>
-            </button>
-          )}
 
+        {/* Mode Switcher: My Work (Focus) vs Team Velocity */}
+        <div className="dashboard-mode-selector" role="tablist" aria-label="Dashboard views">
           <button
             type="button"
-            className="quick-action-btn action-secondary"
-            onClick={() => onNavigateToTasks && onNavigateToTasks()}
-            title="Jump to Kanban Task Board"
+            role="tab"
+            aria-selected={activeTab === "my-work"}
+            className={`dashboard-mode-pill ${activeTab === "my-work" ? "active" : ""}`}
+            onClick={() => handleTabChange("my-work")}
           >
-            <ListTodo size={15} />
-            <span>Kanban Board</span>
+            <Zap size={14} />
+            <span>My Work</span>
+            {horizon.totalActionable > 0 && (
+              <span className="mode-count-pill">{horizon.totalActionable}</span>
+            )}
           </button>
-
-          {onNavigateToCalendar && (
-            <button
-              type="button"
-              className="quick-action-btn action-secondary"
-              onClick={onNavigateToCalendar}
-              title="Open Release Calendar Grid"
-            >
-              <Calendar size={15} />
-              <span>Release Calendar</span>
-            </button>
-          )}
-
           <button
             type="button"
-            className="quick-action-btn action-ghost"
-            onClick={() => setShowPreferences(true)}
-            title="Configure Alert Subscriptions & Email Digests"
+            role="tab"
+            aria-selected={activeTab === "team-velocity"}
+            className={`dashboard-mode-pill ${activeTab === "team-velocity" ? "active" : ""}`}
+            onClick={() => handleTabChange("team-velocity")}
           >
-            <Sliders size={15} />
-            <span>Alert Preferences</span>
+            <FolderGit2 size={14} />
+            <span>Team Velocity</span>
+            <span className="mode-count-pill subtle">{stats.activeProjects}</span>
           </button>
         </div>
-      </section>
+      </header>
 
-      {/* 1. Contextual KPI Stat Cards Row (US-DASH-001, US-DASH-006) */}
-      <section className="dashboard-stats-grid">
-        {/* Card 1: Total Projects */}
+      {/* ====================================================================
+          2. ACTIONABLE TRIAGE METRIC CARDS ROW (High-Utility KPIs)
+          ==================================================================== */}
+      <section className="dashboard-stats-grid actionable-kpi-grid">
+        {/* Card 1: Overdue Attention */}
         <div
-          className="stat-card stat-card-interactive"
-          onClick={() => onNavigateToProjects && onNavigateToProjects()}
-          title="Click to view workspace projects"
+          className={`stat-card stat-card-interactive triage-card-overdue ${
+            horizon.overdue.length > 0 ? "has-overdue" : ""
+          }`}
+          onClick={() => {
+            setActiveTab("my-work");
+            setHorizonFilter("overdue");
+          }}
+          title="Click to view all overdue tasks"
         >
           <div className="stat-card-header">
-            <div className="stat-icon-wrapper icon-projects">
-              <FolderGit2 size={18} />
+            <div className="stat-icon-wrapper icon-overdue">
+              <AlertTriangle size={15} />
             </div>
-            <span className="stat-pill-badge">{stats.activeProjects} active</span>
+            <span className={`stat-pill-badge ${horizon.overdue.length > 0 ? "badge-overdue" : "badge-clean"}`}>
+              {horizon.overdue.length > 0 ? "Immediate Action" : "Clear"}
+            </span>
           </div>
           <div className="stat-card-body">
-            <span className="stat-card-number">{stats.totalProjects}</span>
-            <span className="stat-card-label">Total Projects</span>
+            <span className="stat-card-number">{horizon.overdue.length}</span>
+            <span className="stat-card-label">Overdue Tasks</span>
           </div>
           <div className="stat-card-footer">
-            <span className="stat-footer-text">Manage tenant deliverables</span>
-            <ArrowRight size={14} className="stat-arrow-icon" />
+            <span className="stat-footer-text">
+              {horizon.overdue.length > 0 ? "Triage deliverables" : "Zero past-due tasks"}
+            </span>
+            <ArrowRight size={12} className="stat-arrow-icon" />
           </div>
         </div>
 
-        {/* Card 2: In Progress Tasks */}
+        {/* Card 2: Today's Commitments */}
         <div
-          className="stat-card stat-card-interactive"
-          onClick={() => onNavigateToTasks && onNavigateToTasks({ status: "IN_PROGRESS" })}
-          title="Click to filter Kanban board to In Progress tasks"
+          className="stat-card stat-card-interactive triage-card-today"
+          onClick={() => {
+            setActiveTab("my-work");
+            setHorizonFilter("today");
+          }}
+          title="Click to view tasks scheduled for today"
         >
           <div className="stat-card-header">
             <div className="stat-icon-wrapper icon-progress">
-              <Clock size={18} />
+              <Clock size={15} />
             </div>
-            <span className="stat-pill-badge badge-progress">Active Cycle</span>
+            <span className="stat-pill-badge badge-progress">Active Session</span>
           </div>
           <div className="stat-card-body">
-            <span className="stat-card-number">{stats.inProgress}</span>
-            <span className="stat-card-label">In Progress Tasks</span>
+            <span className="stat-card-number">{horizon.today.length}</span>
+            <span className="stat-card-label">Due Today</span>
           </div>
           <div className="stat-card-footer">
-            <span className="stat-footer-text">{stats.todo} backlog · {stats.revision} revision</span>
-            <ArrowRight size={14} className="stat-arrow-icon" />
+            <span className="stat-footer-text">{stats.inProgress} currently in progress</span>
+            <ArrowRight size={12} className="stat-arrow-icon" />
           </div>
         </div>
 
-        {/* Card 3: Completed Deliverables */}
+        {/* Card 3: Awaiting Review / QA */}
         <div
-          className="stat-card stat-card-interactive"
+          className="stat-card stat-card-interactive triage-card-review"
+          onClick={() => {
+            setActiveTab("my-work");
+            setHorizonFilter("inReview");
+          }}
+          title="Click to filter tasks awaiting review"
+        >
+          <div className="stat-card-header">
+            <div className="stat-icon-wrapper icon-review">
+              <ShieldCheck size={15} />
+            </div>
+            <span className="stat-pill-badge badge-review">Review Blockers</span>
+          </div>
+          <div className="stat-card-body">
+            <span className="stat-card-number">{horizon.inReview.length}</span>
+            <span className="stat-card-label">In Review</span>
+          </div>
+          <div className="stat-card-footer">
+            <span className="stat-footer-text">{stats.revision} sign-offs pending</span>
+            <ArrowRight size={12} className="stat-arrow-icon" />
+          </div>
+        </div>
+
+        {/* Card 4: Daily Velocity & Completion Rate */}
+        <div
+          className="stat-card stat-card-interactive triage-card-velocity"
           onClick={() => onNavigateToTasks && onNavigateToTasks({ status: "DONE" })}
-          title="Click to view completed tasks"
+          title="Click to view all completed tasks"
         >
           <div className="stat-card-header">
             <div className="stat-icon-wrapper icon-completed">
-              <CheckCircle2 size={18} />
+              <CheckCircle2 size={15} />
             </div>
             <span className="stat-pill-badge badge-done">{completionRate}% Done</span>
           </div>
@@ -281,401 +475,562 @@ export function DashboardView({
             <span className="stat-card-label">Completed Tasks</span>
           </div>
           <div className="stat-card-footer">
-            <span className="stat-footer-text">{stats.totalTasks} total work units</span>
-            <ArrowRight size={14} className="stat-arrow-icon" />
-          </div>
-        </div>
-
-        {/* Card 4: Active Capacity & Storage */}
-        <div
-          className="stat-card stat-card-interactive"
-          onClick={() => onNavigateToTasks && onNavigateToTasks()}
-          title="Workspace team and asset capacity"
-        >
-          <div className="stat-card-header">
-            <div className="stat-icon-wrapper icon-members">
-              <Users size={18} />
-            </div>
-            <span className="stat-pill-badge badge-storage">{stats.storageFormatted}</span>
-          </div>
-          <div className="stat-card-body">
-            <span className="stat-card-number">{stats.activeMembers}</span>
-            <span className="stat-card-label">Active Members</span>
-          </div>
-          <div className="stat-card-footer">
-            <span className="stat-footer-text">Storage & team capacity</span>
-            <HardDrive size={14} className="stat-arrow-icon" />
+            <span className="stat-footer-text">{stats.totalTasks} total in workspace</span>
+            <ArrowRight size={12} className="stat-arrow-icon" />
           </div>
         </div>
       </section>
 
-      {/* 2. Middle Row: Recent Projects & Task Distribution */}
-      <div className="dashboard-mid-row">
-        {/* Recent Projects with Live Progress Bars (US-DASH-002, US-DASH-003) */}
-        <div className="dashboard-card recent-projects-card">
-          <div className="dashboard-card-header">
-            <div className="card-title-group">
-              <FolderGit2 size={18} className="text-emerald" />
-              <h3>Recent Projects</h3>
+      {/* ====================================================================
+          3. "MY WORK" ENGINE (Default IC Productivity Center)
+          ==================================================================== */}
+      {activeTab === "my-work" && (
+        <div className="dashboard-my-work-grid">
+          {/* Top Focus Lineup (ClickUp 3.0 Benchmark) */}
+          <section className="dashboard-card lineup-card">
+            <div className="dashboard-card-header">
+              <div className="card-title-group">
+                <Pin size={15} className="text-emerald" />
+                <h3>Focus Lineup</h3>
+                <span className="card-counter-tag">{lineupTasks.length}/5 pinned</span>
+              </div>
+              <span className="card-header-hint">Your primary targets for this active session</span>
             </div>
-            <span className="card-counter-tag">{recentProjects.length} Active</span>
-          </div>
-          <div className="recent-projects-grid">
-            {recentProjects.length > 0 ? (
-              recentProjects.map((proj) => (
-                <div
-                  key={proj.id}
-                  className="project-preview-card"
-                  onClick={() => onNavigateToProjects && onNavigateToProjects()}
-                >
-                  <div className="project-preview-top">
-                    <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-                      {proj.key && <span className="project-key-tag">{proj.key}</span>}
-                      <span className={`tag-priority tag-${(proj.priority || "medium").toLowerCase()}`}>
-                        {proj.priority}
-                      </span>
-                      {proj.isArchived && <span className="archived-pill">ARCHIVED</span>}
-                    </div>
-                  </div>
-                  <h4 className="project-preview-title">{proj.name}</h4>
-                  <p className="project-preview-desc">
-                    {proj.description || "Workspace delivery track and milestones"}
-                  </p>
-                  <div className="project-progress-container">
-                    <div className="project-progress-info">
-                      <span>Progress</span>
-                      <strong>
-                        {proj.tasksDone !== undefined
-                          ? `${proj.tasksDone}/${proj.tasksTotal} Tasks (${proj.progress}%)`
-                          : `${proj.progress}%`}
-                      </strong>
-                    </div>
-                    <div className="progress-bar-track">
-                      <div className="progress-bar-fill" style={{ width: `${proj.progress}%` }} />
-                    </div>
-                  </div>
-                  <div className="project-preview-footer">
-                    <div className="avatar-group">
-                      {proj.team && proj.team.length > 0 ? (
-                        proj.team.map((m, i) => (
-                          <span key={i} className="mini-avatar" title={m.name}>
-                            {m.name ? m.name[0] : "U"}
+
+            <div className="lineup-items-wrap">
+              {lineupTasks.length > 0 ? (
+                <div className="lineup-tasks-row">
+                  {lineupTasks.map((task) => (
+                    <div key={task.id} className="lineup-task-item">
+                      <button
+                        type="button"
+                        className="lineup-check-btn"
+                        onClick={() => handleInlineStatusChange(task, "DONE")}
+                        title="Mark task completed"
+                      >
+                        <Circle size={15} />
+                      </button>
+                      <div className="lineup-task-content">
+                        <span className="lineup-task-title" title={task.title}>
+                          {task.title}
+                        </span>
+                        <div className="lineup-task-meta">
+                          {task.project?.key && (
+                            <span className="lineup-project-tag">{task.project.key}</span>
+                          )}
+                          <span className={`tag-priority mini tag-${(task.priority || "medium").toLowerCase()}`}>
+                            {task.priority}
                           </span>
-                        ))
-                      ) : (
-                        <span className="mini-avatar">T</span>
-                      )}
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        className="lineup-unpin-btn"
+                        onClick={() => toggleLineupPin(task.id)}
+                        title="Remove from Focus Lineup"
+                      >
+                        <PinOff size={13} />
+                      </button>
                     </div>
-                    <div className="project-counters">
-                      <span className="counter-item">
-                        <MessageSquare size={13} /> {proj.commentsCount || 0}
-                      </span>
-                      <span className="counter-item">
-                        <Paperclip size={13} /> {proj.attachmentsCount || 0}
-                      </span>
-                    </div>
-                  </div>
+                  ))}
                 </div>
-              ))
-            ) : (
-              <p className="empty-subtle">No active projects found in workspace.</p>
-            )}
-          </div>
-        </div>
-
-        {/* Priority Distribution Stacked Bar (US-DASH-003, US-DASH-006) */}
-        <div className="dashboard-card task-distribution-card">
-          <div className="dashboard-card-header">
-            <div className="card-title-group">
-              <Flame size={18} className="text-orange" />
-              <h3>Priority Distribution</h3>
-            </div>
-            <span className="card-counter-tag">{dist.total} Tasks</span>
-          </div>
-          {/* Stacked multi-segment bar */}
-          <div className="stacked-bar-container">
-            <div className="stacked-bar-track">
-              {dist.urgent > 0 && (
-                <div
-                  className="stacked-segment segment-urgent"
-                  style={{ width: `${dist.urgentPct}%` }}
-                  title={`Urgent: ${dist.urgent} (${dist.urgentPct}%)`}
-                  onClick={() => onNavigateToTasks && onNavigateToTasks({ priority: "URGENT" })}
-                />
-              )}
-              {dist.high > 0 && (
-                <div
-                  className="stacked-segment segment-high"
-                  style={{ width: `${dist.highPct}%` }}
-                  title={`High: ${dist.high} (${dist.highPct}%)`}
-                  onClick={() => onNavigateToTasks && onNavigateToTasks({ priority: "HIGH" })}
-                />
-              )}
-              {dist.medium > 0 && (
-                <div
-                  className="stacked-segment segment-med"
-                  style={{ width: `${dist.medPct}%` }}
-                  title={`Medium: ${dist.medium} (${dist.medPct}%)`}
-                  onClick={() => onNavigateToTasks && onNavigateToTasks({ priority: "MEDIUM" })}
-                />
-              )}
-              {dist.low > 0 && (
-                <div
-                  className="stacked-segment segment-low"
-                  style={{ width: `${dist.lowPct}%` }}
-                  title={`Low: ${dist.low} (${dist.lowPct}%)`}
-                  onClick={() => onNavigateToTasks && onNavigateToTasks({ priority: "LOW" })}
-                />
+              ) : (
+                <div className="lineup-empty-prompt">
+                  <Sparkles size={16} className="text-emerald" />
+                  <span>No tasks pinned yet. Pin your top deliverables from the stream below to focus today.</span>
+                </div>
               )}
             </div>
+          </section>
 
-            <div className="distribution-legend-grid">
-              <div
-                className="legend-item clickable"
-                onClick={() => onNavigateToTasks && onNavigateToTasks({ priority: "URGENT" })}
-                title="Filter tasks by Urgent"
-              >
-                <div className="legend-header">
-                  <span className="legend-dot dot-urgent" />
-                  <span>Urgent</span>
+          {/* Main Action Streams: Left (Due Date Horizon) vs Right (Scratchpad & Agenda) */}
+          <div className="my-work-split-row">
+            {/* Left Stream: Due Date Horizon & Inline Task Management */}
+            <div className="dashboard-card horizon-stream-card">
+              <div className="dashboard-card-header">
+                <div className="card-title-group">
+                  <ListTodo size={16} className="text-emerald" />
+                  <h3>Actionable Work Stream</h3>
+                  <span className="card-counter-tag">{displayedStreamTasks.length} tasks</span>
                 </div>
-                <small className="legend-pct">({dist.urgentPct}%)</small>
-                <strong className="legend-count">{dist.urgent}</strong>
-              </div>
 
-              <div
-                className="legend-item clickable"
-                onClick={() => onNavigateToTasks && onNavigateToTasks({ priority: "HIGH" })}
-                title="Filter tasks by High"
-              >
-                <div className="legend-header">
-                  <span className="legend-dot dot-high" />
-                  <span>High</span>
-                </div>
-                <small className="legend-pct">({dist.highPct}%)</small>
-                <strong className="legend-count">{dist.high}</strong>
-              </div>
-
-              <div
-                className="legend-item clickable"
-                onClick={() => onNavigateToTasks && onNavigateToTasks({ priority: "MEDIUM" })}
-                title="Filter tasks by Medium"
-              >
-                <div className="legend-header">
-                  <span className="legend-dot dot-med" />
-                  <span>Medium</span>
-                </div>
-                <small className="legend-pct">({dist.medPct}%)</small>
-                <strong className="legend-count">{dist.medium}</strong>
-              </div>
-
-              <div
-                className="legend-item clickable"
-                onClick={() => onNavigateToTasks && onNavigateToTasks({ priority: "LOW" })}
-                title="Filter tasks by Low"
-              >
-                <div className="legend-header">
-                  <span className="legend-dot dot-low" />
-                  <span>Low</span>
-                </div>
-                <small className="legend-pct">({dist.lowPct}%)</small>
-                <strong className="legend-count">{dist.low}</strong>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* 3. Bottom Row: Urgent 48h Tasks, Activity Feed & 90-Day Contribution Heatmap */}
-      <div className="dashboard-bottom-row">
-        {/* Urgent Tasks Due Within 48 Hours Feed (US-DASH-002, US-DASH-004) */}
-        <div className="dashboard-card urgent-tasks-card">
-          <div className="dashboard-card-header">
-            <div className="card-title-group">
-              <Clock size={18} className="text-rose" />
-              <h3>48h Urgent Tasks Feed</h3>
-            </div>
-            <span className="card-counter-tag tag-urgent">{urgentTasks.length} Imminent</span>
-          </div>
-          <div className="urgent-tasks-list">
-            {urgentTasks.length > 0 ? (
-              urgentTasks.map((task) => {
-                const isDone = task.status === "DONE" || completedTaskIds.has(task.id);
-                const dueInfo = getDueTimeLabel(task.dueDate);
-                return (
-                  <div
-                    key={task.id}
-                    className={`urgent-task-item ${isDone ? "is-done" : ""} ${
-                      dueInfo.isOverdue ? "is-overdue" : ""
-                    }`}
+                {/* Horizon Tab Filters */}
+                <div className="horizon-filter-pills" role="tablist">
+                  <button
+                    type="button"
+                    className={`horizon-tab ${horizonFilter === "all" ? "active" : ""}`}
+                    onClick={() => setHorizonFilter("all")}
                   >
+                    All Active ({allRawTasks.filter((t) => t.status !== "DONE").length})
+                  </button>
+                  <button
+                    type="button"
+                    className={`horizon-tab tab-overdue ${horizonFilter === "overdue" ? "active" : ""}`}
+                    onClick={() => setHorizonFilter("overdue")}
+                  >
+                    🔴 Overdue ({horizon.overdue.length})
+                  </button>
+                  <button
+                    type="button"
+                    className={`horizon-tab ${horizonFilter === "today" ? "active" : ""}`}
+                    onClick={() => setHorizonFilter("today")}
+                  >
+                    🟡 Today ({horizon.today.length})
+                  </button>
+                  <button
+                    type="button"
+                    className={`horizon-tab ${horizonFilter === "upcoming" ? "active" : ""}`}
+                    onClick={() => setHorizonFilter("upcoming")}
+                  >
+                    🔵 Next 7d ({horizon.upcoming.length})
+                  </button>
+                  <button
+                    type="button"
+                    className={`horizon-tab ${horizonFilter === "inReview" ? "active" : ""}`}
+                    onClick={() => setHorizonFilter("inReview")}
+                  >
+                    ⚪ In Review ({horizon.inReview.length})
+                  </button>
+                </div>
+              </div>
+
+              {/* Task Stream List with Inline Controls */}
+              <div className="horizon-tasks-container">
+                {displayedStreamTasks.length > 0 ? (
+                  <div className="horizon-task-rows">
+                    {displayedStreamTasks.map((task) => {
+                      const dueInfo = getDueTimeLabel(task.dueDate);
+                      const isPinned = lineupIds.includes(task.id);
+                      return (
+                        <div
+                          key={task.id}
+                          className={`horizon-task-row ${dueInfo.isOverdue ? "row-overdue" : ""}`}
+                        >
+                          {/* 1-Click Complete */}
+                          <button
+                            type="button"
+                            className="task-complete-toggle-btn"
+                            onClick={() => handleInlineStatusChange(task, "DONE")}
+                            title="Complete task"
+                          >
+                            <Circle size={15} />
+                          </button>
+
+                          {/* Task Key */}
+                          {task.project?.key && (
+                            <span className="task-row-key-badge">{task.project.key}-{task.id}</span>
+                          )}
+
+                          {/* Title & Project Name */}
+                          <div
+                            className="task-row-title-wrap"
+                            onClick={() => onNavigateToTasks && onNavigateToTasks()}
+                            style={{ cursor: "pointer" }}
+                          >
+                            <span className="task-row-title">{task.title}</span>
+                            <span className="task-row-project-name">
+                              {task.project?.name || "Global Workspace"}
+                            </span>
+                          </div>
+
+                          {/* Priority Flag */}
+                          <span className={`tag-priority mini tag-${(task.priority || "medium").toLowerCase()}`}>
+                            {task.priority}
+                          </span>
+
+                          {/* Due Date Indicator */}
+                          <div className={`task-due-indicator ${dueInfo.isOverdue ? "overdue" : ""}`}>
+                            <Calendar size={12} />
+                            <span>{dueInfo.label}</span>
+                          </div>
+
+                          {/* Inline Status Dropdown Select */}
+                          <div className="task-inline-status-picker">
+                            <select
+                              value={task.status}
+                              onChange={(e) => handleInlineStatusChange(task, e.target.value)}
+                              className={`status-select-pill status-${task.status.toLowerCase()}`}
+                              title="Change status"
+                            >
+                              {STATUS_OPTIONS.map((opt) => (
+                                <option key={opt.id} value={opt.id}>
+                                  {opt.label}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+
+                          {/* Quick Reschedule Nudge Button (for overdue or imminent tasks) */}
+                          {dueInfo.isOverdue && (
+                            <button
+                              type="button"
+                              className="reschedule-nudge-btn"
+                              onClick={() => handleRescheduleNudge(task, 1)}
+                              title="Push due date +1 Day"
+                            >
+                              +1d
+                            </button>
+                          )}
+
+                          {/* Pin to Lineup */}
+                          <button
+                            type="button"
+                            className={`pin-action-btn ${isPinned ? "is-pinned" : ""}`}
+                            onClick={() => toggleLineupPin(task.id)}
+                            title={isPinned ? "Unpin from Lineup" : "Pin to Lineup"}
+                          >
+                            <Pin size={13} />
+                          </button>
+                        </div>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <div className="horizon-empty-state">
+                    <CheckCircle2 size={32} className="text-emerald" />
+                    <h4>Zero tasks pending in this horizon</h4>
+                    <p>You have cleared all deliverables for this filter. Check other horizons or enjoy your day!</p>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Right Stream: Quick Scratchpad & Agenda */}
+            <div className="dashboard-right-stream-column">
+              {/* Quick Scratchpad (ClickUp Benchmark) */}
+              <div className="dashboard-card scratchpad-card">
+                <div className="dashboard-card-header">
+                  <div className="card-title-group">
+                    <Sparkles size={15} className="text-emerald" />
+                    <h3>Quick Scratchpad</h3>
+                  </div>
+                  {scratchSaved && <span className="scratch-saved-pill">Saved</span>}
+                </div>
+                <div className="scratchpad-body">
+                  <textarea
+                    value={scratchNotes}
+                    onChange={handleScratchpadChange}
+                    placeholder="Jot down quick thoughts, notes, or tasks..."
+                    className="scratchpad-textarea"
+                    rows={6}
+                  />
+                  <div className="scratchpad-footer">
+                    <small>Persisted locally in your workspace</small>
                     <button
                       type="button"
-                      className={`task-quick-check-btn ${isDone ? "checked" : ""}`}
-                      onClick={(e) => handleQuickComplete(e, task)}
-                      title={isDone ? "Task completed" : "Click to mark task as Done"}
-                      aria-label={`Mark ${task.title} as completed`}
+                      className="scratch-convert-btn"
+                      onClick={() => onOpenWizard && onOpenWizard()}
+                      title="Create formal project task"
                     >
-                      {isDone && <Check size={13} />}
+                      <Plus size={13} />
+                      <span>New Task</span>
                     </button>
-
-                    <div className="urgent-task-details">
-                      <div className="urgent-task-top-meta">
-                        {task.project?.key && (
-                          <span className="project-key-tag mini">{task.project.key}</span>
-                        )}
-                        <span className={`tag-priority mini tag-${(task.priority || "high").toLowerCase()}`}>
-                          {task.priority}
-                        </span>
-                        <span className={`due-time-badge ${dueInfo.isOverdue ? "overdue" : "imminent"}`}>
-                          <Clock size={11} /> {dueInfo.label}
-                        </span>
-                      </div>
-                      <strong className={`urgent-task-title ${isDone ? "strike" : ""}`}>
-                        {task.title}
-                      </strong>
-                    </div>
-
-                    <div className="urgent-task-assignee">
-                      {task.assignee ? (
-                        <span className="mini-avatar" title={`Assigned to ${task.assignee.name}`}>
-                          {task.assignee.name ? task.assignee.name[0] : "A"}
-                        </span>
-                      ) : (
-                        <span className="unassigned-pill">Unassigned</span>
-                      )}
-                    </div>
                   </div>
-                );
-              })
-            ) : (
-              <div className="empty-feed-placeholder">
-                <CheckCircle2 size={24} className="text-emerald" />
-                <span>All clear! No urgent tasks pending in the 48-hour delivery window.</span>
+                </div>
               </div>
-            )}
-          </div>
-        </div>
 
-        {/* Recent Workspace Activity Feed Stream (US-DASH-005) */}
-        <div className="dashboard-card activity-feed-card">
-          <div className="dashboard-card-header">
-            <div className="card-title-group">
-              <Activity size={18} className="text-blue" />
-              <h3>Workspace Activity</h3>
-            </div>
-            <span className="card-counter-tag">Live Trail</span>
-          </div>
-          <div className="activity-feed-list">
-            {activityFeed.length > 0 ? (
-              activityFeed.map((act) => (
-                <div key={act.id} className="activity-stream-item">
-                  <div className="activity-actor-avatar">
-                    {act.actor?.avatarUrl ? (
-                      <img src={act.actor.avatarUrl} alt={act.actor.name} className="actor-img" />
-                    ) : (
-                      <span className="actor-fallback">
-                        {act.actor?.name ? act.actor.name[0] : "S"}
-                      </span>
-                    )}
+              {/* Today's Agenda & Meetings */}
+              <div className="dashboard-card meetings-card">
+                <div className="dashboard-card-header">
+                  <div className="card-title-group">
+                    <Video size={15} className="text-emerald" />
+                    <h3>Today's Schedule</h3>
                   </div>
-                  <div className="activity-content">
-                    <p className="activity-text">
-                      <strong>{act.actor?.name || "System"}</strong>{" "}
-                      <span>{formatAuditAction(act.action, act.resourceType)}</span>
-                    </p>
-                    <div className="activity-meta">
-                      <span className="activity-resource-tag">{act.resourceType || "RESOURCE"}</span>
-                      <span className="activity-time">{formatRelativeTime(act.createdAt)}</span>
+                  <button
+                    type="button"
+                    className="card-view-more-btn"
+                    onClick={() => onNavigateToCalendar && onNavigateToCalendar()}
+                    title="Open calendar"
+                  >
+                    <span>Calendar</span>
+                    <ChevronRight size={13} />
+                  </button>
+                </div>
+                <div className="meetings-list">
+                  {(data?.upcomingMeetings || []).map((m) => (
+                    <div key={m.id} className="meeting-row-item">
+                      <div className="meeting-icon-box">
+                        <Video size={14} className="text-emerald" />
+                      </div>
+                      <div className="meeting-info">
+                        <strong>{m.title}</strong>
+                        <span>{m.date} · {m.platform}</span>
+                      </div>
+                      <button
+                        type="button"
+                        className="meeting-join-pill"
+                        onClick={() => window.open("https://meet.google.com", "_blank")}
+                        title="Open meeting room"
+                      >
+                        Join
+                        <ExternalLink size={10} />
+                      </button>
                     </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ====================================================================
+          4. "TEAM VELOCITY" ENGINE (Manager & Project Health Overview)
+          ==================================================================== */}
+      {activeTab === "team-velocity" && (
+        <div className="dashboard-team-velocity-grid">
+          {/* Active Projects Health Rollup (Excludes Archived / Ghost Projects) */}
+          <div className="dashboard-card active-projects-health-card">
+            <div className="dashboard-card-header">
+              <div className="card-title-group">
+                <FolderGit2 size={16} className="text-emerald" />
+                <h3>Active Project Health & Delivery Rollup</h3>
+                <span className="card-counter-tag">{recentProjects.length} active</span>
+              </div>
+              <button
+                type="button"
+                className="card-view-more-btn"
+                onClick={() => onNavigateToProjects && onNavigateToProjects()}
+                title="View all projects in workspace"
+              >
+                <span>View all projects</span>
+                <ChevronRight size={13} />
+              </button>
+            </div>
+
+            <div className="projects-health-table-wrap">
+              {recentProjects.length > 0 ? (
+                <table className="projects-health-table">
+                  <thead>
+                    <tr>
+                      <th>Project</th>
+                      <th>Health</th>
+                      <th>Progress</th>
+                      <th>Deliverables</th>
+                      <th>Team Members</th>
+                      <th>Activity</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {recentProjects.map((proj) => {
+                      const health = calculateProjectHealth(proj);
+                      return (
+                        <tr
+                          key={proj.id}
+                          className="project-health-row"
+                          onClick={() => {
+                            if (onNavigateToProjects) onNavigateToProjects();
+                            window.dispatchEvent(
+                              new CustomEvent("teamguard:filter-tasks", {
+                                detail: { projectId: proj.id },
+                              })
+                            );
+                          }}
+                        >
+                          <td className="project-cell-name">
+                            <div className="project-title-lockup">
+                              {proj.key && <span className="project-key-tag mini">{proj.key}</span>}
+                              <div>
+                                <strong>{proj.name}</strong>
+                                <small className="project-desc-text truncate">
+                                  {proj.description || "Active workspace track"}
+                                </small>
+                              </div>
+                            </div>
+                          </td>
+                          <td>
+                            <span className={`health-pill health-${health.tone}`}>
+                              <span className="health-dot" style={{ backgroundColor: health.color }} />
+                              {health.label}
+                            </span>
+                          </td>
+                          <td className="project-cell-progress">
+                            <div className="progress-info-row">
+                              <span>{proj.progress}%</span>
+                              <div className="progress-bar-track mini">
+                                <div
+                                  className="progress-bar-fill"
+                                  style={{
+                                    width: `${proj.progress}%`,
+                                    backgroundColor: health.color,
+                                  }}
+                                />
+                              </div>
+                            </div>
+                          </td>
+                          <td className="project-cell-counts">
+                            <span>
+                              {proj.tasksDone}/{proj.tasksTotal} tasks
+                            </span>
+                          </td>
+                          <td className="project-cell-team">
+                            <div className="team-avatars-stack">
+                              {(proj.team || []).slice(0, 3).map((m, idx) => (
+                                <span
+                                  key={idx}
+                                  className="member-avatar-circle"
+                                  title={m.name}
+                                >
+                                  {m.name ? m.name[0].toUpperCase() : "U"}
+                                </span>
+                              ))}
+                            </div>
+                          </td>
+                          <td className="project-cell-meta">
+                            <span className="meta-badge" title="Comments">
+                              <MessageSquare size={12} /> {proj.commentsCount || 0}
+                            </span>
+                            <span className="meta-badge" title="Files">
+                              <Paperclip size={12} /> {proj.attachmentsCount || 0}
+                            </span>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              ) : (
+                <div className="empty-subtle-box">
+                  <p>No active non-archived projects in this workspace.</p>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Velocity Radar & Recent Collaborative Activity Stream */}
+          <div className="velocity-secondary-row">
+            {/* Priority Distribution Bar */}
+            <div className="dashboard-card priority-velocity-card">
+              <div className="dashboard-card-header">
+                <div className="card-title-group">
+                  <Flame size={16} className="text-orange" />
+                  <h3>Priority Distribution Radar</h3>
+                  <span className="card-counter-tag">{dist.total} total</span>
+                </div>
+              </div>
+
+              <div className="stacked-bar-container">
+                <div className="stacked-bar-track">
+                  {dist.urgent > 0 && (
+                    <div
+                      className="stacked-segment segment-urgent"
+                      style={{ width: `${dist.urgentPct}%` }}
+                      title={`Urgent: ${dist.urgent} (${dist.urgentPct}%)`}
+                      onClick={() => onNavigateToTasks && onNavigateToTasks({ priority: "URGENT" })}
+                    />
+                  )}
+                  {dist.high > 0 && (
+                    <div
+                      className="stacked-segment segment-high"
+                      style={{ width: `${dist.highPct}%` }}
+                      title={`High: ${dist.high} (${dist.highPct}%)`}
+                      onClick={() => onNavigateToTasks && onNavigateToTasks({ priority: "HIGH" })}
+                    />
+                  )}
+                  {dist.medium > 0 && (
+                    <div
+                      className="stacked-segment segment-med"
+                      style={{ width: `${dist.medPct}%` }}
+                      title={`Medium: ${dist.medium} (${dist.medPct}%)`}
+                      onClick={() => onNavigateToTasks && onNavigateToTasks({ priority: "MEDIUM" })}
+                    />
+                  )}
+                  {dist.low > 0 && (
+                    <div
+                      className="stacked-segment segment-low"
+                      style={{ width: `${dist.lowPct}%` }}
+                      title={`Low: ${dist.low} (${dist.lowPct}%)`}
+                      onClick={() => onNavigateToTasks && onNavigateToTasks({ priority: "LOW" })}
+                    />
+                  )}
+                </div>
+
+                <div className="distribution-legend-grid">
+                  <div
+                    className="legend-item clickable"
+                    onClick={() => onNavigateToTasks && onNavigateToTasks({ priority: "URGENT" })}
+                  >
+                    <div className="legend-header">
+                      <span className="legend-dot dot-urgent" />
+                      <span>Urgent</span>
+                    </div>
+                    <small>({dist.urgentPct}%)</small>
+                    <strong>{dist.urgent}</strong>
+                  </div>
+                  <div
+                    className="legend-item clickable"
+                    onClick={() => onNavigateToTasks && onNavigateToTasks({ priority: "HIGH" })}
+                  >
+                    <div className="legend-header">
+                      <span className="legend-dot dot-high" />
+                      <span>High</span>
+                    </div>
+                    <small>({dist.highPct}%)</small>
+                    <strong>{dist.high}</strong>
+                  </div>
+                  <div
+                    className="legend-item clickable"
+                    onClick={() => onNavigateToTasks && onNavigateToTasks({ priority: "MEDIUM" })}
+                  >
+                    <div className="legend-header">
+                      <span className="legend-dot dot-med" />
+                      <span>Medium</span>
+                    </div>
+                    <small>({dist.medPct}%)</small>
+                    <strong>{dist.medium}</strong>
+                  </div>
+                  <div
+                    className="legend-item clickable"
+                    onClick={() => onNavigateToTasks && onNavigateToTasks({ priority: "LOW" })}
+                  >
+                    <div className="legend-header">
+                      <span className="legend-dot dot-low" />
+                      <span>Low</span>
+                    </div>
+                    <small>({dist.lowPct}%)</small>
+                    <strong>{dist.low}</strong>
                   </div>
                 </div>
-              ))
-            ) : (
-              <p className="empty-subtle">No recent audit activity recorded.</p>
-            )}
-          </div>
-        </div>
-      </div>
-
-      {/* 4. Full-Width 90-Day Contribution Heatmap (US-DASH-005, US-DASH-006) */}
-      <section className="dashboard-card contribution-heatmap-card">
-        <div className="dashboard-card-header">
-          <div className="card-title-group">
-            <Sparkles size={18} className="text-emerald" />
-            <div>
-              <h3>90-Day Workspace Output Matrix</h3>
-              <p className="card-subtitle-desc">
-                GitHub-style daily task completions and milestone delivery events over the past 13 weeks
-              </p>
+              </div>
             </div>
-          </div>
-          <div className="heatmap-header-stats">
-            <span className="heatmap-stat-item">
-              <strong>{heatmap.totalEvents}</strong> Total Deliveries
-            </span>
-            <span className="heatmap-stat-item">
-              <strong>{heatmap.activeDaysCount}</strong> / 91 Active Days
-            </span>
-          </div>
-        </div>
 
-        <div className="heatmap-matrix-wrapper">
-          <div className="heatmap-day-labels">
-            <span>Mon</span>
-            <span>Wed</span>
-            <span>Fri</span>
-          </div>
-
-          <div className="heatmap-grid-scrollable">
-            <div className="heatmap-matrix-columns">
-              {heatmap.weeks.map((week, wIdx) => (
-                <div key={wIdx} className="heatmap-column">
-                  {week.map((level, dIdx) => {
-                    const dayIndex = wIdx * 7 + dIdx;
-                    const dayData = heatmap.days[dayIndex];
-                    const tooltipText = dayData
-                      ? `${dayData.count} event${dayData.count !== 1 ? "s" : ""} on ${dayData.date}`
-                      : `Activity level: ${level}`;
-                    return (
-                      <div
-                        key={dIdx}
-                        className={`heatmap-matrix-cell heat-level-${level}`}
-                        title={tooltipText}
-                        onMouseEnter={() => setActiveTooltip(tooltipText)}
-                        onMouseLeave={() => setActiveTooltip(null)}
-                      />
-                    );
-                  })}
+            {/* Collaborative Activity Stream */}
+            <div className="dashboard-card team-activity-card">
+              <div className="dashboard-card-header">
+                <div className="card-title-group">
+                  <Zap size={16} className="text-emerald" />
+                  <h3>Workspace Activity Stream</h3>
                 </div>
-              ))}
+              </div>
+
+              <div className="team-activity-list">
+                {activityFeed.length > 0 ? (
+                  activityFeed.slice(0, 5).map((log) => (
+                    <div key={log.id} className="activity-item-row">
+                      <div className="activity-avatar-pill">
+                        {log.actor?.name ? log.actor.name[0].toUpperCase() : "A"}
+                      </div>
+                      <div className="activity-item-text">
+                        <div className="activity-item-title">
+                          <strong>{log.actor?.name || "Member"}</strong>{" "}
+                          <span>{formatAuditAction(log.action, log.resourceType)}</span>
+                        </div>
+                        <small className="activity-item-time">
+                          {formatRelativeTime(log.createdAt)}
+                        </small>
+                      </div>
+                    </div>
+                  ))
+                ) : (
+                  <p className="empty-subtle">No recent team activity recorded.</p>
+                )}
+              </div>
             </div>
           </div>
         </div>
-
-        <div className="heatmap-footer-legend">
-          <div className="heatmap-tooltip-display">
-            {activeTooltip ? <span>{activeTooltip}</span> : <span>Hover over any day cell to inspect deliverable count</span>}
-          </div>
-          <div className="heatmap-legend-scales">
-            <span className="scale-text">Less</span>
-            <span className="heatmap-matrix-cell heat-level-0 mini" />
-            <span className="heatmap-matrix-cell heat-level-1 mini" />
-            <span className="heatmap-matrix-cell heat-level-2 mini" />
-            <span className="heatmap-matrix-cell heat-level-3 mini" />
-            <span className="heatmap-matrix-cell heat-level-4 mini" />
-            <span className="scale-text">More</span>
-          </div>
-        </div>
-      </section>
-
-      {/* Notification Preferences Modal (US-NOTIF-003 / TG-NOTIF-003) */}
-      <NotificationPreferencesModal
-        isOpen={showPreferences}
-        onClose={() => setShowPreferences(false)}
-        activeOrg={activeOrg}
-        onShowNotice={onShowNotice}
-      />
+      )}
     </div>
   );
 }
+
+export default DashboardView;

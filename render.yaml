@@ -1,0 +1,55 @@
+# ==============================================================================
+# TeamGuard Backend - Render Free Tier Blueprint Specification
+# ==============================================================================
+# Docs: https://render.com/docs/blueprint-spec
+
+version: "1"
+
+services:
+  - type: web
+    name: teamguard-api
+    runtime: node
+    plan: free
+    region: oregon
+    rootDir: backend
+    buildCommand: npm install && npx prisma generate
+    startCommand: npm start
+    healthCheckPath: /health
+    autoDeploy: true
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 10000
+      - key: DATABASE_URL
+        sync: false
+        # Connect to your Render PostgreSQL database instance or Neon / Supabase URL
+      - key: JWT_ACCESS_SECRET
+        generateValue: true
+      - key: ACCESS_TOKEN_TTL
+        value: 15m
+      - key: REFRESH_TOKEN_TTL_DAYS
+        value: 30
+      - key: FRONTEND_ORIGIN
+        sync: false
+        # Set to your Netlify app domain, e.g. https://your-teamguard.netlify.app
+      - key: COOKIE_SAME_SITE
+        value: none
+      - key: COOKIE_SECURE
+        value: "true"
+      - key: BOOTSTRAP_ADMIN_NAME
+        value: System Administrator
+      - key: BOOTSTRAP_ADMIN_USERNAME
+        value: admin
+      - key: BOOTSTRAP_ADMIN_EMAIL
+        value: admin@teamguard.local
+      - key: BOOTSTRAP_ADMIN_PASSWORD
+        sync: false
+
+# Optional: Uncomment if provisioning a free Render PostgreSQL database directly
+# databases:
+#   - name: teamguard-db
+#     plan: free
+#     region: oregon
+#     databaseName: teamguard
+#     user: teamguard_user
