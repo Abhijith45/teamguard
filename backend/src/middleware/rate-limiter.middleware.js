@@ -24,6 +24,46 @@ export const authRateLimiter = rateLimit({
 });
 
 /**
+ * Global rate limiter across all public/tenant API routes (300 req / 5 min).
+ * Defends against API flooding, DoS, and scraping.
+ */
+export const globalRateLimiter = rateLimit({
+  windowMs: 5 * 60 * 1000,
+  max: isTestEnv ? 10000 : Number(process.env.GLOBAL_RATE_LIMIT_MAX ?? 300),
+  standardHeaders: true,
+  legacyHeaders: false,
+  statusCode: 429,
+  skip: (req) => isTestEnv || req.path === "/health" || req.path === "/api/health",
+  handler: (req, res, _next, options) => {
+    res.status(options.statusCode).json({
+      error: "Too Many Requests",
+      message: "Request rate limit exceeded. Please slow down.",
+      retryAfterSeconds: Math.ceil(options.windowMs / 1000),
+    });
+  },
+});
+
+/**
+ * Mutation rate limiter for state-modifying requests (POST/PUT/PATCH/DELETE) (150 req / 10 min).
+ * Defends against write-amplification and automated spamming.
+ */
+export const mutationRateLimiter = rateLimit({
+  windowMs: 10 * 60 * 1000,
+  max: isTestEnv ? 5000 : Number(process.env.MUTATION_RATE_LIMIT_MAX ?? 150),
+  standardHeaders: true,
+  legacyHeaders: false,
+  statusCode: 429,
+  skip: (req) => isTestEnv || ["GET", "HEAD", "OPTIONS"].includes(req.method),
+  handler: (req, res, _next, options) => {
+    res.status(options.statusCode).json({
+      error: "Too Many Requests",
+      message: "Too many write operations. Please slow down.",
+      retryAfterSeconds: Math.ceil(options.windowMs / 1000),
+    });
+  },
+});
+
+/**
  * Test helper to reset rate limit counters for a specific IP or local test runners.
  */
 export async function resetAuthRateLimiter(ip = "127.0.0.1") {

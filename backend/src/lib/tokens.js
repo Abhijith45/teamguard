@@ -17,6 +17,7 @@ export function signAccessToken(userId) {
     expiresIn: process.env.ACCESS_TOKEN_TTL ?? "15m",
     issuer: TOKEN_ISSUER,
     audience: TOKEN_AUDIENCE,
+    algorithm: "HS256",
   });
 }
 
@@ -24,6 +25,7 @@ export function verifyAccessToken(token) {
   return jwt.verify(token, accessSecret(), {
     issuer: TOKEN_ISSUER,
     audience: TOKEN_AUDIENCE,
+    algorithms: ["HS256"],
   });
 }
 

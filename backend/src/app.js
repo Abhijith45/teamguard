@@ -4,7 +4,8 @@ import cookieParser from "cookie-parser";
 import express from "express";
 import helmet from "helmet";
 import { prisma } from "../config/prisma.js";
-import { authRateLimiter } from "./middleware/rate-limiter.middleware.js";
+import { authRateLimiter, globalRateLimiter, mutationRateLimiter } from "./middleware/rate-limiter.middleware.js";
+import { authenticate } from "./middleware/authenticate.js";
 import authRoutes from "./routes/auth.routes.js";
 import organizationsRoutes from "./routes/organizations.routes.js";
 import dashboardRoutes from "./routes/dashboard.routes.js";
@@ -97,6 +98,8 @@ app.use(
 app.use(express.json({ limit: "1mb" }));
 app.use(cookieParser());
 app.use(conditionalETagMiddleware);
+app.use(globalRateLimiter);
+app.use(mutationRateLimiter);
 
 // 3. Database Connectivity Health Check (TASK-004 / OPS-06)
 app.get(["/health", "/api/health"], async (_req, res) => {
@@ -145,14 +148,24 @@ app.use("/api/audit", auditRoutes);
 app.use("/api/notifications", notificationsRoutes);
 app.use("/api/search", searchRoutes);
 app.use("/api/demo", demoRoutes);
-// Cache Telemetry & Diagnostics (TASK-CACHE)
-app.get(["/api/platform/cache-stats", "/api/v1/platform/cache-stats"], (_req, res) => {
-  res.json({
-    status: "healthy",
-    cache: cache.getStats(),
-    timestamp: new Date().toISOString(),
-  });
-});
+// Cache Telemetry & Diagnostics (Protected Platform Metric Endpoint)
+app.get(
+  ["/api/platform/cache-stats", "/api/v1/platform/cache-stats"],
+  authenticate,
+  (req, res, next) => {
+    if (!req.auth?.isPlatformAdmin) {
+      return res.status(403).json({ error: "Platform admin access required" });
+    }
+    next();
+  },
+  (_req, res) => {
+    res.json({
+      status: "healthy",
+      cache: cache.getStats(),
+      timestamp: new Date().toISOString(),
+    });
+  }
+);
 
 app.use("/api/platform", platformRoutes);
 app.use("/api/v1/platform", platformRoutes);

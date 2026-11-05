@@ -32,6 +32,22 @@ const personaEmailMap = {
 
 export async function switchPersona(req, res, next) {
   try {
+    const isDemoEnabled = process.env.DEMO_MODE_ENABLED !== "false";
+    if (!isDemoEnabled) {
+      return res.status(403).json({ error: "Demo mode is disabled in this environment" });
+    }
+
+    const allowedIps = (process.env.DEMO_ALLOWED_IPS || "")
+      .split(",")
+      .map((s) => s.trim())
+      .filter(Boolean);
+    if (allowedIps.length > 0) {
+      const clientIp = req.ip || req.socket?.remoteAddress;
+      if (!allowedIps.includes(clientIp)) {
+        return res.status(403).json({ error: "Demo access is restricted" });
+      }
+    }
+
     const { persona, organizationSlug } = switchSchema.parse(req.body);
     let targetEmail = personaEmailMap[persona];
     if (organizationSlug === "nova-labs" && persona === "super-admin") {

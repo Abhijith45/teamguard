@@ -184,14 +184,15 @@ export async function registerUser(input, metadata) {
       },
     });
 
-    // Assign all existing permissions to Super Admin role
+    // Assign all existing permissions to Super Admin role in bulk
     const allPermissions = await tx.permission.findMany();
-    for (const perm of allPermissions) {
-      await tx.rolePermission.create({
-        data: {
+    if (allPermissions.length > 0) {
+      await tx.rolePermission.createMany({
+        data: allPermissions.map((perm) => ({
           roleId: superAdminRole.id,
           permissionId: perm.id,
-        },
+        })),
+        skipDuplicates: true,
       });
     }
 
@@ -213,7 +214,7 @@ export async function registerUser(input, metadata) {
     });
 
     return newUser;
-  });
+  }, { timeout: 20000 });
 
   return createSession(user.id, metadata, null, input.rememberMe ?? true);
 }
@@ -226,7 +227,9 @@ export async function loginUser(identifier, password, metadata, activeOrgId = nu
     },
   });
 
-  const passwordMatches = user ? await bcrypt.compare(password, user.passwordHash) : false;
+  // Always run bcrypt comparison (constant time) even if user doesn't exist to eliminate account enumeration timing side-channels
+  const DUMMY_HASH = "$2b$10$wE8wOq15Jm23KdfN9l8iQeTf0bW6f4Q0.3rV2mP9Y8h9x3A1b8rYe";
+  const passwordMatches = await bcrypt.compare(password, user?.passwordHash ?? DUMMY_HASH);
   if (!user || !user.isActive || !passwordMatches) {
     throw new HttpError(401, "Invalid username/email or password");
   }

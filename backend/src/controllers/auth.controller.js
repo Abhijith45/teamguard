@@ -13,11 +13,52 @@ import {
   updateUserProfile,
 } from "../services/auth.service.js";
 
+const ALLOWED_AVATAR_HOSTNAMES = [
+  "images.unsplash.com",
+  "avatars.githubusercontent.com",
+  "lh3.googleusercontent.com",
+  "cdn.discordapp.com",
+  "ui-avatars.com",
+  "gravatar.com",
+  "www.gravatar.com",
+  "example.com",
+  "localhost",
+  "127.0.0.1",
+];
+
+function isAllowedAvatarUrl(url) {
+  if (!url) return true;
+  try {
+    const parsed = new URL(url);
+    if (!["http:", "https:"].includes(parsed.protocol)) return false;
+    return ALLOWED_AVATAR_HOSTNAMES.some(
+      (h) => parsed.hostname === h || parsed.hostname.endsWith(`.${h}`)
+    );
+  } catch {
+    return false;
+  }
+}
+
+export function isStrongPassword(password) {
+  if (typeof password !== "string") return false;
+  return (
+    /[A-Z]/.test(password) &&
+    /[a-z]/.test(password) &&
+    /[0-9]/.test(password) &&
+    /[!@#$%^&*()_+\-=[\]{}|;':",.<>?/`~\\^]/.test(password)
+  );
+}
+
 const registerSchema = z.object({
   name: z.string().trim().min(2).max(80),
   username: z.string().trim().toLowerCase().regex(/^[a-z0-9_]{3,32}$/),
   email: z.string().trim().toLowerCase().email().max(254),
-  password: z.string().min(8).max(128).refine(passwordFitsBcrypt, "Password must be no more than 72 UTF-8 bytes"),
+  password: z
+    .string()
+    .min(8)
+    .max(128)
+    .refine(passwordFitsBcrypt, "Password must be no more than 72 UTF-8 bytes")
+    .refine(isStrongPassword, "Password must contain uppercase, lowercase, digit, and special character"),
   rememberMe: z.boolean().optional().default(true),
 }).strict();
 
@@ -31,14 +72,26 @@ const profileUpdateSchema = z.object({
   name: z.string().trim().min(2).max(80).optional(),
   email: z.string().trim().toLowerCase().email().max(254).optional(),
   username: z.string().trim().toLowerCase().regex(/^[a-z0-9_]{3,32}$/).optional(),
-  avatarUrl: z.string().trim().url().max(1024).nullable().optional(),
+  avatarUrl: z
+    .string()
+    .trim()
+    .url()
+    .max(1024)
+    .refine(isAllowedAvatarUrl, "Avatar URL must use http(s) from a trusted image host")
+    .nullable()
+    .optional(),
 }).strict().refine((data) => Object.keys(data).length > 0, {
   message: "At least one profile field must be provided for update",
 });
 
 const changePasswordSchema = z.object({
   currentPassword: z.string().min(1).max(128).refine(passwordFitsBcrypt, "Current password must be no more than 72 UTF-8 bytes"),
-  newPassword: z.string().min(8).max(128).refine(passwordFitsBcrypt, "New password must be no more than 72 UTF-8 bytes"),
+  newPassword: z
+    .string()
+    .min(8)
+    .max(128)
+    .refine(passwordFitsBcrypt, "New password must be no more than 72 UTF-8 bytes")
+    .refine(isStrongPassword, "New password must contain uppercase, lowercase, digit, and special character"),
   revokeOtherSessions: z.boolean().optional().default(true),
 }).strict();
 

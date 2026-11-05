@@ -7,12 +7,20 @@ import { globalSearchService } from "../services/search.service.js";
 export async function globalSearch(req, res, next) {
   try {
     const organizationId = req.organizationId;
-    const query = req.query.q || req.query.query || "";
+    const rawQuery = String(req.query.q || req.query.query || "").trim();
+
+    if (rawQuery.length > 100) {
+      return res.status(400).json({ error: "Search query too long (maximum 100 characters)" });
+    }
+
+    // Strip unprintable control characters and dangerous HTML delimiters
+    const sanitizedQuery = rawQuery.replace(/[\x00-\x1f\x7f<>&"]/g, "").trim();
+
     const limit = req.query.limit;
 
     const data = await globalSearchService({
       organizationId,
-      query,
+      query: sanitizedQuery,
       limit,
     });
 

@@ -13,13 +13,27 @@ export function errorHandler(error, _req, res, _next) {
 
   const statusCode = error.statusCode ?? 500;
   if (statusCode >= 500) {
-    console.error(error);
+    console.error(
+      JSON.stringify({
+        level: "error",
+        message: error.message,
+        code: error.code,
+        stack: process.env.NODE_ENV !== "production" ? error.stack : undefined,
+        timestamp: new Date().toISOString(),
+      })
+    );
   }
 
   const payload = {
     error: statusCode >= 500 ? "Internal server error" : error.message,
   };
-  if (error.code && typeof error.code === "string" && !error.code.startsWith("P2")) {
+  // Only surface safe application-level error codes (never ORM or internal database codes)
+  if (
+    error.code &&
+    typeof error.code === "string" &&
+    !error.code.startsWith("P") &&
+    !error.code.startsWith("DB_")
+  ) {
     payload.code = error.code;
   }
   if (error.field) {
