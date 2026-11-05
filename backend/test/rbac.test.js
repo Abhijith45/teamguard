@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import app from "../src/app.js";
 import http from "node:http";
+import { prisma } from "../config/prisma.js";
 
 let server;
 let baseUrl;
@@ -151,11 +152,12 @@ test("5. Tenant Isolation: Cannot access an organization without active membersh
   });
   const token = auth.data.accessToken;
 
-  // Send request with Nova Labs org ID (id: 2)
+  // Send request with Nova Labs org ID
+  const novaOrg = await prisma.organization.findUnique({ where: { slug: "nova-labs" } });
   const fakeOrgRes = await api("/api/dashboard", {
     headers: {
       authorization: `Bearer ${token}`,
-      "x-organization-id": "2", // Nova Labs
+      "x-organization-id": String(novaOrg.id), // Nova Labs
     },
   });
 

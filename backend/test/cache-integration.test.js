@@ -40,6 +40,7 @@ describe("TASK-CACHE: Multi-Tier Caching Integration & ETag Testing", () => {
 
     acmeOrg = await prisma.organization.findUnique({ where: { slug: "acme-corp" } });
     superAdminUser = await prisma.user.findUnique({ where: { email: "admin@teamguard.io" } });
+    await prisma.user.update({ where: { id: superAdminUser.id }, data: { isPlatformAdmin: true } });
     superAdminToken = signAccessToken(superAdminUser.id);
   });
 
@@ -50,7 +51,9 @@ describe("TASK-CACHE: Multi-Tier Caching Integration & ETag Testing", () => {
   });
 
   test("REQ 1 [Platform Cache Diagnostics]: GET /api/platform/cache-stats returns telemetry", async () => {
-    const res = await api("/api/platform/cache-stats");
+    const res = await api("/api/platform/cache-stats", {
+      headers: { authorization: `Bearer ${superAdminToken}` },
+    });
     assert.equal(res.status, 200);
     assert.equal(res.data.status, "healthy");
     assert.ok(res.data.cache);

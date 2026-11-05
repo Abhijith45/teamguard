@@ -126,12 +126,13 @@ test("TASK-001 [REQ 4]: Unknown organization or unjoined organization returns HT
   assert.equal(unknownOrgRes.status, 403, "Expected 403 for non-existent organization ID");
   assert.match(unknownOrgRes.data.error, /Access denied/i);
 
-  // Case B: Known organization where user holds NO membership (Alex Chen is only in Acme Corp, org 1)
+  // Case B: Known organization where user holds NO membership (Alex Chen is only in Acme Corp, not Nova Labs)
   const { token: managerToken } = await getAuthToken("project-manager", "acme-corp");
+  const novaOrg = await prisma.organization.findUnique({ where: { slug: "nova-labs" } });
   const unjoinedOrgRes = await api("/api/dashboard", {
     headers: {
       authorization: `Bearer ${managerToken}`,
-      "x-organization-id": "2", // Nova Labs
+      "x-organization-id": String(novaOrg.id), // Nova Labs
     },
   });
   assert.equal(unjoinedOrgRes.status, 403, "Expected 403 when user is not a member of the organization");
