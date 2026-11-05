@@ -5,7 +5,20 @@ import { validateDatabaseUrl } from "./database-url.js";
 
 const globalForPrisma = globalThis;
 const connectionString = validateDatabaseUrl(process.env.DATABASE_URL);
-const adapter = new PrismaPg({ connectionString });
+
+// Automatically detect Supabase / production SSL requirements
+const isProduction = process.env.NODE_ENV === "production";
+const isSupabase =
+  connectionString.includes("supabase.co") ||
+  connectionString.includes("supabase.com") ||
+  connectionString.includes("pooler.supabase.com");
+const requiresSsl =
+  isSupabase || isProduction || connectionString.includes("sslmode=require");
+
+const adapter = new PrismaPg({
+  connectionString,
+  ...(requiresSsl ? { ssl: { rejectUnauthorized: false } } : {}),
+});
 
 export const prisma = globalForPrisma.prisma ?? new PrismaClient({ adapter });
 

@@ -8,6 +8,6 @@ export default defineConfig({
     seed: "node config/seed.js",
   },
   datasource: {
-    url: env("DATABASE_URL"),
+    url: env("DIRECT_URL") || env("DATABASE_URL"),
   },
 });

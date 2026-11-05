@@ -154,6 +154,16 @@ flowchart LR
   - `FRONTEND_ORIGIN` whitelist permitting the Netlify app domain.
   - `COOKIE_SAME_SITE=none` and `COOKIE_SECURE=true` enabling cross-domain refresh token cookies between Netlify and Render.
 
+### 6.3 Database Architecture (Supabase Managed PostgreSQL)
+- **Engine**: Managed PostgreSQL 14+ on Supabase with SSL enforcement.
+- **Connection Routing**:
+  - Runtime queries utilize Supavisor Connection Pooler on port 6543 (`DATABASE_URL`).
+  - Schema migrations and deployment utilize Direct Connection on port 5432 (`DIRECT_URL`).
+- **Production Initialization Script (`init-production-db.js`)**:
+  - Applies database schema migrations and relational constraints via `npx prisma migrate deploy`.
+  - Seeds the canonical 36-permission RBAC catalogue.
+  - Guarantees zero test/demo records (0 demo organizations, 0 sample projects, 0 mock tasks).
+
 ---
 
 ## 7. Security & Compliance Invariants

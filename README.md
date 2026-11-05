@@ -129,9 +129,46 @@ rbac/
 
 ## 🚀 Live Cloud Deployment Guide
 
-TeamGuard is optimized for zero-cost deployment on the **Netlify Free Tier** (Frontend) and **Render Free Tier** (Backend + Database).
+TeamGuard is designed for modern cloud architectures, supporting:
+- **Database**: [Supabase Managed PostgreSQL](https://supabase.com/) (or Render / Neon)
+- **Backend API**: [Render Free Tier](https://render.com/) (Node.js ESM)
+- **Frontend SPA**: [Netlify Free Tier](https://www.netlify.com/) (Vite Static Hosting)
 
-### 1. Deploy Backend to Render (Free Tier)
+---
+
+### 1. Database Provisioning & Initialization (Supabase)
+
+#### Step 1: Create a Supabase Project
+1. Log in to your [Supabase Dashboard](https://supabase.com/dashboard) and click **New project**.
+2. Select an organization, name your project (e.g. `teamguard-prod`), and assign a strong database password.
+3. In **Project Settings** → **Database**, locate your connection strings:
+   - **Connection Pooler (Port 6543, Transaction mode)**: Recommended for application queries (`DATABASE_URL`).
+   - **Direct Connection (Port 5432, Session mode)**: Required for running schema migrations (`DIRECT_URL`).
+
+#### Step 2: Initialize Tables with Zero Test Data
+TeamGuard includes an automated production database initialization script that applies all 27 tables, creates relational foreign keys, catalogs the canonical RBAC permissions matrix, and guarantees **zero mock/test data**:
+
+```bash
+cd backend
+
+# Configure your Supabase connection strings in .env:
+# DATABASE_URL="postgresql://postgres.[project-ref]:[password]@aws-0-[region].pooler.supabase.com:6543/postgres?pgbouncer=true&sslmode=require"
+# DIRECT_URL="postgresql://postgres.[project-ref]:[password]@aws-0-[region].pooler.supabase.com:5432/postgres?sslmode=require"
+
+# Run the production initialization script
+npm run db:init:prod
+```
+
+The script will:
+- Validate SSL connectivity against Supabase.
+- Apply production schema migrations (`npx prisma migrate deploy`).
+- Sync all 36 canonical system permissions.
+- Audit table counts to ensure **0 test users, 0 demo organizations, and 0 dummy tasks**.
+- Optionally provision a clean Administrator account if `BOOTSTRAP_ADMIN_EMAIL` and `BOOTSTRAP_ADMIN_PASSWORD` are provided in the environment.
+
+---
+
+### 2. Deploy Backend to Render (Free Tier)
 
 #### Option A: One-Click Render Blueprint (Recommended)
 1. Fork or push this repository to your GitHub account.
@@ -173,7 +210,7 @@ TeamGuard is optimized for zero-cost deployment on the **Netlify Free Tier** (Fr
 
 ---
 
-### 2. Deploy Frontend to Netlify (Free Tier)
+### 3. Deploy Frontend to Netlify (Free Tier)
 
 1. Sign in to your [Netlify Dashboard](https://app.netlify.com/).
 2. Click **Add new site** → **Import an existing project** → **GitHub**.
@@ -261,6 +298,27 @@ Verified test coverage includes:
 cd frontend
 npm test
 ```
+
+---
+
+## 🔄 CI/CD Automation Pipeline
+
+The repository includes a production-grade GitHub Actions workflow (`.github/workflows/ci.yml`) enforcing multi-stage quality gates on every push and pull request to `main`:
+
+```mermaid
+flowchart LR
+    A["Push / PR to main"] --> B["Backend Tests & DB Init Check"]
+    A --> C["Frontend Unit Tests & Vite Build"]
+    A --> D["Docker Packaging Validation"]
+    B & C --> E["Playwright End-to-End Regression"]
+    E & D --> F["Production Release Gate Check"]
+```
+
+1. **Backend Verification**: Boots a PostgreSQL service container, executes Prisma migrations, verifies the production database initialization script with zero test records, and executes the automated test suite.
+2. **Frontend Verification**: Runs all 113 unit/component tests, compiles the Vite production bundle, and validates `dist/index.html` and Netlify `dist/_redirects`.
+3. **Docker Packaging**: Validates container configurations and builds hardened production Docker images.
+4. **Playwright E2E**: Boots both servers in CI and runs user journey regression tests with browser automation.
+5. **Production Release Gate**: Enforces that all jobs pass with 100% success before green-lighting release.
 
 ---
 
