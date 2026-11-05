@@ -29,7 +29,7 @@ describe("TASK-603: CI/CD Quality Gates, E2E Regression Suite & Final Release Ve
 
     // PostgreSQL Container Health Check in CI
     assert.match(content, /image:\s*postgres:16-alpine/, "Must declare PostgreSQL 16 Alpine service");
-    assert.match(content, /--health-cmd\s*pg_isready/, "Postgres service must declare pg_isready healthcheck");
+    assert.match(content, /--health-cmd\s*["']?pg_isready/, "Postgres service must declare pg_isready healthcheck");
 
     // Node.js version
     assert.match(content, /NODE_VERSION:\s*["']?22["']?|node-version:\s*(\${{\s*env\.NODE_VERSION\s*}}|["']?22["']?)/, "Must test on Node.js 22 LTS");
