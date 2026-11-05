@@ -103,6 +103,36 @@ async function main() {
     console.log(`  User     : ${info.db_user}`);
     console.log(`  Schema   : ${info.schema_name}`);
     console.log(`  Version  : ${info.pg_version.split(",")[0]}`);
+
+    // Check for previous failed migrations or partial schema state
+    let shouldResetSchema = process.argv.includes("--clean-reset") || process.argv.includes("--force");
+    try {
+      const failedCheck = await client.query(`
+        SELECT migration_name FROM "_prisma_migrations"
+        WHERE finished_at IS NULL OR rolled_back_at IS NOT NULL
+      `);
+      if (failedCheck.rows.length > 0) {
+        console.warn(`\n  [RECOVERY] Detected ${failedCheck.rows.length} failed migration(s) from earlier attempt:`);
+        for (const row of failedCheck.rows) {
+          console.warn(`    - ${row.migration_name}`);
+        }
+        console.warn(`  [RECOVERY] Automatically resetting partial public schema to apply consolidated schema...`);
+        shouldResetSchema = true;
+      }
+    } catch {
+      // _prisma_migrations doesn't exist yet (fresh database)
+    }
+
+    if (shouldResetSchema) {
+      await client.query(`
+        DROP SCHEMA IF EXISTS public CASCADE;
+        CREATE SCHEMA public;
+        GRANT ALL ON SCHEMA public TO postgres;
+        GRANT ALL ON SCHEMA public TO public;
+      `);
+      console.log(`  [RECOVERY] Public schema reset successfully.`);
+    }
+
     await client.end();
   } catch (err) {
     console.error(`  Connection Probe Failed: ${err.message}`);
